@@ -1,0 +1,44 @@
+/* Hamburger button */
+.hamburger {
+  display: flex;
+  align-items: center;
+}
+
+.hamburgerInput {
+  display: none;
+}
+
+.hamburgerLabel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.line {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
+  transform-origin: center;
+}
+
+.hamburgerInput:checked+.hamburgerLabel .line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.hamburgerInput:checked+.hamburgerLabel .line:nth-child(2) {
+  opacity: 0;
+  transform: translateX(-7px);
+}
+
+.hamburgerInput:checked+.hamburgerLabel .line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}

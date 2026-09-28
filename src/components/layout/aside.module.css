@@ -1,0 +1,89 @@
+.aside {
+  grid-area: aside;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  transition:
+    width 0.3s ease,
+    padding 0.3s ease;
+  overflow: hidden;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+}
+
+.menuItem:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+/* Collapsed aside */
+.asideCollapsed {
+  width: 60px;
+  padding: 1rem 0.5rem;
+  align-items: center;
+}
+
+.menuLabel {
+  opacity: 1;
+  width: auto;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    opacity 0.2s ease 0.1s,
+    width 0.3s ease;
+}
+
+.asideCollapsed .menuLabel {
+  opacity: 0;
+  width: 0;
+  transition:
+    opacity 0.15s ease,
+    width 0.3s ease;
+}
+
+.asideCollapsed .menuItem {
+  display: none;
+}
+
+.asideCollapsed .header {
+  display: none;
+}
+
+.header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.header>svg {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+}
+
+.headerText h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.headerText :nth-child(2) {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}

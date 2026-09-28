@@ -1,31 +1,46 @@
+"use client";
+
+import { useState } from "react";
 import {
-  ChartNoAxesColumn,
-  Package,
-  Settings,
-  ShoppingCart,
-  TrendingDown,
-  TrendingUp,
+  BarChart3,
+  Boxes,
+  CreditCard,
+  WalletCards,
+  CircleDollarSign,
 } from "lucide-react";
-import style from "../../app/layout.module.css";
+import style from "./aside.module.css";
+import HamburgerButton from "./HamburgerButton";
 
 const sections = [
-  { label: "Resumen", Icon: ChartNoAxesColumn },
-  { label: "Ingresos", Icon: TrendingUp },
-  { label: "Gastos", Icon: TrendingDown },
-  { label: "Productos", Icon: Package },
-  { label: "Ventas", Icon: ShoppingCart },
-  { label: "Configuración", Icon: Settings },
+  { label: "Resumen", Icon: BarChart3 },
+  { label: "Productos", Icon: Boxes },
+  { label: "Registrar Venta", Icon: CreditCard },
+  { label: "Gastos", Icon: WalletCards },
 ];
 
 export default function Aside() {
+  const [isOpen, setIsOpen] = useState(true);
+
   return (
-    <aside className={style.aside}>
-      <span>Menú Lateral</span>
+    <aside className={`${style.aside} ${!isOpen ? style.asideCollapsed : ""}`}>
+      <HamburgerButton
+        checked={isOpen}
+        onToggle={() => setIsOpen((prev) => !prev)}
+        setIsOpen={setIsOpen}
+      />
+      <header className={style.header}>
+        <CircleDollarSign />
+
+        <div className={style.headerText}>
+          <h1>Caja Simple</h1>
+          <span>Control de caja diario</span>
+        </div>
+      </header>
       <nav className={style.menu}>
         {sections.map(({ label, Icon }) => (
           <a key={label} href="#" className={style.menuItem}>
             <Icon size={18} />
-            {label}
+            <span className={style.menuLabel}>{label}</span>
           </a>
         ))}
       </nav>
