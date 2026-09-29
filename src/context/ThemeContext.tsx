@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useMemo,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
+import { createContext, useSyncExternalStore, type ReactNode } from "react";
 
 type Theme = "light" | "dark";
 
@@ -37,20 +31,16 @@ function subscribe(callback: () => void) {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const theme = useSyncExternalStore(
-    subscribe,
-    getClientTheme,
-    getServerTheme,
-  );
+  const theme = useSyncExternalStore(subscribe, getClientTheme, getServerTheme);
 
-  const toggleTheme = useCallback(() => {
+  const toggleTheme = () => {
     const next: Theme = theme === "light" ? "dark" : "light";
     localStorage.setItem(STORAGE_KEY, next);
     document.documentElement.setAttribute("data-theme", next);
     window.dispatchEvent(new Event("storage"));
-  }, [theme]);
+  };
 
-  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
+  const value = { theme, toggleTheme };
 
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

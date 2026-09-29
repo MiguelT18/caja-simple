@@ -29,7 +29,9 @@ export default function Aside() {
         setIsOpen={setIsOpen}
       />
       <header className={style.header}>
-        <CircleDollarSign />
+        <span className={style.headerIcon}>
+          <CircleDollarSign width={32} height={32} />
+        </span>
 
         <div className={style.headerText}>
           <h1>Caja Simple</h1>

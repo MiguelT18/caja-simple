@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+
+    "ejercicios": "tsx src/scripts/ejercicios/run.ts",
+    "ejercicios:watch": "tsx watch src/scripts/ejercicios/run.ts"
   },
   "dependencies": {
     "lucide-react": "^1.48.0",
@@ -18,8 +21,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   },
   "packageManager": "pnpm@12.6.0"
