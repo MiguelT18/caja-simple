@@ -30,7 +30,7 @@ export default function Aside() {
       />
       <header className={style.header}>
         <span className={style.headerIcon}>
-          <CircleDollarSign width={32} height={32} />
+          <CircleDollarSign width={20} height={20} />
         </span>
 
         <div className={style.headerText}>

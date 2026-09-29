@@ -3,6 +3,13 @@
   --foreground: #171717;
   --color-text: #1a1a2e;
   --color-text-secondary: #6b7280;
+  --color-primary: #153f3a;
+
+  --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+  --text-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
+  --text-md: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+  --text-lg: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
+  --text-xl: clamp(1.5rem, 1.3rem + 1vw, 2rem);
 }
 
 [data-theme="dark"] {
@@ -20,6 +27,10 @@
   font-size: 100%;
   font: inherit;
   vertical-align: baseline;
+}
+
+html {
+  font-size: 62.5%;
 }
 
 html,
@@ -82,9 +93,34 @@ body {
     sans-serif;
 }
 
+main {
+  height: 100dvh;
+  overflow-y: auto;
+}
+
 a {
   color: inherit;
   text-decoration: none;
+}
+
+.text-xs {
+  font-size: var(--text-xs);
+}
+
+.text-sm {
+  font-size: var(--text-sm);
+}
+
+.text-md {
+  font-size: var(--text-md);
+}
+
+.text-lg {
+  font-size: var(--text-lg);
+}
+
+.text-xl {
+  font-size: var(--text-xl);
 }
 
 /*

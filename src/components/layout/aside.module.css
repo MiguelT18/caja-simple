@@ -65,14 +65,15 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  margin-top: 0.25rem;
 }
 
 .headerIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   background-color: var(--color-primary);
-  border: 2px solid red;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
 }
 
 .headerText {
@@ -82,7 +83,7 @@
 
 .headerText h1 {
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text);
 }
 
