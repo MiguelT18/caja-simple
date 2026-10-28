@@ -1,0 +1,167 @@
+/* Tokens de diseño de Caja Simple. Ver DESIGN.md para las reglas de uso. */
+
+:root {
+	color-scheme: light dark;
+
+	/* Neutros cálidos */
+	--color-bg: #faf8f5;
+	--color-surface: #ffffff;
+	--color-surface-muted: #f3efe9;
+	--color-border: #e7e1d8;
+	--color-border-strong: #d3cabd;
+	--color-text: #1f1a17;
+	--color-text-muted: #6b625a;
+	--color-text-subtle: #8f857b;
+
+	/* Marca: ámbar / caramelo */
+	--color-primary: #b45309;
+	--color-primary-hover: #92400e;
+	--color-primary-soft: #fdf1e3;
+	--color-on-primary: #ffffff;
+	--color-focus: #d97706;
+
+	/* Colores con significado */
+	--color-income: #2a7548;
+	--color-income-soft: #e8f5ec;
+	--color-expense: #b4233c;
+	--color-expense-soft: #fcebee;
+	--color-warning: #8a6100;
+	--color-warning-soft: #fef6d8;
+	--color-info: #2b6cb0;
+	--color-info-soft: #e8f1fb;
+
+	/* Turnos */
+	--color-shift-morning: #1f6f99;
+	--color-shift-morning-soft: #e4f2fa;
+	--color-shift-afternoon: #c2410c;
+	--color-shift-afternoon-soft: #ffede3;
+	--color-shift-night: #4c3fb0;
+	--color-shift-night-soft: #eceafb;
+
+	/* Sucursales (gráficos y leyendas) */
+	--color-branch-1: #b45309;
+	--color-branch-2: #2b6cb0;
+	--color-branch-3: #2a7548;
+	--color-branch-4: #8e44ad;
+	--color-branch-5: #0f8b8d;
+	--color-branch-6: #c2410c;
+
+	/* Tipografía */
+	--font-sans: 'Plus Jakarta Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--font-regular: 400;
+	--font-medium: 500;
+	--font-semibold: 600;
+	--font-bold: 700;
+
+	/*
+	 * Escala fluida: cada tamaño crece de forma lineal entre un viewport de 360px y uno de 1280px.
+	 * Los tamaños chicos tienen como piso su valor base (legibilidad; inputs nunca < 16px) y crecen 1px en pantallas grandes.
+	 * Los títulos y las cifras se reducen en móvil. Los interlineados no tienen unidad para escalar junto con el tamaño.
+	 */
+	--text-xs: clamp(0.75rem, 0.7255rem + 0.1087vw, 0.8125rem); /* 12 → 13px */
+	--text-xs-lh: 1.33;
+	--text-sm: clamp(0.875rem, 0.8505rem + 0.1087vw, 0.9375rem); /* 14 → 15px */
+	--text-sm-lh: 1.43;
+	--text-base: clamp(1rem, 0.9755rem + 0.1087vw, 1.0625rem); /* 16 → 17px */
+	--text-base-lh: 1.5;
+	--text-lg: clamp(1.0625rem, 1.038rem + 0.1087vw, 1.125rem); /* 17 → 18px */
+	--text-lg-lh: 1.55;
+	--text-xl: clamp(1.125rem, 1.0761rem + 0.2174vw, 1.25rem); /* 18 → 20px */
+	--text-xl-lh: 1.4;
+	--text-2xl: clamp(1.25rem, 1.1522rem + 0.4348vw, 1.5rem); /* 20 → 24px */
+	--text-2xl-lh: 1.33;
+	--text-3xl: clamp(1.5rem, 1.3533rem + 0.6522vw, 1.875rem); /* 24 → 30px */
+	--text-3xl-lh: 1.2;
+	--text-4xl: clamp(1.75rem, 1.5543rem + 0.8696vw, 2.25rem); /* 28 → 36px */
+	--text-4xl-lh: 1.1;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--color-bg: #171310;
+		--color-surface: #211c18;
+		--color-surface-muted: #2b2520;
+		--color-border: #3a322b;
+		--color-border-strong: #4d433a;
+		--color-text: #f3eee8;
+		--color-text-muted: #b3a89c;
+		--color-text-subtle: #8a7f74;
+
+		--color-primary: #f0a04b;
+		--color-primary-hover: #f5b871;
+		--color-primary-soft: #3a2a18;
+		--color-on-primary: #1f1a17;
+		--color-focus: #f0a04b;
+
+		--color-income: #5cc88a;
+		--color-income-soft: #1a2e22;
+		--color-expense: #f27a8c;
+		--color-expense-soft: #3a1c22;
+		--color-warning: #e8c35a;
+		--color-warning-soft: #33290f;
+		--color-info: #7ab3f0;
+		--color-info-soft: #16263a;
+
+		--color-shift-morning: #7cc4ea;
+		--color-shift-morning-soft: #152a36;
+		--color-shift-afternoon: #fb9a6a;
+		--color-shift-afternoon-soft: #3a2216;
+		--color-shift-night: #a99df5;
+		--color-shift-night-soft: #231f3d;
+
+		--color-branch-1: #f0a04b;
+		--color-branch-2: #7ab3f0;
+		--color-branch-3: #5cc88a;
+		--color-branch-4: #c08fdb;
+		--color-branch-5: #4fc7c9;
+		--color-branch-6: #fb9a6a;
+	}
+}
+
+:root[data-theme='dark'] {
+	--color-bg: #171310;
+	--color-surface: #211c18;
+	--color-surface-muted: #2b2520;
+	--color-border: #3a322b;
+	--color-border-strong: #4d433a;
+	--color-text: #f3eee8;
+	--color-text-muted: #b3a89c;
+	--color-text-subtle: #8a7f74;
+
+	--color-primary: #f0a04b;
+	--color-primary-hover: #f5b871;
+	--color-primary-soft: #3a2a18;
+	--color-on-primary: #1f1a17;
+	--color-focus: #f0a04b;
+
+	--color-income: #5cc88a;
+	--color-income-soft: #1a2e22;
+	--color-expense: #f27a8c;
+	--color-expense-soft: #3a1c22;
+	--color-warning: #e8c35a;
+	--color-warning-soft: #33290f;
+	--color-info: #7ab3f0;
+	--color-info-soft: #16263a;
+
+	--color-shift-morning: #7cc4ea;
+	--color-shift-morning-soft: #152a36;
+	--color-shift-afternoon: #fb9a6a;
+	--color-shift-afternoon-soft: #3a2216;
+	--color-shift-night: #a99df5;
+	--color-shift-night-soft: #231f3d;
+
+	--color-branch-1: #f0a04b;
+	--color-branch-2: #7ab3f0;
+	--color-branch-3: #5cc88a;
+	--color-branch-4: #c08fdb;
+	--color-branch-5: #4fc7c9;
+	--color-branch-6: #fb9a6a;
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
+}

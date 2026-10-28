@@ -1,0 +1,25 @@
+---
+import "@fontsource-variable/plus-jakarta-sans";
+import "../styles/tokens.css";
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<meta charset="utf-8" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" href="/favicon.ico" />
+<meta name="viewport" content="width=device-width" />
+<meta name="generator" content={Astro.generator} />
+<script is:inline>
+  // Aplica el tema guardado antes de pintar para evitar un parpadeo.
+  try {
+    const theme = localStorage.getItem("caja-simple-theme");
+    if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  } catch {}
+</script>
+<title>{title} · Caja Simple</title>

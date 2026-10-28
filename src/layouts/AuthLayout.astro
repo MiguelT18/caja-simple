@@ -1,0 +1,146 @@
+---
+import BaseHead from "../components/BaseHead.astro";
+import Logo from "../components/Logo.astro";
+
+interface Props {
+  title: string;
+  heading: string;
+  description: string;
+}
+
+const { title, heading, description } = Astro.props;
+---
+
+<html lang="es">
+  <head>
+    <BaseHead title={title} />
+  </head>
+  <body>
+    <main class="auth-main">
+      <div class="auth-brand">
+        <Logo class="auth-logo" />
+        <span class="auth-brand-text">
+          <span class="auth-brand-name">Caja Simple</span>
+          <span class="auth-brand-tagline">Tu negocio, bajo control</span>
+        </span>
+      </div>
+
+      <section class="auth-card" aria-labelledby="auth-heading">
+        <header class="auth-header">
+          <h1 id="auth-heading">{heading}</h1>
+          <p>{description}</p>
+        </header>
+
+        <slot />
+
+        <p class="auth-switch">
+          <slot name="switch" />
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
+
+<style>
+  .auth-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    min-height: 100dvh;
+    padding: 2rem 1rem;
+  }
+
+  .auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .auth-logo {
+    width: 2.75rem;
+    height: 2.75rem;
+    color: var(--color-primary);
+  }
+
+  .auth-brand-text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .auth-brand-name {
+    font-size: var(--text-xl);
+    line-height: 1.2;
+    font-weight: var(--font-bold);
+    letter-spacing: -0.01em;
+  }
+
+  .auth-brand-tagline {
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    color: var(--color-text-muted);
+  }
+
+  .auth-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 26rem;
+    padding: 2rem;
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    background: var(--color-surface);
+  }
+
+  .auth-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: center;
+  }
+
+  .auth-header p {
+    margin: 0;
+    color: var(--color-text-muted);
+  }
+
+  .auth-switch {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    text-align: center;
+  }
+
+  .auth-switch :global(a) {
+    color: var(--color-primary);
+    font-weight: var(--font-semibold);
+    text-decoration: none;
+  }
+
+  .auth-switch :global(a:hover) {
+    text-decoration: underline;
+  }
+
+  .auth-switch :global(a:focus-visible) {
+    border-radius: 0.25rem;
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 480px) {
+    .auth-main {
+      justify-content: flex-start;
+      padding-top: 2.5rem;
+    }
+
+    .auth-card {
+      padding: 1.5rem 1rem;
+      border: none;
+      border-radius: 0;
+      background: none;
+    }
+  }
+</style>

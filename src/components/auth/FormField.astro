@@ -1,0 +1,38 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends HTMLAttributes<"input"> {
+  id: string;
+  label: string;
+  hint?: string;
+}
+
+const { id, label, hint, type = "text", ...rest } = Astro.props;
+
+const hintId = `${id}-hint`;
+const errorId = `${id}-error`;
+const describedBy = [hint && hintId, errorId].filter(Boolean).join(" ");
+---
+
+<div class="field">
+  <label class="field-label" for={id}>{label}</label>
+  <div class="field-control">
+    <input
+      class="input"
+      id={id}
+      name={id}
+      type={type}
+      aria-describedby={describedBy}
+      {...rest}
+    />
+    <slot name="addon" />
+  </div>
+  {hint && <p class="field-hint" id={hintId}>{hint}</p>}
+  <p class="field-error" id={errorId} aria-live="polite"></p>
+</div>
+
+<style>
+  .field-control {
+    position: relative;
+  }
+</style>

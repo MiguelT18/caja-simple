@@ -1,0 +1,52 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Sidebar from '../components/Sidebar.astro';
+
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+
+// TODO: reemplazar por el usuario de la sesión cuando exista la autenticación.
+const user = {
+	firstName: 'María Fernanda',
+	lastName: 'López García',
+	email: 'maria.lopez@cajasimple.com',
+};
+---
+
+<html lang="es">
+	<head>
+		<BaseHead title={title} />
+	</head>
+	<body>
+		<Sidebar user={user} />
+		<main>
+			<slot />
+		</main>
+	</body>
+</html>
+
+<style is:global>
+	body {
+		display: flex;
+		min-height: 100dvh;
+	}
+
+	main {
+		flex: 1;
+		min-width: 0;
+		padding: 2rem;
+	}
+
+	@media (max-width: 768px) {
+		body {
+			flex-direction: column;
+		}
+
+		main {
+			padding: 1rem;
+		}
+	}
+</style>

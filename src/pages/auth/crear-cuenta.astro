@@ -1,0 +1,99 @@
+---
+import AuthLayout from "../../layouts/AuthLayout.astro";
+import AuthDivider from "../../components/auth/AuthDivider.astro";
+import FormField from "../../components/auth/FormField.astro";
+import GoogleButton from "../../components/auth/GoogleButton.astro";
+import PasswordField from "../../components/auth/PasswordField.astro";
+---
+
+<AuthLayout
+  title="Crear cuenta"
+  heading="Crea tu cuenta"
+  description="Empieza a controlar tu negocio"
+>
+  <p class="notice" role="status" data-auth-notice></p>
+
+  <GoogleButton label="Registrarse con Google" />
+
+  <AuthDivider />
+
+  <form class="auth-form" method="post" novalidate data-auth-form>
+    <div class="field-row">
+      <FormField
+        id="firstName"
+        label="Nombres"
+        autocomplete="given-name"
+        required
+        data-required-message="Ingresa tus nombres"
+      />
+      <FormField
+        id="lastName"
+        label="Apellidos"
+        autocomplete="family-name"
+        required
+        data-required-message="Ingresa tus apellidos"
+      />
+    </div>
+    <FormField
+      id="email"
+      label="Correo electrónico"
+      type="email"
+      autocomplete="email"
+      autocapitalize="none"
+      spellcheck="false"
+      required
+      data-required-message="Ingresa tu correo"
+    />
+    <PasswordField
+      id="password"
+      label="Contraseña"
+      autocomplete="new-password"
+      required
+      minlength={8}
+      hint="Mínimo 8 caracteres"
+      data-required-message="Ingresa una contraseña"
+      data-minlength-message="La contraseña debe tener al menos 8 caracteres"
+    />
+    <PasswordField
+      id="passwordConfirm"
+      label="Repetir contraseña"
+      autocomplete="new-password"
+      required
+      data-required-message="Repite tu contraseña"
+      data-match="password"
+      data-match-message="Las contraseñas no coinciden"
+    />
+    <button type="submit" class="btn btn-primary btn-block">Crear cuenta</button>
+  </form>
+
+  <Fragment slot="switch">
+    ¿Ya tienes cuenta? <a href="/auth/iniciar-sesion">Inicia sesión</a>
+  </Fragment>
+</AuthLayout>
+
+<script>
+  import "../../scripts/auth-form.ts";
+</script>
+
+<style>
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .auth-form .btn {
+    margin-top: 0.5rem;
+  }
+
+  .field-row {
+    display: grid;
+    gap: 1rem;
+  }
+
+  @media (min-width: 480px) {
+    .field-row {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
