@@ -1,50 +1,60 @@
 /* Tokens de diseño de Caja Simple. Ver DESIGN.md para las reglas de uso. */
 
+/* Cada color es light-dark(claro, oscuro): el tema lo elige `color-scheme` (sistema o data-theme). */
 :root {
 	color-scheme: light dark;
 
 	/* Neutros cálidos */
-	--color-bg: #faf8f5;
-	--color-surface: #ffffff;
-	--color-surface-muted: #f3efe9;
-	--color-border: #e7e1d8;
-	--color-border-strong: #d3cabd;
-	--color-text: #1f1a17;
-	--color-text-muted: #6b625a;
-	--color-text-subtle: #8f857b;
+	--color-bg: light-dark(#faf8f5, #171310);
+	--color-surface: light-dark(#ffffff, #211c18);
+	--color-surface-muted: light-dark(#f3efe9, #2b2520);
+	--color-border: light-dark(#e7e1d8, #3a322b);
+	--color-border-strong: light-dark(#d3cabd, #4d433a);
+	--shadow-sm: 0 1px 2px light-dark(rgb(31 26 23 / 0.06), rgb(0 0 0 / 0.4));
+	--shadow-md:
+		0 1px 2px light-dark(rgb(31 26 23 / 0.04), rgb(0 0 0 / 0.3)),
+		0 8px 24px -6px light-dark(rgb(31 26 23 / 0.1), rgb(0 0 0 / 0.55));
+
+	/* Barras de scroll: alias de los neutros, así cambian solas con el tema. */
+	--scrollbar-thumb: var(--color-border-strong);
+	--scrollbar-thumb-hover: var(--color-text-subtle);
+	--scrollbar-track: transparent;
+	--color-text: light-dark(#1f1a17, #f3eee8);
+	--color-text-muted: light-dark(#6b625a, #b3a89c);
+	--color-text-subtle: light-dark(#8f857b, #8a7f74);
 
 	/* Marca: ámbar / caramelo */
-	--color-primary: #b45309;
-	--color-primary-hover: #92400e;
-	--color-primary-soft: #fdf1e3;
-	--color-on-primary: #ffffff;
-	--color-focus: #d97706;
+	--color-primary: light-dark(#b45309, #f0a04b);
+	--color-primary-hover: light-dark(#92400e, #f5b871);
+	--color-primary-soft: light-dark(#fdf1e3, #3a2a18);
+	--color-on-primary: light-dark(#ffffff, #1f1a17);
+	--color-focus: light-dark(#d97706, #f0a04b);
 
 	/* Colores con significado */
-	--color-income: #2a7548;
-	--color-income-soft: #e8f5ec;
-	--color-expense: #b4233c;
-	--color-expense-soft: #fcebee;
-	--color-warning: #8a6100;
-	--color-warning-soft: #fef6d8;
-	--color-info: #2b6cb0;
-	--color-info-soft: #e8f1fb;
+	--color-income: light-dark(#2a7548, #5cc88a);
+	--color-income-soft: light-dark(#e8f5ec, #1a2e22);
+	--color-expense: light-dark(#b4233c, #f27a8c);
+	--color-expense-soft: light-dark(#fcebee, #3a1c22);
+	--color-warning: light-dark(#8a6100, #e8c35a);
+	--color-warning-soft: light-dark(#fef6d8, #33290f);
+	--color-info: light-dark(#2b6cb0, #7ab3f0);
+	--color-info-soft: light-dark(#e8f1fb, #16263a);
 
 	/* Turnos */
-	--color-shift-morning: #1f6f99;
-	--color-shift-morning-soft: #e4f2fa;
-	--color-shift-afternoon: #c2410c;
-	--color-shift-afternoon-soft: #ffede3;
-	--color-shift-night: #4c3fb0;
-	--color-shift-night-soft: #eceafb;
+	--color-shift-morning: light-dark(#1f6f99, #7cc4ea);
+	--color-shift-morning-soft: light-dark(#e4f2fa, #152a36);
+	--color-shift-afternoon: light-dark(#c2410c, #fb9a6a);
+	--color-shift-afternoon-soft: light-dark(#ffede3, #3a2216);
+	--color-shift-night: light-dark(#4c3fb0, #a99df5);
+	--color-shift-night-soft: light-dark(#eceafb, #231f3d);
 
 	/* Sucursales (gráficos y leyendas) */
-	--color-branch-1: #b45309;
-	--color-branch-2: #2b6cb0;
-	--color-branch-3: #2a7548;
-	--color-branch-4: #8e44ad;
-	--color-branch-5: #0f8b8d;
-	--color-branch-6: #c2410c;
+	--color-branch-1: light-dark(#b45309, #f0a04b);
+	--color-branch-2: light-dark(#2b6cb0, #7ab3f0);
+	--color-branch-3: light-dark(#2a7548, #5cc88a);
+	--color-branch-4: light-dark(#8e44ad, #c08fdb);
+	--color-branch-5: light-dark(#0f8b8d, #4fc7c9);
+	--color-branch-6: light-dark(#c2410c, #fb9a6a);
 
 	/* Tipografía */
 	--font-sans: 'Plus Jakarta Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -74,88 +84,6 @@
 	--text-3xl-lh: 1.2;
 	--text-4xl: clamp(1.75rem, 1.5543rem + 0.8696vw, 2.25rem); /* 28 → 36px */
 	--text-4xl-lh: 1.1;
-}
-
-@media (prefers-color-scheme: dark) {
-	:root:not([data-theme='light']) {
-		--color-bg: #171310;
-		--color-surface: #211c18;
-		--color-surface-muted: #2b2520;
-		--color-border: #3a322b;
-		--color-border-strong: #4d433a;
-		--color-text: #f3eee8;
-		--color-text-muted: #b3a89c;
-		--color-text-subtle: #8a7f74;
-
-		--color-primary: #f0a04b;
-		--color-primary-hover: #f5b871;
-		--color-primary-soft: #3a2a18;
-		--color-on-primary: #1f1a17;
-		--color-focus: #f0a04b;
-
-		--color-income: #5cc88a;
-		--color-income-soft: #1a2e22;
-		--color-expense: #f27a8c;
-		--color-expense-soft: #3a1c22;
-		--color-warning: #e8c35a;
-		--color-warning-soft: #33290f;
-		--color-info: #7ab3f0;
-		--color-info-soft: #16263a;
-
-		--color-shift-morning: #7cc4ea;
-		--color-shift-morning-soft: #152a36;
-		--color-shift-afternoon: #fb9a6a;
-		--color-shift-afternoon-soft: #3a2216;
-		--color-shift-night: #a99df5;
-		--color-shift-night-soft: #231f3d;
-
-		--color-branch-1: #f0a04b;
-		--color-branch-2: #7ab3f0;
-		--color-branch-3: #5cc88a;
-		--color-branch-4: #c08fdb;
-		--color-branch-5: #4fc7c9;
-		--color-branch-6: #fb9a6a;
-	}
-}
-
-:root[data-theme='dark'] {
-	--color-bg: #171310;
-	--color-surface: #211c18;
-	--color-surface-muted: #2b2520;
-	--color-border: #3a322b;
-	--color-border-strong: #4d433a;
-	--color-text: #f3eee8;
-	--color-text-muted: #b3a89c;
-	--color-text-subtle: #8a7f74;
-
-	--color-primary: #f0a04b;
-	--color-primary-hover: #f5b871;
-	--color-primary-soft: #3a2a18;
-	--color-on-primary: #1f1a17;
-	--color-focus: #f0a04b;
-
-	--color-income: #5cc88a;
-	--color-income-soft: #1a2e22;
-	--color-expense: #f27a8c;
-	--color-expense-soft: #3a1c22;
-	--color-warning: #e8c35a;
-	--color-warning-soft: #33290f;
-	--color-info: #7ab3f0;
-	--color-info-soft: #16263a;
-
-	--color-shift-morning: #7cc4ea;
-	--color-shift-morning-soft: #152a36;
-	--color-shift-afternoon: #fb9a6a;
-	--color-shift-afternoon-soft: #3a2216;
-	--color-shift-night: #a99df5;
-	--color-shift-night-soft: #231f3d;
-
-	--color-branch-1: #f0a04b;
-	--color-branch-2: #7ab3f0;
-	--color-branch-3: #5cc88a;
-	--color-branch-4: #c08fdb;
-	--color-branch-5: #4fc7c9;
-	--color-branch-6: #fb9a6a;
 }
 
 :root[data-theme='light'] {

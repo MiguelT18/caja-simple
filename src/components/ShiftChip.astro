@@ -1,0 +1,13 @@
+---
+import { Moon, Sun, Sunset } from "@lucide/astro";
+import type { Shift } from "../data/mock";
+
+interface Props {
+  shift: Shift;
+}
+
+const { shift } = Astro.props;
+const Icon = { morning: Sun, afternoon: Sunset, night: Moon }[shift.tone];
+---
+
+<span class={`chip chip-${shift.tone}`}><Icon size={14} stroke-width={2} />{shift.name}</span>

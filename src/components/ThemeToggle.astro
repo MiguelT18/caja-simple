@@ -1,0 +1,104 @@
+---
+import { Moon, Sun } from "@lucide/astro";
+
+interface Props {
+  class?: string;
+  /** Tamaño del ícono en px; el del botón lo pone quien lo usa con su clase. */
+  iconSize?: number;
+}
+
+// `rest` lleva el atributo de scope de Astro para que los estilos del padre (tamaño, posición) lleguen al botón.
+const { class: className, iconSize = 18, ...rest } = Astro.props;
+---
+
+<button
+  type="button"
+  class:list={["icon-btn theme-toggle", className]}
+  aria-pressed="false"
+  aria-label="Modo oscuro"
+  title="Cambiar tema"
+  {...rest}
+>
+  <Moon class="theme-icon icon-moon" size={iconSize} stroke-width={1.75} />
+  <Sun class="theme-icon icon-sun" size={iconSize} stroke-width={1.75} />
+</button>
+
+<script>
+  // Tema: la preferencia guardada manda; si no hay, se sigue la del sistema.
+  // BaseHead aplica la guardada antes de pintar; aquí solo se cambia y se refleja en aria-pressed.
+  const THEME_KEY = "caja-simple-theme";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const toggles = document.querySelectorAll<HTMLButtonElement>(".theme-toggle");
+
+  function isDark() {
+    const theme = document.documentElement.dataset.theme;
+    return theme ? theme === "dark" : darkQuery.matches;
+  }
+
+  function sync() {
+    toggles.forEach((toggle) => toggle.setAttribute("aria-pressed", String(isDark())));
+  }
+
+  toggles.forEach((toggle) => {
+    toggle.addEventListener("click", () => {
+      const theme = isDark() ? "light" : "dark";
+      document.documentElement.dataset.theme = theme;
+      try {
+        localStorage.setItem(THEME_KEY, theme);
+      } catch {}
+      sync();
+    });
+  });
+
+  darkQuery.addEventListener("change", sync);
+  sync();
+</script>
+
+<style>
+  .theme-toggle {
+    position: relative;
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .theme-icon {
+    position: absolute;
+    transition:
+      transform 400ms cubic-bezier(0.65, 0, 0.35, 1),
+      opacity 250ms ease;
+  }
+
+  /* Luna en tema claro, sol en tema oscuro (el oscuro puede venir del sistema o de data-theme). */
+  .icon-sun {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.5);
+  }
+
+  :global(:root[data-theme="dark"]) .icon-moon {
+    opacity: 0;
+    transform: rotate(90deg) scale(0.5);
+  }
+
+  :global(:root[data-theme="dark"]) .icon-sun {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .icon-moon {
+      opacity: 0;
+      transform: rotate(90deg) scale(0.5);
+    }
+
+    :global(:root:not([data-theme="light"])) .icon-sun {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .theme-icon {
+      transition: none;
+    }
+  }
+</style>

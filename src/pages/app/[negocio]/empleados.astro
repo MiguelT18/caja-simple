@@ -1,0 +1,34 @@
+---
+import { UserPlus } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import EmployeesTable from "@/components/app/EmployeesTable";
+import Layout from "@/layouts/Layout.astro";
+import { appPaths, businessContext, fullName } from "@/data/queries";
+import { initials } from "@/lib/format";
+
+export const getStaticPaths = () => appPaths.business();
+
+const ctx = businessContext(Astro.params.negocio!);
+const { business, branchById, employees, shiftById } = ctx;
+
+const rows = employees.map((e) => {
+  const shift = shiftById(e.shiftId);
+  return {
+    id: e.id,
+    initials: initials(e.firstName, e.lastName),
+    name: fullName(e),
+    role: e.jobTitle,
+    branch: branchById(e.branchId).name,
+    shift: { name: shift.name, tone: shift.tone },
+    active: e.status === "activo",
+  };
+});
+---
+
+<Layout title={`Empleados · ${business.name}`} context={{ membership: ctx.membership }}>
+  <PageHeader title="Empleados" description={`${employees.length} personas en las sucursales de ${business.name}. Entran gratis, siempre.`}>
+    <button type="button" class="btn btn-secondary"><UserPlus size={18} stroke-width={2} />Invitar empleado</button>
+  </PageHeader>
+
+  <EmployeesTable client:visible rows={rows} />
+</Layout>

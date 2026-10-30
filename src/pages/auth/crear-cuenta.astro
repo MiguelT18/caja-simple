@@ -10,9 +10,8 @@ import PasswordField from "../../components/auth/PasswordField.astro";
   title="Crear cuenta"
   heading="Crea tu cuenta"
   description="Empieza a controlar tu negocio"
+  pitch="Abre tu caja hoy. Empezar es gratis."
 >
-  <p class="notice" role="status" data-auth-notice></p>
-
   <GoogleButton label="Registrarse con Google" />
 
   <AuthDivider />
@@ -71,21 +70,7 @@ import PasswordField from "../../components/auth/PasswordField.astro";
   </Fragment>
 </AuthLayout>
 
-<script>
-  import "../../scripts/auth-form.ts";
-</script>
-
 <style>
-  .auth-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .auth-form .btn {
-    margin-top: 0.5rem;
-  }
-
   .field-row {
     display: grid;
     gap: 1rem;

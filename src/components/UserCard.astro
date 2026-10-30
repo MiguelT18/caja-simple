@@ -1,0 +1,98 @@
+---
+import { LogOut } from "@lucide/astro";
+import type { User } from "../data/mock";
+
+interface Props {
+  user: User;
+}
+
+const { user } = Astro.props;
+
+const fullName = `${user.firstName} ${user.lastName}`;
+const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
+---
+
+<div class="user-card">
+  {
+    user.avatarUrl ? (
+      <img class="avatar" src={user.avatarUrl} alt="" width="36" height="36" />
+    ) : (
+      <span class="avatar avatar-initials" aria-hidden="true">
+        {initials}
+      </span>
+    )
+  }
+  <div class="user-info">
+    <span class="user-name" title={fullName}>{fullName}</span>
+    <span class="user-email" title={user.email}>{user.email}</span>
+  </div>
+  <form method="post" action="/logout">
+    <button type="submit" class="icon-btn logout" aria-label="Cerrar sesión" title="Cerrar sesión">
+      <LogOut size={18} stroke-width={1.75} />
+    </button>
+  </form>
+</div>
+
+<style>
+  .user-card {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem;
+    border-radius: 0.75rem;
+    background: var(--color-surface-muted);
+  }
+
+  .avatar {
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .avatar-initials {
+    display: grid;
+    place-items: center;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+  }
+
+  .user-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .user-name,
+  .user-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-name {
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-semibold);
+  }
+
+  .user-email {
+    font-size: var(--text-xs);
+    line-height: var(--text-xs-lh);
+    color: var(--color-text-muted);
+  }
+
+  .logout {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .logout:hover {
+    background: var(--color-expense-soft);
+    color: var(--color-expense);
+  }
+</style>

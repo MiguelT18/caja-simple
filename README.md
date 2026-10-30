@@ -1,43 +1,23 @@
-# Astro Starter Kit: Minimal
+# Caja Simple
+
+Caja de negocios pequeños con una o varias sucursales: ventas, gastos, productos, turnos y cuadre de caja. Hecha con Astro 7.
+
+> Estado: prototipo. Todavía no hay backend: los datos son de demostración y la autenticación no está conectada.
+
+## Desarrollo
 
 ```sh
-pnpm create astro@latest -- --template minimal
+pnpm install
+pnpm dev       # http://localhost:4321
+pnpm build     # genera ./dist
+pnpm preview
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+Requiere Node ≥ 22.23 y pnpm.
 
-## 🚀 Project Structure
+## Documentación
 
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
-
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
-
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
-
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+- [`PRODUCT.md`](PRODUCT.md): para quién es, qué resuelve y cómo habla.
+- [`DESIGN.md`](DESIGN.md): sistema de diseño (tokens, tipografía, íconos, navegación).
+- [`AGENTS.md`](AGENTS.md): mapa del código y convenciones, para personas y agentes de IA.
+- [`docs/`](docs/): decisiones de negocio, por ejemplo los [planes de suscripción](docs/planes-de-suscripcion.md).

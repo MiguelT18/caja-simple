@@ -44,6 +44,12 @@ button {
 	font-variant-numeric: tabular-nums;
 }
 
+/* Anillo de foco común; :where() deja que cada componente lo ajuste sin pelear especificidad. */
+:where(a, button):focus-visible {
+	outline: 2px solid var(--color-focus);
+	outline-offset: 2px;
+}
+
 /* Botones */
 .btn {
 	display: inline-flex;
@@ -63,11 +69,6 @@ button {
 		background-color 150ms,
 		border-color 150ms,
 		color 150ms;
-}
-
-.btn:focus-visible {
-	outline: 2px solid var(--color-focus);
-	outline-offset: 2px;
 }
 
 .btn:disabled {
@@ -96,6 +97,26 @@ button {
 
 .btn-block {
 	width: 100%;
+}
+
+/* Botón cuadrado con solo un icono (tema, menú, cerrar sesión). El tamaño lo pone cada uno. */
+.icon-btn {
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border: none;
+	border-radius: 0.5rem;
+	background: none;
+	color: var(--color-text-muted);
+	cursor: pointer;
+	transition:
+		background-color 150ms,
+		color 150ms;
+}
+
+.icon-btn:hover {
+	background: var(--color-surface-muted);
+	color: var(--color-text);
 }
 
 /* Campos de formulario */
@@ -195,4 +216,196 @@ button {
 
 .notice:empty {
 	display: none;
+}
+
+/* Barras de scroll */
+html {
+	scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Respaldo para navegadores sin scrollbar-color (Safari). */
+@supports not (scrollbar-color: auto) {
+	::-webkit-scrollbar {
+		width: 12px;
+		height: 12px;
+	}
+
+	::-webkit-scrollbar-track {
+		background: var(--scrollbar-track);
+	}
+
+	::-webkit-scrollbar-thumb {
+		border: 3px solid transparent;
+		border-radius: 999px;
+		background: var(--scrollbar-thumb) padding-box;
+	}
+
+	::-webkit-scrollbar-thumb:hover {
+		background-color: var(--scrollbar-thumb-hover);
+	}
+}
+
+/* Páginas de la app */
+.page-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: 1.75rem;
+}
+
+.page-title-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.page-head p {
+	margin: 0.25rem 0 0;
+	color: var(--color-text-muted);
+}
+
+.sample {
+	padding: 0.125rem 0.5rem;
+	border: 1px dashed var(--color-border-strong);
+	border-radius: 999px;
+	color: var(--color-text-muted);
+	font-size: var(--text-xs);
+	line-height: var(--text-xs-lh);
+	font-weight: var(--font-medium);
+	white-space: nowrap;
+}
+
+.card {
+	border: 1px solid var(--color-border);
+	border-radius: 0.75rem;
+	background: var(--color-surface);
+	box-shadow: var(--shadow-sm);
+}
+
+.card-title {
+	margin: 0;
+	font-size: var(--text-lg);
+	line-height: var(--text-lg-lh);
+	font-weight: var(--font-semibold);
+}
+
+.section-title {
+	margin: 2.5rem 0 1rem;
+}
+
+/* Tablas: el contenedor hace scroll horizontal en pantallas angostas. */
+.table-wrap {
+	overflow-x: auto;
+}
+
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--text-sm);
+	line-height: var(--text-sm-lh);
+}
+
+.table th {
+	padding: 0.625rem 1rem;
+	background: var(--color-surface-muted);
+	color: var(--color-text-muted);
+	font-weight: var(--font-semibold);
+	text-align: left;
+	white-space: nowrap;
+}
+
+.table td {
+	padding: 0.75rem 1rem;
+	border-top: 1px solid var(--color-border);
+	vertical-align: middle;
+}
+
+.table tbody tr:hover {
+	background: var(--color-surface-muted);
+}
+
+.table tfoot td {
+	font-weight: var(--font-semibold);
+}
+
+.table .end {
+	text-align: right;
+}
+
+.table .muted {
+	color: var(--color-text-muted);
+}
+
+/* Chips: turnos y estados. El texto siempre nombra el estado; el color solo acompaña. */
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	padding: 0.25rem 0.625rem;
+	border-radius: 999px;
+	font-size: var(--text-xs);
+	line-height: var(--text-xs-lh);
+	font-weight: var(--font-semibold);
+	white-space: nowrap;
+}
+
+.chip-morning {
+	background: var(--color-shift-morning-soft);
+	color: var(--color-shift-morning);
+}
+
+.chip-afternoon {
+	background: var(--color-shift-afternoon-soft);
+	color: var(--color-shift-afternoon);
+}
+
+.chip-night {
+	background: var(--color-shift-night-soft);
+	color: var(--color-shift-night);
+}
+
+.chip-income {
+	background: var(--color-income-soft);
+	color: var(--color-income);
+}
+
+.chip-warning {
+	background: var(--color-warning-soft);
+	color: var(--color-warning);
+}
+
+.chip-info {
+	background: var(--color-info-soft);
+	color: var(--color-info);
+}
+
+.chip-neutral {
+	background: var(--color-surface-muted);
+	color: var(--color-text-muted);
+}
+
+.amount-income {
+	color: var(--color-income);
+	font-weight: var(--font-semibold);
+}
+
+.amount-expense {
+	color: var(--color-expense);
+	font-weight: var(--font-semibold);
+}
+
+.avatar-initials {
+	display: inline-grid;
+	flex-shrink: 0;
+	place-items: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 50%;
+	background: var(--color-surface-muted);
+	color: var(--color-text-muted);
+	font-size: var(--text-xs);
+	font-weight: var(--font-semibold);
 }

@@ -1,0 +1,82 @@
+/*
+ * Tailwind + shadcn/ui, solo para /app/* (lo importa Layout.astro; la landing y /auth no lo cargan).
+ * Las variables de shadcn apuntan a los tokens de tokens.css, que ya resuelven claro/oscuro con light-dark().
+ * tokens.css y global.css no tienen capa, así que ganan sobre las capas de Tailwind.
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-on-primary);
+  --secondary: var(--color-surface-muted);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-surface-muted);
+  --muted-foreground: var(--color-text-muted);
+  --accent: var(--color-surface-muted);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--color-expense);
+  --border: var(--color-border);
+  --input: var(--color-border-strong);
+  --ring: var(--color-focus);
+  /* Gráficos: turnos, ingreso y gasto. Las tortas por categoría usan --color-branch-1..6. */
+  --chart-1: var(--color-shift-morning);
+  --chart-2: var(--color-shift-afternoon);
+  --chart-3: var(--color-shift-night);
+  --chart-4: var(--color-income);
+  --chart-5: var(--color-expense);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+}

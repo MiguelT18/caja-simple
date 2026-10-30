@@ -1,0 +1,42 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Cabin+Sketch:wght@700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}body{margin:0;width:1440px;height:900px;overflow:hidden;font-family:"Public Sans",sans-serif;background:#EEF1EC;color:#1B231F;display:grid;grid-template-columns:600px 1fr}
+.board{margin:24px;border:14px solid #8B5E3C;border-radius:6px;background:#1F2B25;color:#ECEAE2;padding:48px 44px;display:grid;grid-template-rows:auto auto 1fr auto;box-shadow:inset 0 0 80px rgba(0,0,0,.35)}
+.brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:20px}.logo{width:36px;height:36px;border-radius:8px;background:#F2CF5B}
+.hoy{font-family:"Cabin Sketch";font-size:44px;margin:72px 0 0;color:#ECEAE2}
+.date{font-family:"Cabin Sketch";font-size:132px;line-height:.9;margin:8px 0 0}
+.month{font-family:"Cabin Sketch";font-size:40px;opacity:.85}
+.rows{align-self:end;border-top:2px solid rgba(236,234,226,.35)}
+.row{display:flex;justify-content:space-between;height:52px;align-items:center;border-bottom:2px solid rgba(236,234,226,.35);font-family:"Cabin Sketch";font-size:26px}
+.row b{color:#F2CF5B;font-weight:700;font-variant-numeric:tabular-nums}
+.note{font-size:15px;margin-top:20px;color:#C9CBC2}
+main{display:flex;align-items:center;justify-content:center}
+.form{width:420px;display:flex;flex-direction:column;gap:16px}
+h1{font-size:32px;margin:0;letter-spacing:-.01em}.sub{margin:0 0 12px;color:#56605A;font-size:17px}
+.btn{height:48px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:17px}
+.sec{border:1.5px solid #B9C2BB;background:#fff}.pri{background:#1F2B25;color:#F2CF5B}
+.div{display:flex;gap:12px;align-items:center;color:#56605A;font-size:15px}.div:before,.div:after{content:"";flex:1;height:1px;background:#C9D0CA}
+label{font-size:17px;font-weight:500}.in{height:48px;border:1.5px solid #B9C2BB;border-radius:8px;background:#fff;margin-top:6px}
+.sw{text-align:center;font-size:17px;color:#56605A;margin-top:12px}.sw a{color:#1B231F;font-weight:700;text-decoration:underline}
+</style></head><body>
+<aside class="board">
+<div class="brand"><span class="logo"></span>Caja Simple</div>
+<div><p class="hoy">Hoy</p><p class="date">29</p><p class="month">jueves · octubre</p></div>
+<div class="rows">
+<div class="row"><span>Turno</span><b>tarde</b></div>
+<div class="row"><span>Hora</span><b>15:42</b></div>
+<div class="row"><span>Ventas · gastos · cuadre</span><b>a tu caja</b></div>
+</div>
+<p class="note">Una sola cuenta para trabajar en un negocio y para llevar el tuyo.</p>
+</aside>
+<main><div class="form">
+<h1>Inicia sesión</h1><p class="sub">Abre tu caja del día</p>
+<div class="btn sec">Continuar con Google</div>
+<div class="div">o con tu correo</div>
+<div><label>Correo electrónico</label><div class="in"></div></div>
+<div><label>Contraseña</label><div class="in"></div></div>
+<div class="btn pri">Iniciar sesión</div>
+<p class="sw">¿No tienes cuenta? <a>Crear cuenta</a></p>
+</div></main>
+</body></html>

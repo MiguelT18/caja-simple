@@ -1,0 +1,284 @@
+---
+import { Check, ChevronsUpDown } from "@lucide/astro";
+
+interface Option {
+  label: string;
+  detail?: string;
+  href: string;
+  current?: boolean;
+}
+
+interface Props {
+  /** id único del popover: el panel lateral usa dos selectores. */
+  id: string;
+  /** Qué se elige: «Negocio» o «Sucursal». */
+  label: string;
+  icon: (props: Record<string, unknown>) => unknown;
+  options: Option[];
+  footer?: { label: string; href: string };
+}
+
+const { id, label, icon: Icon, options, footer } = Astro.props;
+const current = options.find((o) => o.current) ?? options[0];
+---
+
+<!-- Cada opción es un enlace: el negocio y la sucursal van en la URL, no se guardan en el navegador. -->
+<div class="context-switcher" data-switcher>
+  <button
+    type="button"
+    class="switch-trigger"
+    popovertarget={id}
+    aria-haspopup="true"
+    aria-label={`${label}: ${current.label}. Cambiar ${label.toLowerCase()}`}
+  >
+    <span class="switch-icon">
+      <Icon size={18} stroke-width={1.75} />
+    </span>
+    <span class="switch-text">
+      <span class="switch-label">{label}</span>
+      <span class="switch-name">{current.label}</span>
+    </span>
+    <ChevronsUpDown class="switch-chevron" size={16} stroke-width={1.75} />
+  </button>
+
+  <div id={id} class="switch-menu" popover>
+    <ul>
+      {
+        options.map((option) => (
+          <li>
+            <a href={option.href} class="switch-option" aria-current={option.current ? "true" : undefined}>
+              <span class="option-text">
+                <span class="option-name">{option.label}</span>
+                {option.detail && <span class="option-detail">{option.detail}</span>}
+              </span>
+              <Check class="option-check" size={16} stroke-width={2} />
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+    {footer && <a href={footer.href} class="switch-manage">{footer.label}</a>}
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-switcher]").forEach((root) => {
+    const trigger = root.querySelector<HTMLButtonElement>(".switch-trigger")!;
+    const menu = root.querySelector<HTMLElement>(".switch-menu")!;
+    const options = [...root.querySelectorAll<HTMLAnchorElement>(".switch-option")];
+
+    function position() {
+      const rect = trigger.getBoundingClientRect();
+      menu.style.top = `${rect.bottom + 6}px`;
+      menu.style.left = `${rect.left}px`;
+      menu.style.width = `${rect.width}px`;
+    }
+
+    // La posición se calcula antes de mostrarse para que la animación arranque ya en su lugar.
+    menu.addEventListener("beforetoggle", (event) => {
+      const open = (event as ToggleEvent).newState === "open";
+      trigger.setAttribute("aria-expanded", String(open));
+      if (open) position();
+    });
+
+    menu.addEventListener("toggle", (event) => {
+      if ((event as ToggleEvent).newState !== "open") return;
+      (options.find((option) => option.hasAttribute("aria-current")) ?? options[0]).focus();
+    });
+
+    menu.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      const index = options.indexOf(document.activeElement as HTMLAnchorElement);
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      options[(index + step + options.length) % options.length].focus();
+    });
+
+    window.addEventListener("resize", () => menu.hidePopover());
+  });
+</script>
+
+<style>
+  .switch-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.625rem;
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 150ms;
+  }
+
+  .switch-trigger:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  .switch-icon {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    background: var(--color-surface);
+    color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .switch-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .switch-label {
+    font-size: var(--text-xs);
+    line-height: var(--text-xs-lh);
+    color: var(--color-text-muted);
+  }
+
+  .switch-name {
+    overflow: hidden;
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-semibold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .switch-trigger :global(.switch-chevron) {
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+    transition: color 150ms;
+  }
+
+  .switch-trigger[aria-expanded="true"] :global(.switch-chevron) {
+    color: var(--color-primary);
+  }
+
+  /* El popover vive en la capa superior; su posición la calcula el script. */
+  .switch-menu {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 0.375rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-md);
+
+    /* Estado cerrado. allow-discrete mantiene el popover visible mientras termina la salida. */
+    opacity: 0;
+    transform: translateY(-0.375rem) scale(0.97);
+    transform-origin: top center;
+    transition:
+      opacity 150ms ease-in,
+      transform 150ms ease-in,
+      overlay 150ms ease-in allow-discrete,
+      display 150ms ease-in allow-discrete;
+  }
+
+  .switch-menu:popover-open {
+    opacity: 1;
+    transform: none;
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* Punto de partida de la animación de entrada. */
+  @starting-style {
+    .switch-menu:popover-open {
+      opacity: 0;
+      transform: translateY(-0.375rem) scale(0.97);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .switch-menu {
+      transition: none;
+    }
+  }
+
+  .switch-menu ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .switch-option {
+    display: flex;
+    text-decoration: none;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .switch-option:hover {
+    background: var(--color-surface-muted);
+  }
+
+  .option-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .option-name {
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-medium);
+  }
+
+  .option-detail {
+    overflow: hidden;
+    font-size: var(--text-xs);
+    line-height: var(--text-xs-lh);
+    color: var(--color-text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .switch-option :global(.option-check) {
+    flex-shrink: 0;
+    color: var(--color-primary);
+    visibility: hidden;
+  }
+
+  .switch-option[aria-current="true"] :global(.option-check) {
+    visibility: visible;
+  }
+
+  .switch-manage {
+    display: block;
+    margin-top: 0.375rem;
+    padding: 0.625rem 0.625rem 0.375rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-primary);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-semibold);
+    text-decoration: none;
+  }
+
+  .switch-manage:hover {
+    text-decoration: underline;
+  }
+</style>

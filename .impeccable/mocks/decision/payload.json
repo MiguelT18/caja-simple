@@ -1,0 +1,249 @@
+{
+ "title": "Mundo visual de las páginas de acceso",
+ "question": "La tirada asignó «Pizarra del día». Quédate con ella, toma una alternativa o vuelve a tirar.",
+ "options": [
+  {
+   "id": "assigned",
+   "kind": "assigned",
+   "label": "Pizarra del día",
+   "kicker": "THE ROLL",
+   "lineage": "pizarras de tiza con el menú y los precios del día en bodegas y mercados",
+   "thesis": "Entrar es abrir la caja del día: la pizarra escribe la fecha y el turno de hoy.",
+   "palette": [
+    "#1F2B25",
+    "#ECEAE2",
+    "#F2CF5B",
+    "#E7A3B6",
+    "#8B5E3C",
+    "#EEF1EC"
+   ],
+   "materials": [
+    "pizarra de tiza",
+    "marco de madera",
+    "pared encalada"
+   ],
+   "viewport": "A la izquierda, una pizarra a toda la altura con la fecha y el turno reales escritos a tiza; a la derecha, el formulario estándar sobre una pared clara.",
+   "risk": "Si la tiza se usa en los controles, se vuelve disfraz; queda solo en la pizarra.",
+   "raised": [
+    {
+     "from": "challenger-doujin",
+     "raise": "La lista de la pizarra encaja en filas enteras de igual altura, sin filas a medias."
+    },
+    {
+     "from": "challenger-jcard",
+     "raise": "La hora y el turno van alineados a la derecha, en cifras tabulares pegadas al marco."
+    },
+    {
+     "from": "challenger-crouwel",
+     "raise": "Las líneas de la pizarra son la retícula: el formulario sigue la misma altura de fila."
+    },
+    {
+     "from": "challenger-saville",
+     "raise": "Al menos media pizarra queda vacía; la fecha es la dueña del campo."
+    },
+    {
+     "from": "challenger-acetate",
+     "raise": "El formulario usa un solo tamaño para etiquetas, campos y ayudas; la jerarquía viene solo del título."
+    },
+    {
+     "from": "challenger-specimen",
+     "raise": "En la pizarra la jerarquía es solo de escala: tiza blanca y el amarillo solo para el turno."
+    }
+   ],
+   "html": ".impeccable/mocks/decision/assigned.html"
+  },
+  {
+   "id": "model-pick",
+   "kind": "pick",
+   "label": "Libreta de cuentas",
+   "kicker": "IMPECCABLE’S PICK",
+   "lineage": "el cuaderno cuadriculado de fiados y cuentas del mostrador",
+   "thesis": "La cuenta nueva se anota como la primera línea de la libreta del negocio.",
+   "palette": [
+    "#F6F7FB",
+    "#C9D6EC",
+    "#1E3A8A",
+    "#C0392B",
+    "#22252B"
+   ],
+   "materials": [
+    "papel cuadriculado",
+    "bolígrafo azul",
+    "margen rojo"
+   ],
+   "viewport": "Una hoja cuadriculada a toda la pantalla, el título a bolígrafo y los campos apoyados en la retícula.",
+   "risk": "Es la dirección más familiar: papel claro con tinta, cerca del look de siempre.",
+   "html": ".impeccable/mocks/decision/model-pick.html"
+  },
+  {
+   "id": "challenger-doujin",
+   "kind": "challenger",
+   "catalogId": "pop-culture-shelf-doujin-event-catalog",
+   "label": "Catálogo de feria",
+   "verdict": "declined",
+   "lineage": "catálogos de ferias de fanzines en papel periódico",
+   "thesis": "Cada sucursal como un puesto numerado en un plano de feria.",
+   "palette": [
+    "#E9E6DF",
+    "#1A1A1A",
+    "#2F6FDE"
+   ],
+   "materials": [
+    "papel periódico",
+    "tinta única"
+   ],
+   "viewport": "Una cuadrícula de celdas numeradas con un plano al costado.",
+   "case": "Funde mal: ni el empleado ni el dueño reconocen su negocio en una feria de fanzines.",
+   "kept": "Filas enteras y densas, sin celdas a medias.",
+   "risk": "Ruido visual en una pantalla de un solo trabajo.",
+   "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-doujin-event-catalog-hero.webp"
+  },
+  {
+   "id": "challenger-jcard",
+   "kind": "challenger",
+   "catalogId": "vernacular-ephemera-cassette-j-card",
+   "label": "Carátula de casete",
+   "verdict": "declined",
+   "lineage": "carátulas de casete escritas a mano",
+   "thesis": "Lado A iniciar sesión, lado B crear cuenta.",
+   "palette": [
+    "#FAFAF7",
+    "#2849A8",
+    "#9A9A9A",
+    "#C8102E"
+   ],
+   "materials": [
+    "cartulina rayada",
+    "bolígrafo"
+   ],
+   "viewport": "Una carátula desplegada con los dos lados del acceso.",
+   "case": "Funde a medias: el giro A/B es ingenioso, pero no habla de la caja.",
+   "kept": "Valores alineados a la derecha, pegados al margen.",
+   "risk": "Nostalgia ajena al negocio.",
+   "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-cassette-j-card-hero.webp"
+  },
+  {
+   "id": "challenger-crouwel",
+   "kind": "challenger",
+   "catalogId": "crouwel-grid-specimen",
+   "label": "Retícula Crouwel",
+   "verdict": "declined",
+   "lineage": "carteles de tipos construidos en retícula",
+   "thesis": "El logo construido celda por celda en una retícula visible.",
+   "palette": [
+    "#FFFFFF",
+    "#C8D6F0",
+    "#111111",
+    "#E6332A"
+   ],
+   "materials": [
+    "retícula visible",
+    "grotesca"
+   ],
+   "viewport": "Letras enormes de retícula junto al formulario.",
+   "case": "Funde frío: se ve correcto pero no cercano para un negocio de barrio.",
+   "kept": "La retícula visible como armazón real.",
+   "risk": "Distante y de diseñador.",
+   "hero": "https://impeccable.style/worlds/cards/crouwel-grid-specimen-hero.webp"
+  },
+  {
+   "id": "challenger-saville",
+   "kind": "challenger",
+   "catalogId": "brand-identity-canon-saville-catalog-sleeve",
+   "label": "Funda de catálogo",
+   "verdict": "declined",
+   "lineage": "identidades de catálogo de un sello discográfico",
+   "thesis": "La caja como una funda negra con un código de color.",
+   "palette": [
+    "#0E0E0E",
+    "#F2F2F2",
+    "#E94E1B",
+    "#2BA84A"
+   ],
+   "materials": [
+    "negro mate",
+    "líneas blancas"
+   ],
+   "viewport": "Campo negro vasto con un pulso de líneas y el formulario.",
+   "case": "Funde mal: codificar con color contradice la regla de no comunicar solo con color.",
+   "kept": "Vastos espacios vacíos con un único elemento dueño del campo.",
+   "risk": "Críptico para una pantalla de acceso.",
+   "hero": "https://impeccable.style/worlds/cards/brand-identity-canon-saville-catalog-sleeve-hero.webp"
+  },
+  {
+   "id": "challenger-acetate",
+   "kind": "challenger",
+   "catalogId": "rw-manual-acetate-tab-board",
+   "label": "Manual con pestañas",
+   "verdict": "declined",
+   "lineage": "manuales de software con divisores de color",
+   "thesis": "Iniciar sesión y crear cuenta como dos pestañas de un manual.",
+   "palette": [
+    "#E8A317",
+    "#2E7D32",
+    "#1E3A8A",
+    "#F4F4F0"
+   ],
+   "materials": [
+    "acetato",
+    "cartón de color"
+   ],
+   "viewport": "Un divisor de color con una hoja de acetato encima.",
+   "case": "Funde mal: el manual de software no pertenece al mundo del mostrador.",
+   "kept": "Un solo tamaño hace casi todo el trabajo.",
+   "risk": "Retro de oficina.",
+   "hero": "https://impeccable.style/worlds/cards/rw-manual-acetate-tab-board-hero.webp"
+  },
+  {
+   "id": "challenger-specimen",
+   "kind": "challenger",
+   "catalogId": "variable-font-specimen",
+   "label": "Muestrario tipográfico",
+   "verdict": "declined",
+   "lineage": "muestrarios interactivos de fuentes variables",
+   "thesis": "La marca como una letra gigante que cambia de peso.",
+   "palette": [
+    "#FAFAFA",
+    "#111111",
+    "#FF4F00"
+   ],
+   "materials": [
+    "papel plano",
+    "tinta negra"
+   ],
+   "viewport": "Una «C» enorme junto al formulario.",
+   "case": "Funde mal: es un juguete de tipógrafos, no una caja.",
+   "kept": "Jerarquía solo por contraste de escala.",
+   "risk": "Decoración sin función.",
+   "hero": "https://impeccable.style/worlds/cards/variable-font-specimen-hero.webp"
+  }
+ ],
+ "reroll": {
+  "registers": [
+   "safer",
+   "bolder"
+  ]
+ },
+ "buildPath": {
+  "value": "code"
+ },
+ "canon": true,
+ "canonCard": {
+  "kind": "canon",
+  "label": "El estándar de la categoría",
+  "thesis": "Acceso partido en dos, como en cualquier SaaS, hecho con cuidado.",
+  "palette": [
+   "#FFFFFF",
+   "#111827",
+   "#B45309"
+  ],
+  "materials": [
+   "retícula limpia",
+   "panel de marca"
+  ],
+  "viewport": "Un panel de marca de color a la izquierda y el formulario blanco a la derecha.",
+  "risk": "Indistinguible de la competencia, a propósito.",
+  "html": ".impeccable/mocks/decision/canon.html"
+ },
+ "steer": true
+}

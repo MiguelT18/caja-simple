@@ -1,0 +1,272 @@
+---
+// Arco del día: el astro recorre el arco de mañana a noche siguiendo el scroll de los turnos
+// (lo mueve `src/scripts/landing.ts`). Sin JS o con movimiento reducido queda quieto en la mañana.
+import { SKY_START, skyPoint } from "../../scripts/sky";
+
+const start = skyPoint(SKY_START);
+
+// Estrellas en % del cielo; solo se ven de noche. Las de la segunda tanda son más tenues.
+const stars = [
+  [12, 30], [22, 14], [31, 40], [44, 9], [58, 22], [67, 8], [76, 33], [86, 16], [93, 42],
+];
+const faintStars = [
+  [7, 18], [17, 46], [27, 24], [38, 30], [51, 12], [63, 38], [72, 20], [81, 44], [90, 26], [97, 10],
+];
+
+// Nubes de la mañana: posición en % y ancho relativo.
+const clouds = [
+  [14, 22, 1], [48, 12, 0.7], [78, 30, 0.85],
+];
+---
+
+<div class="sky" aria-hidden="true" data-phase="morning" style={`--x: ${start.x}; --y: ${start.y}`}>
+  {/* Un cielo por turno: se apilan y solo se ve el de la fase activa (los degradados no se animan, la opacidad sí). */}
+  <span class="wash" data-wash="morning"></span>
+  <span class="wash" data-wash="afternoon"></span>
+  <span class="wash" data-wash="night"></span>
+  {clouds.map(([x, y, w], i) => <span class="cloud" style={`left: ${x}%; top: ${y}%; --w: ${w}; --i: ${i}`} />)}
+  <svg class="sky-lines" viewBox="0 0 1200 520" preserveAspectRatio="none">
+    <path class="sky-arc" d="M40 500 A560 340 0 0 1 1160 500" vector-effect="non-scaling-stroke"></path>
+    <path class="sky-horizon" d="M0 500 H1200" vector-effect="non-scaling-stroke"></path>
+  </svg>
+  {stars.map(([x, y], i) => <span class="star" style={`left: ${x}%; top: ${y}%; --i: ${i}`} />)}
+  {faintStars.map(([x, y], i) => <span class="star star-faint" style={`left: ${x}%; top: ${y}%; --i: ${i + stars.length}`} />)}
+  <span class="sky-body">
+    <span class="sun"></span>
+    <span class="moon"></span>
+  </span>
+</div>
+
+<style>
+  .sky {
+    --sky: var(--color-shift-morning);
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: clip;
+    container-type: size;
+    /* Se desvanece en los bordes: el recorte lateral del brillo no se nota. */
+    mask: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+    pointer-events: none;
+  }
+
+  .sky[data-phase="afternoon"] {
+    --sky: var(--color-shift-afternoon);
+  }
+
+  .sky[data-phase="night"] {
+    --sky: var(--color-shift-night);
+  }
+
+  /* Cielos */
+  .wash {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .wash[data-wash="morning"] {
+    background: linear-gradient(var(--color-shift-morning-soft) 10%, var(--color-surface-muted) 96%);
+  }
+
+  /* Tarde: cálido arriba y un resplandor bajo y ancho sobre el horizonte. */
+  .wash[data-wash="afternoon"] {
+    background:
+      radial-gradient(60% 55% at 50% 100%, color-mix(in srgb, var(--color-shift-afternoon) 28%, transparent), transparent),
+      linear-gradient(
+        color-mix(in srgb, var(--color-shift-afternoon-soft) 70%, var(--color-surface-muted)) 10%,
+        color-mix(in srgb, var(--color-shift-afternoon-soft) 60%, var(--color-surface-muted)) 96%
+      );
+  }
+
+  .wash[data-wash="night"] {
+    background: linear-gradient(
+      color-mix(in srgb, var(--color-shift-night) 22%, var(--color-shift-night-soft)) 10%,
+      color-mix(in srgb, var(--color-shift-night-soft) 55%, var(--color-surface-muted)) 96%
+    );
+  }
+
+  .sky[data-phase="morning"] .wash[data-wash="morning"],
+  .sky[data-phase="afternoon"] .wash[data-wash="afternoon"],
+  .sky[data-phase="night"] .wash[data-wash="night"] {
+    opacity: 1;
+  }
+
+  /* Nubes de la mañana: una pastilla con una loma encima; derivan despacio. */
+  .cloud {
+    position: absolute;
+    width: calc(var(--w) * 5.5rem);
+    height: calc(var(--w) * 1.5rem);
+    border-radius: 999px;
+    /* Color opaco para que la loma no se note al superponerse. En oscuro, una nube blanca sería un manchón: se vuelve un velo celeste. */
+    background: light-dark(
+      color-mix(in srgb, var(--color-surface) 75%, var(--color-shift-morning-soft)),
+      color-mix(in srgb, var(--color-shift-morning) 16%, var(--color-shift-morning-soft))
+    );
+    opacity: 0;
+    transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .cloud::before {
+    content: "";
+    position: absolute;
+    left: 22%;
+    bottom: 40%;
+    width: 45%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: inherit;
+  }
+
+  .sky[data-phase="morning"] .cloud {
+    opacity: 1;
+  }
+
+  .sky-lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .sky-arc,
+  .sky-horizon {
+    fill: none;
+    stroke: var(--color-border-strong);
+    stroke-width: 1.5;
+  }
+
+  .sky-arc {
+    stroke-dasharray: 2 8;
+    stroke-linecap: round;
+  }
+
+  .sky-horizon {
+    stroke: var(--color-border);
+    transition: stroke 600ms;
+  }
+
+  .sky[data-phase="afternoon"] .sky-horizon {
+    stroke: color-mix(in srgb, var(--color-shift-afternoon) 45%, var(--color-border));
+  }
+
+  .star {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--color-shift-night);
+    opacity: 0;
+    transition: opacity 800ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i) * 60ms);
+  }
+
+  .sky[data-phase="night"] .star {
+    opacity: 0.7;
+  }
+
+  .star-faint {
+    width: 2px;
+    height: 2px;
+  }
+
+  .sky[data-phase="night"] .star-faint {
+    opacity: 0.4;
+  }
+
+  /* El astro se mueve con translate en unidades del contenedor: solo composición, sin layout. */
+  .sky-body {
+    position: absolute;
+    top: 0;
+    left: 0;
+    translate: calc(var(--x) * 1cqw) calc(var(--y) * 1cqh);
+  }
+
+  .sky-body {
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: -1.375rem 0 0 -1.375rem;
+  }
+
+  .sun,
+  .moon {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    transition:
+      opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+      scale 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .sun {
+    background: var(--sky);
+    box-shadow: 0 8px 28px -4px color-mix(in srgb, var(--sky) 70%, transparent);
+    transition:
+      opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+      scale 600ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 600ms,
+      box-shadow 600ms;
+  }
+
+  /* Luna creciente: el mismo disco con un mordisco circular. */
+  .moon {
+    background: var(--color-shift-night);
+    mask: radial-gradient(circle at 72% 32%, transparent 42%, #000 43%);
+    opacity: 0;
+    scale: 0.6;
+  }
+
+  .sky[data-phase="night"] .sun {
+    opacity: 0;
+    scale: 0.6;
+  }
+
+  .sky[data-phase="night"] .moon {
+    opacity: 1;
+    scale: 1;
+  }
+
+  @media (max-width: 640px) {
+    .cloud {
+      width: calc(var(--w) * 3.25rem);
+      height: calc(var(--w) * 0.9rem);
+    }
+
+    .sky-body {
+      width: 1.75rem;
+      height: 1.75rem;
+      margin: -0.875rem 0 0 -0.875rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cloud {
+      animation: drift calc(38s + var(--i) * 9s) ease-in-out infinite alternate;
+    }
+
+    .star {
+      animation: twinkle calc(3s + var(--i) * 0.37s) ease-in-out infinite alternate;
+    }
+  }
+
+  @keyframes drift {
+    to {
+      translate: 3rem 0;
+    }
+  }
+
+  @keyframes twinkle {
+    to {
+      scale: 0.5;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sky *,
+    .sky {
+      transition: none;
+    }
+  }
+</style>

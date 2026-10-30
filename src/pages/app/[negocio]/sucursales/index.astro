@@ -1,0 +1,166 @@
+---
+import { ArrowRight, CircleCheck, Clock, MapPin, Plus, TriangleAlert, Users } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import Layout from "@/layouts/Layout.astro";
+import { appPaths, businessContext } from "@/data/queries";
+import { formatBs } from "@/lib/format";
+
+export const getStaticPaths = () => appPaths.business();
+
+const ctx = businessContext(Astro.params.negocio!);
+const { business, branchSummary } = ctx;
+---
+
+<Layout title={`Sucursales · ${business.name}`} context={{ membership: ctx.membership }}>
+  <PageHeader title="Sucursales" description={`${branchSummary.length} ${branchSummary.length === 1 ? "sucursal" : "sucursales"} de ${business.name} · movimientos de hoy`}>
+    <button type="button" class="btn btn-secondary"><Plus size={18} stroke-width={2} />Agregar sucursal</button>
+  </PageHeader>
+
+  <section class="branch-grid">
+    {
+      branchSummary.map((stats, i) => {
+        const { branch } = stats;
+        return (
+          <article class="card branch" style={`--branch: var(--color-branch-${(i % 6) + 1})`}>
+            <header>
+              <h2 class="card-title">
+                <span class="branch-dot" aria-hidden="true" />
+                {branch.name}
+              </h2>
+              <p class="meta">
+                <MapPin size={16} stroke-width={1.75} />
+                {branch.address}
+              </p>
+              <p class="meta">
+                <Users size={16} stroke-width={1.75} />
+                {stats.employees} {stats.employees === 1 ? "empleado" : "empleados"}
+              </p>
+              <p class="meta">
+                <Clock size={16} stroke-width={1.75} />
+                {stats.shifts.map((s) => `${s.name} ${s.start}–${s.end}`).join(" · ")}
+              </p>
+            </header>
+            <dl class="rows">
+              <div>
+                <dt>Ventas</dt>
+                <dd class="num amount-income">{formatBs(stats.sales, "+")}</dd>
+              </div>
+              <div>
+                <dt>Gastos</dt>
+                <dd class="num amount-expense">{formatBs(stats.expenses, "−")}</dd>
+              </div>
+              <div class="balance">
+                <dt>Saldo</dt>
+                <dd class="num">{formatBs(stats.sales - stats.expenses)}</dd>
+              </div>
+            </dl>
+            {stats.cash === "cuadra" && (
+              <span class="chip chip-income">
+                <CircleCheck size={14} stroke-width={2} />
+                La caja cuadró
+              </span>
+            )}
+            {stats.cash === "descuadre" && (
+              <span class="chip chip-warning">
+                <TriangleAlert size={14} stroke-width={2} />
+                Caja descuadrada
+              </span>
+            )}
+            {stats.cash === "en-curso" && (
+              <span class="chip chip-info">
+                <Clock size={14} stroke-width={2} />
+                Turno en curso
+              </span>
+            )}
+            <a href={stats.href} class="btn btn-secondary btn-block enter">
+              Entrar a {branch.name}
+              <ArrowRight size={18} stroke-width={2} />
+            </a>
+          </article>
+        );
+      })
+    }
+  </section>
+</Layout>
+
+<style>
+  .branch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: 1rem;
+  }
+
+  .branch {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.25rem;
+    padding: 1.25rem;
+  }
+
+  .enter {
+    margin-top: auto;
+  }
+
+  .branch header {
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  .card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .branch-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: var(--branch);
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .rows {
+    display: grid;
+    gap: 0.5rem;
+    width: 100%;
+    margin: 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-sm);
+  }
+
+  .rows div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .rows dt {
+    color: var(--color-text-muted);
+  }
+
+  .rows dd {
+    margin: 0;
+  }
+
+  .balance dt {
+    color: var(--color-text);
+    font-weight: var(--font-semibold);
+  }
+
+  .balance dd {
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+  }
+</style>

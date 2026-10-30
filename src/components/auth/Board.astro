@@ -1,0 +1,615 @@
+---
+import Logo from "../Logo.astro";
+
+interface Props {
+  /** Frase en tiza que invita a la acción de la página (entrar o crear la cuenta). */
+  pitch: string;
+}
+
+const { pitch } = Astro.props;
+
+// Valores de respaldo para el primer pintado; `auth-board.ts` los reemplaza con el reloj de quien entra.
+const now = new Date();
+const fallbackDay = now.getDate();
+const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(now)
+  + " · " + new Intl.DateTimeFormat("es", { month: "long" }).format(now);
+---
+
+<!-- Los trazos de tiza van fuera de los [data-board-*] porque auth-board.ts reemplaza su texto. -->
+<aside class="board" aria-label="Hoy">
+  <svg class="board-defs" aria-hidden="true" focusable="false">
+    <filter id="chalk-stroke" x="-20%" y="-60%" width="140%" height="220%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="wobble" />
+      <feDisplacementMap in="SourceGraphic" in2="wobble" scale="2.5" xChannelSelector="R" yChannelSelector="G" result="rough" />
+      <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="8" result="grain" />
+      <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  3 0 0 0 -0.7" result="grain-alpha" />
+      <feComposite in="rough" in2="grain-alpha" operator="in" />
+    </filter>
+  </svg>
+
+  <div class="board-slate">
+    <div class="board-head">
+      <div class="board-brand">
+        <Logo class="board-logo" />
+        <span>Caja Simple</span>
+      </div>
+      <p class="board-tagline">Tu negocio, bajo control. La caja del día, sin cuaderno ni calculadora.</p>
+    </div>
+
+    <div class="board-today chalk" data-board-today>
+      <span class="board-greeting">
+        <span data-board-greeting>Hola</span>
+        <svg class="mark mark-underline" viewBox="0 0 200 12" preserveAspectRatio="none" aria-hidden="true">
+          <g filter="url(#chalk-stroke)">
+            <path pathLength="1" vector-effect="non-scaling-stroke" d="M3 7C30 3 55 10 85 6s55-4 85 1 22-1 27-2" />
+          </g>
+        </svg>
+      </span>
+      <span class="board-day num">
+        <span data-board-day>{fallbackDay}</span>
+        <svg class="mark mark-oval" viewBox="0 0 200 140" preserveAspectRatio="none" aria-hidden="true">
+          <g filter="url(#chalk-stroke)">
+            <path
+              pathLength="1"
+              vector-effect="non-scaling-stroke"
+              d="M60 16C110 3 178 18 187 60c9 44-46 72-95 70-52-2-82-30-78-64C18 34 52 13 104 11c16 0 30 2 42 6"
+            />
+          </g>
+        </svg>
+      </span>
+      <span class="board-date" data-board-date>{fallbackDate}</span>
+    </div>
+
+    <!-- Caja registradora dibujada en tiza: decoración, sin cifras. -->
+    <svg class="doodle doodle-register" viewBox="0 0 120 104" aria-hidden="true">
+      <g filter="url(#chalk-stroke)">
+        <path pathLength="1" d="M28 34V12c0-3 2-4 4-2l3 3 3-3 3 3 3-3 3 3 3-3 2 2v22" />
+        <path pathLength="1" d="M64 34V24M56 8h30v16H56z" />
+        <path pathLength="1" d="M18 34h84l8 38H10z" />
+        <path pathLength="1" d="M26 44h8m8 0h8m8 0h8M26 53h8m8 0h8m8 0h8M26 62h8m8 0h8m8 0h8" />
+        <path pathLength="1" d="M82 43h14v20H82z" />
+        <path pathLength="1" d="M6 72h108v24H6zM50 84h20" />
+      </g>
+    </svg>
+
+    <p class="board-pitch">{pitch}</p>
+
+    <dl class="board-rows chalk">
+      <div class="board-row">
+        <dt>Hora</dt>
+        <dd class="num"><time data-board-time></time></dd>
+      </div>
+      <div class="board-row">
+        <dt>Ventas y gastos</dt>
+        <dd>por sucursal</dd>
+      </div>
+      <div class="board-row">
+        <dt>Cuadre de caja</dt>
+        <dd>por turno</dd>
+      </div>
+    </dl>
+
+    <p class="board-note">
+      <svg class="doodle doodle-arrow" viewBox="0 0 32 14" aria-hidden="true">
+        <g filter="url(#chalk-stroke)">
+          <path pathLength="1" d="M2 8c8-2 16-3 27-1" />
+          <path pathLength="1" d="M22 2l7 5-7 5" />
+        </g>
+      </svg>
+      Una sola cuenta para trabajar en un negocio y para llevar el tuyo.
+    </p>
+  </div>
+
+  <!-- Repisa con dos tizas y el borrador. -->
+  <div class="board-tray" aria-hidden="true">
+    <svg class="tray-items" viewBox="0 0 160 16">
+      <rect class="tray-chalk" x="6" y="8" width="48" height="7" rx="3.5" />
+      <rect class="tray-chalk-yellow" x="64" y="8.5" width="20" height="6.5" rx="3.25" />
+      <path class="tray-shine" d="M9 9.6h42M67 10h14" />
+      <rect class="tray-eraser-back" x="108" y="2" width="46" height="8" rx="2" />
+      <rect class="tray-eraser-felt" x="108" y="9" width="46" height="6" rx="1" />
+    </svg>
+  </div>
+</aside>
+
+<style>
+  .board {
+    --frame: 0.875rem;
+    --tray-drop: 0.625rem;
+    --wood-grain-y: repeating-linear-gradient(
+        90deg,
+        transparent 0 2px,
+        rgb(0 0 0 / 0.08) 2px 3px,
+        transparent 3px 7px,
+        rgb(255 255 255 / 0.05) 7px 8px,
+        transparent 8px 11px
+      ),
+      repeating-linear-gradient(90deg, transparent 0 13px, rgb(0 0 0 / 0.12) 13px 14.5px, transparent 14.5px 23px);
+    --wood-grain-x: repeating-linear-gradient(
+        180deg,
+        transparent 0 2px,
+        rgb(0 0 0 / 0.08) 2px 3px,
+        transparent 3px 5px,
+        rgb(255 255 255 / 0.05) 5px 6px,
+        transparent 6px 9px
+      ),
+      repeating-linear-gradient(180deg, transparent 0 4px, rgb(0 0 0 / 0.1) 4px 5px, transparent 5px 11px);
+    /* Renglón de tiza: no es recto ni continuo, como pasado a mano. */
+    --chalk-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 4' preserveAspectRatio='none'%3E%3Cpath d='M1 2.3C60 1.4 120 2.9 200 2s140-.8 199 .4' fill='none' stroke='%23eceae2' stroke-opacity='.3' stroke-width='2' stroke-linecap='round' stroke-dasharray='70 1.5 120 2 90 1 119'/%3E%3C/svg%3E");
+    --chalk-line-alt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 4' preserveAspectRatio='none'%3E%3Cpath d='M1 1.8C80 2.8 150 1.3 230 2.2s120.5.6 168-.6' fill='none' stroke='%23eceae2' stroke-opacity='.3' stroke-width='2' stroke-linecap='round' stroke-dasharray='130 2 60 1.5 140 1 67'/%3E%3C/svg%3E");
+    /* La pizarra siempre cabe en la ventana: margen, padding y tiza se ajustan a la altura disponible. */
+    --board-gap: clamp(0.75rem, 3dvh, 1.5rem);
+
+    position: sticky;
+    top: var(--board-gap);
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 2 * var(--board-gap) - var(--tray-drop));
+    margin: var(--board-gap) 0 calc(var(--board-gap) + var(--tray-drop)) 1.5rem;
+    padding: var(--frame);
+    border-radius: 0.375rem;
+    background: var(--wood-grain-y), linear-gradient(90deg, rgb(255 255 255 / 0.05), rgb(0 0 0 / 0.08)),
+      var(--board-frame);
+    box-shadow:
+      inset 1px 0 0 rgb(255 255 255 / 0.14),
+      inset -1px 0 0 rgb(0 0 0 / 0.25),
+      0 1px 2px rgb(24 32 28 / 0.2),
+      0 18px 36px -18px rgb(24 32 28 / 0.45);
+  }
+
+  /* Travesaños de arriba y abajo, con la veta a lo largo. */
+  .board::before,
+  .board::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: var(--frame);
+    background: var(--wood-grain-x), var(--board-frame);
+  }
+
+  .board::before {
+    top: 0;
+    border-radius: 0.375rem 0.375rem 0 0;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 -1px 0 rgb(0 0 0 / 0.2);
+  }
+
+  .board::after {
+    bottom: 0;
+    border-radius: 0 0 0.375rem 0.375rem;
+  }
+
+  .board-defs {
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+
+  .board-slate {
+    --color-surface: var(--board); /* el trazo interior del logo toma el color de la pizarra */
+
+    container-type: inline-size;
+    position: relative;
+    display: grid;
+    flex: 1;
+    grid-template-rows: auto 1fr auto auto auto;
+    grid-template-areas: "brand" "today" "pitch" "rows" "note";
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(1.25rem, 5dvh, 2.75rem) 2.5rem clamp(1.25rem, 4.5dvh, 2.5rem);
+    border-radius: 2px;
+    /* Borrones de borrador, polvo de tiza y la pizarra. */
+    background:
+      radial-gradient(ellipse 55% 16% at 72% 24%, var(--chalk-dust), transparent 70%),
+      radial-gradient(ellipse 48% 12% at 30% 64%, var(--chalk-dust), transparent 70%),
+      radial-gradient(ellipse 70% 14% at 55% 92%, var(--chalk-dust), transparent 70%),
+      var(--slate-grain),
+      linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 45%),
+      var(--board);
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.45),
+      inset 0 2px 6px rgb(0 0 0 / 0.35),
+      inset 0 0 5rem rgb(0 0 0 / 0.35);
+    color: var(--chalk);
+  }
+
+  .board-head {
+    grid-area: brand;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .board-brand {
+    display: flex;
+    white-space: nowrap;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-lh);
+    font-weight: var(--font-bold);
+  }
+
+  .board-logo {
+    width: 2.25rem;
+    height: 2.25rem;
+    color: var(--chalk-yellow);
+  }
+
+  .board-today {
+    grid-area: today;
+    display: flex;
+    flex-direction: column;
+    align-self: center;
+    font-family: var(--font-chalk);
+    font-weight: 700;
+  }
+
+  .board-tagline,
+  .board-pitch {
+    margin: 0;
+    font-family: var(--font-chalk);
+    font-weight: 700;
+    text-wrap: balance;
+  }
+
+  .board-tagline {
+    max-width: 26ch;
+    color: var(--chalk-muted);
+    font-size: clamp(1.0625rem, min(0.85rem + 0.5vw, 3dvh), 1.375rem);
+    line-height: 1.3;
+  }
+
+  .board-pitch {
+    grid-area: pitch;
+    max-width: 22ch;
+    margin-bottom: clamp(1rem, 3.5dvh, 1.75rem);
+    font-size: clamp(1.25rem, min(0.95rem + 0.8vw, 3.8dvh), 1.75rem);
+    line-height: 1.25;
+  }
+
+  /* Polvo de tiza alrededor de las letras. */
+  .chalk,
+  .board-brand,
+  .board-tagline,
+  .board-pitch {
+    text-shadow: 0 0 1px rgb(236 234 226 / 0.35);
+  }
+
+  .board-greeting {
+    position: relative;
+    width: fit-content;
+    padding-bottom: 0.3em;
+    color: var(--chalk-yellow);
+    font-size: clamp(1.5rem, min(1rem + 1.6vw, 5dvh), 2.75rem);
+    line-height: 1.1;
+  }
+
+  .board-day {
+    position: relative;
+    width: fit-content;
+    margin-left: -0.3em;
+    padding: 0.1em 0.3em 0.06em;
+    font-size: clamp(3.5rem, min(2rem + 7vw, 14dvh), 8.5rem);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+  }
+
+  .board-date {
+    color: var(--chalk-muted);
+    font-size: clamp(1.25rem, min(1rem + 1vw, 4dvh), 2.25rem);
+    line-height: 1.2;
+  }
+
+  /* Trazos y dibujos: todos comparten el filtro de tiza y se dibujan con stroke-dashoffset. */
+  .mark,
+  .doodle {
+    overflow: visible;
+    pointer-events: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .mark path,
+  .doodle path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+
+  .mark {
+    position: absolute;
+  }
+
+  .mark-underline {
+    inset: auto 0 0;
+    width: 100%;
+    height: 0.3em;
+    stroke-width: 4px;
+  }
+
+  .mark-oval {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    color: var(--chalk);
+    stroke-width: 3px;
+    opacity: 0.85;
+  }
+
+  .doodle-register {
+    grid-area: today;
+    align-self: center;
+    justify-self: end;
+    width: clamp(5.5rem, 28cqi, 9rem);
+    color: var(--chalk-muted);
+    stroke-width: 2.5;
+    opacity: 0.8;
+  }
+
+  /* Sin espacio a lo ancho, la caja registradora se borra para no chocar con el saludo. */
+  @container (max-width: 28rem) {
+    .doodle-register {
+      display: none;
+    }
+  }
+
+  .board-rows {
+    grid-area: rows;
+    margin: 0;
+    padding-top: 3px;
+    background: var(--chalk-line) top / 100% 3px no-repeat;
+    font-family: var(--font-chalk);
+    font-weight: 700;
+    font-size: clamp(1.125rem, min(0.9rem + 0.6vw, 3.2dvh), 1.625rem);
+  }
+
+  .board-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    height: var(--board-row);
+    background: var(--chalk-line-alt) bottom / 100% 3px no-repeat;
+  }
+
+  .board-row:nth-child(2) {
+    background-image: var(--chalk-line);
+  }
+
+  .board-row dd {
+    margin: 0;
+    color: var(--chalk-yellow);
+    text-align: right;
+  }
+
+  .board-note {
+    grid-area: note;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    max-width: 32ch;
+    margin: 1.25rem 0 0;
+    color: var(--chalk-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .doodle-arrow {
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1lh;
+    color: var(--chalk-yellow);
+    stroke-width: 2.25;
+  }
+
+  /* Repisa: sobresale del marco y sostiene las tizas delante de la pizarra. */
+  .board-tray {
+    position: absolute;
+    z-index: 1;
+    right: -0.5rem;
+    bottom: calc(-1 * var(--tray-drop));
+    left: -0.5rem;
+    height: 1.25rem;
+    border-radius: 0.25rem;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.16), transparent 35%, rgb(0 0 0 / 0.25)),
+      var(--wood-grain-x),
+      var(--board-frame);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.2),
+      0 8px 14px -6px rgb(24 32 28 / 0.5);
+  }
+
+  .tray-items {
+    position: absolute;
+    bottom: calc(100% - 4px);
+    left: 2.75rem;
+    width: 13rem;
+    height: 1.3rem;
+    overflow: visible;
+    filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.4));
+  }
+
+  .tray-chalk {
+    fill: var(--chalk);
+  }
+
+  .tray-chalk-yellow {
+    fill: var(--chalk-yellow);
+  }
+
+  .tray-shine {
+    stroke: rgb(255 255 255 / 0.55);
+    stroke-width: 1.2;
+    stroke-linecap: round;
+  }
+
+  .tray-eraser-back {
+    fill: var(--eraser-back);
+  }
+
+  .tray-eraser-felt {
+    fill: var(--eraser-felt);
+  }
+
+  /* En pantallas bajas se borra primero la nota (y el dibujo) y luego las filas de capacidades; la hora queda. */
+  @media (min-width: 961px) and (max-height: 46rem) {
+    .board-note,
+    .board-tagline,
+    .doodle-register {
+      display: none;
+    }
+  }
+
+  @media (min-width: 961px) and (max-height: 38rem) {
+    .board-row:not(:first-child) {
+      display: none;
+    }
+  }
+
+  /* La tiza se escribe de izquierda a derecha al cargar y después se pasan los trazos. Sin animación, todo queda visible. */
+  @media (prefers-reduced-motion: no-preference) {
+    .chalk > * {
+      animation: chalk-write 900ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+
+    .chalk > :nth-child(2) {
+      animation-delay: 120ms;
+    }
+
+    .chalk > :nth-child(3) {
+      animation-delay: 240ms;
+    }
+
+    .board-rows > * {
+      animation-delay: 360ms;
+    }
+
+    .board-rows > :nth-child(2) {
+      animation-delay: 440ms;
+    }
+
+    .board-rows > :nth-child(3) {
+      animation-delay: 520ms;
+    }
+
+    .board-tagline,
+    .board-pitch {
+      animation: chalk-write 900ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+
+    .board-pitch {
+      animation-delay: 300ms;
+    }
+
+    .mark path,
+    .doodle path {
+      animation: chalk-draw 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+
+    .mark-underline path {
+      animation-duration: 450ms;
+      animation-delay: 300ms;
+    }
+
+    .mark-oval path {
+      animation-delay: 380ms;
+    }
+
+    .doodle-arrow path {
+      animation-duration: 450ms;
+      animation-delay: 560ms;
+    }
+
+    .doodle-arrow path + path {
+      animation-delay: 760ms;
+    }
+
+    .doodle-register path {
+      animation-duration: 900ms;
+      animation-delay: 600ms;
+    }
+
+    .doodle-register path:nth-child(n + 4) {
+      animation-delay: 800ms;
+    }
+  }
+
+  /* La máscara solo existe durante la animación: al terminar, la tiza queda sin recortes. */
+  @keyframes chalk-write {
+    from {
+      mask-image: linear-gradient(90deg, #000 50%, transparent 60%);
+      mask-size: 220% 100%;
+      mask-position: 100% 0;
+    }
+
+    to {
+      mask-image: linear-gradient(90deg, #000 50%, transparent 60%);
+      mask-size: 220% 100%;
+      mask-position: 0 0;
+    }
+  }
+
+  @keyframes chalk-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+  }
+
+  /* Pantallas medianas y móviles: la pizarra se vuelve una franja arriba, sin repisa ni dibujos. */
+  @media (max-width: 960px) {
+    .board {
+      --frame: 0.5rem;
+      --tray-drop: 0rem;
+
+      position: relative;
+      top: 0;
+      height: auto;
+      margin: 1rem 1rem 0;
+    }
+
+    .board-slate {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto;
+      grid-template-areas: "brand today";
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+    }
+
+    .board-today {
+      flex-direction: row;
+      align-items: baseline;
+      gap: 0.5rem;
+      text-align: right;
+    }
+
+    .board-greeting,
+    .board-day,
+    .board-date {
+      margin: 0;
+      padding: 0;
+      font-size: 1.375rem;
+      line-height: 1.2;
+    }
+
+    .board-date,
+    .board-tagline,
+    .board-pitch,
+    .board-rows,
+    .board-note,
+    .board-tray,
+    .mark,
+    .doodle {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .board-greeting {
+      display: none;
+    }
+  }
+</style>

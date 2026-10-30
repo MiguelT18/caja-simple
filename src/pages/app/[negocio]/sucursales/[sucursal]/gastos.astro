@@ -1,0 +1,129 @@
+---
+import { Plus } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import ShiftChip from "@/components/ShiftChip.astro";
+import DonutChart from "@/components/app/charts/DonutChart";
+import ExpensesTable from "@/components/app/ExpensesTable";
+import Layout from "@/layouts/Layout.astro";
+import { appPaths, branchContext, expensesByCategory, fullName, sum } from "@/data/queries";
+import { formatBs } from "@/lib/format";
+
+export const getStaticPaths = () => appPaths.branch("gastos");
+
+const { negocio, sucursal } = Astro.params;
+const ctx = branchContext(negocio!, sucursal!);
+const { branch, employeeById, expenseHistory, expenses, shiftById, shifts } = ctx;
+
+const weekTotal = sum(expenseHistory.map((g) => g.amount));
+const todayTotal = sum(expenses.map((g) => g.amount));
+const byShift = shifts.map((shift) => ({
+  shift,
+  total: sum(expenseHistory.filter((g) => g.shiftId === shift.id).map((g) => g.amount)),
+}));
+
+const rows = expenseHistory.map((g) => {
+  const shift = shiftById(g.shiftId);
+  return {
+    id: g.id,
+    date: g.date,
+    time: g.time,
+    concept: g.concept,
+    category: g.category,
+    shift: { name: shift.name, tone: shift.tone },
+    by: fullName(employeeById(g.employeeId)),
+    amount: g.amount,
+  };
+});
+---
+
+<Layout title={`Gastos · ${branch.name}`} context={{ membership: ctx.membership, branch }}>
+  <PageHeader title="Gastos" description={`Salidas de dinero de los últimos 7 días en ${branch.name}`}>
+    <button type="button" class="btn btn-secondary"><Plus size={18} stroke-width={2} />Registrar gasto</button>
+  </PageHeader>
+
+  <div class="top">
+    <dl class="card totals">
+      <div class="totals-main">
+        <dt>Total de la semana</dt>
+        <dd class="num amount-expense">{formatBs(weekTotal, "−")}</dd>
+      </div>
+      <div>
+        <dt>Hoy</dt>
+        <dd class="num">{formatBs(todayTotal, "−")}</dd>
+      </div>
+      {
+        byShift.map(({ shift, total }) => (
+          <div>
+            <dt>
+              <ShiftChip shift={shift} />
+            </dt>
+            <dd class="num">{formatBs(total, "−")}</dd>
+          </div>
+        ))
+      }
+    </dl>
+
+    <section class="card chart-card" aria-labelledby="by-category">
+      <h2 id="by-category" class="card-title">Por categoría</h2>
+      <DonutChart client:visible items={expensesByCategory(expenseHistory)} totalLabel="en 7 días" />
+    </section>
+  </div>
+
+  <h2 class="section-title">Historial</h2>
+  <ExpensesTable client:visible rows={rows} />
+</Layout>
+
+<style>
+  .top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .totals {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    align-content: start;
+    margin: 0;
+    padding: 1.25rem;
+  }
+
+  .totals div {
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  .totals dt {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .totals dd {
+    margin: 0;
+    font-weight: var(--font-semibold);
+  }
+
+  .totals-main {
+    grid-column: 1 / -1;
+  }
+
+  .totals-main dd {
+    font-size: var(--text-3xl);
+    line-height: var(--text-3xl-lh);
+    font-weight: var(--font-bold);
+  }
+
+  .chart-card {
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  @media (max-width: 1100px) {
+    .top {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

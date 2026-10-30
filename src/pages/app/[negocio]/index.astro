@@ -1,0 +1,198 @@
+---
+import { ArrowRight, CircleCheck, Clock, TriangleAlert } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import BarCompareChart from "@/components/app/charts/BarCompareChart";
+import Layout from "@/layouts/Layout.astro";
+import { appPaths, businessContext } from "@/data/queries";
+import { formatBs } from "@/lib/format";
+
+export const getStaticPaths = () => appPaths.business();
+
+const ctx = businessContext(Astro.params.negocio!);
+const { business, branchSummary, salesTotal, expensesTotal } = ctx;
+const balance = salesTotal - expensesTotal;
+const rows = branchSummary.map((b) => ({ label: b.branch.name, sales: b.sales, expenses: b.expenses }));
+---
+
+<Layout title={`Resumen · ${business.name}`} context={{ membership: ctx.membership }}>
+  <PageHeader
+    title="Resumen del negocio"
+    description={`${business.name} · hoy en sus ${branchSummary.length} ${branchSummary.length === 1 ? "sucursal" : "sucursales"}`}
+  />
+
+  <section class="kpis" aria-label="Totales de hoy en todas las sucursales">
+    <div class="card kpi">
+      <p class="kpi-label">Ventas</p>
+      <p class="kpi-value num amount-income">{formatBs(salesTotal, "+")}</p>
+      <p class="kpi-note">{branchSummary.reduce((n, b) => n + b.salesCount, 0)} ventas</p>
+    </div>
+    <div class="card kpi">
+      <p class="kpi-label">Gastos</p>
+      <p class="kpi-value num amount-expense">{formatBs(expensesTotal, "−")}</p>
+      <p class="kpi-note">Entre todas las sucursales</p>
+    </div>
+    <div class="card kpi">
+      <p class="kpi-label">Saldo del día</p>
+      <p class:list={["kpi-value num", { "amount-expense": balance < 0 }]}>{formatBs(balance)}</p>
+      <p class="kpi-note">Ventas menos gastos</p>
+    </div>
+  </section>
+
+  <section class="card chart-card" aria-labelledby="compare-title">
+    <h2 id="compare-title" class="card-title">Ventas y gastos por sucursal</h2>
+    <BarCompareChart client:visible rows={rows} />
+  </section>
+
+  <h2 class="section-title">Cada sucursal hoy</h2>
+  <ul class="branch-list" role="list">
+    {
+      branchSummary.map((b, i) => (
+        <li class="card branch-row" style={`--branch: var(--color-branch-${(i % 6) + 1})`}>
+          <a href={b.href} class="branch-link">
+            <span class="branch-dot" aria-hidden="true" />
+            <span class="branch-name">{b.branch.name}</span>
+            <ArrowRight size={16} stroke-width={2} />
+          </a>
+          <span class="num amount-income">{formatBs(b.sales, "+")}</span>
+          <span class="num amount-expense">{formatBs(b.expenses, "−")}</span>
+          <span class="status">
+            {b.cash === "cuadra" && (
+              <span class="chip chip-income">
+                <CircleCheck size={14} stroke-width={2} />
+                La caja cuadró
+              </span>
+            )}
+            {b.cash === "descuadre" && (
+              <span class="chip chip-warning">
+                <TriangleAlert size={14} stroke-width={2} />
+                Caja descuadrada
+              </span>
+            )}
+            {b.cash === "en-curso" && (
+              <span class="chip chip-info">
+                <Clock size={14} stroke-width={2} />
+                Turno en curso
+              </span>
+            )}
+            {b.lowStock > 0 && (
+              <span class="chip chip-warning">
+                <TriangleAlert size={14} stroke-width={2} />
+                {b.lowStock} {b.lowStock === 1 ? "producto" : "productos"} con stock bajo
+              </span>
+            )}
+          </span>
+        </li>
+      ))
+    }
+  </ul>
+</Layout>
+
+<style>
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .kpi {
+    padding: 1.25rem;
+  }
+
+  .kpi p {
+    margin: 0;
+  }
+
+  .kpi p + p {
+    margin-top: 0.25rem;
+  }
+
+  .kpi-label {
+    color: var(--color-text-muted);
+    font-weight: var(--font-medium);
+  }
+
+  .kpi-value {
+    font-size: var(--text-3xl);
+    line-height: var(--text-3xl-lh);
+    font-weight: var(--font-bold);
+    letter-spacing: -0.01em;
+  }
+
+  .kpi-note {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .chart-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1.25rem;
+  }
+
+  .section-title {
+    margin-top: 2rem;
+  }
+
+  .branch-list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .branch-row {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1.2fr) repeat(2, minmax(7rem, auto)) minmax(0, 2fr);
+    align-items: center;
+    gap: 1rem;
+    padding: 0.875rem 1.25rem;
+  }
+
+  .branch-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    color: var(--color-text);
+    font-weight: var(--font-semibold);
+    text-decoration: none;
+  }
+
+  .branch-link:hover .branch-name {
+    text-decoration: underline;
+  }
+
+  .branch-dot {
+    flex-shrink: 0;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: var(--branch);
+  }
+
+  .status {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 960px) {
+    .kpis {
+      grid-template-columns: 1fr;
+    }
+
+    .branch-row {
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 0.75rem 1.5rem;
+    }
+
+    .branch-link,
+    .status {
+      grid-column: 1 / -1;
+      justify-content: flex-start;
+    }
+  }
+</style>

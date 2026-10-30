@@ -1,19 +1,17 @@
 ---
 import BaseHead from '../components/BaseHead.astro';
+import '../styles/app.css';
 import Sidebar from '../components/Sidebar.astro';
+import type { Branch } from '../data/mock';
+import { currentUser, type Membership } from '../data/queries';
 
 interface Props {
 	title: string;
+	/** Negocio (y sucursal) de la página; se omite en «Tus negocios». */
+	context?: { membership: Membership; branch?: Branch };
 }
 
-const { title } = Astro.props;
-
-// TODO: reemplazar por el usuario de la sesión cuando exista la autenticación.
-const user = {
-	firstName: 'María Fernanda',
-	lastName: 'López García',
-	email: 'maria.lopez@cajasimple.com',
-};
+const { title, context } = Astro.props;
 ---
 
 <html lang="es">
@@ -21,7 +19,7 @@ const user = {
 		<BaseHead title={title} />
 	</head>
 	<body>
-		<Sidebar user={user} />
+		<Sidebar user={currentUser()} context={context} />
 		<main>
 			<slot />
 		</main>
@@ -37,7 +35,8 @@ const user = {
 	main {
 		flex: 1;
 		min-width: 0;
-		padding: 2rem;
+		/* El lateral flotante ya deja margen a su derecha. */
+		padding: 2rem 2rem 2rem 1.25rem;
 	}
 
 	@media (max-width: 768px) {

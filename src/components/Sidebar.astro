@@ -1,56 +1,53 @@
 ---
-import {
-  CirclePlus,
-  LayoutDashboard,
-  LogOut,
-  Moon,
-  Package,
-  Sun,
-  Wallet,
-} from "@lucide/astro";
+import { BriefcaseBusiness, CirclePlus, Store } from "@lucide/astro";
+import type { Branch, User } from "../data/mock";
+import { appNav } from "../data/navigation";
+import { branchHref, branchSections, entryHref, myBusinesses, type Membership } from "../data/queries";
+import ContextSwitcher from "./ContextSwitcher.astro";
 import Logo from "./Logo.astro";
-
-export interface SidebarUser {
-  firstName: string;
-  lastName: string;
-  email: string;
-  avatarUrl?: string;
-}
+import ThemeToggle from "./ThemeToggle.astro";
+import UserCard from "./UserCard.astro";
 
 interface Props {
-  user: SidebarUser;
+  user: User;
+  /** Negocio (y sucursal) de la página; sin él, la persona está en «Tus negocios». */
+  context?: { membership: Membership; branch?: Branch };
 }
 
-const { user } = Astro.props;
-
-const fullName = `${user.firstName} ${user.lastName}`;
-const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
-
-const navItems = [
-  {
-    label: "Resumen",
-    href: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "Productos",
-    href: "/productos",
-    icon: Package,
-  },
-  {
-    label: "Registrar venta",
-    href: "/registrar-venta",
-    icon: CirclePlus,
-  },
-  { label: "Gastos", href: "/gastos", icon: Wallet },
-];
+const { user, context } = Astro.props;
+const m = context?.membership;
+const branch = context?.branch;
 
 const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
+const navSections = appNav(m, branch);
+const saleHref = m && branch ? branchHref(m.business, branch, "registrar-venta") : undefined;
+
+const businessOptions = myBusinesses().map((other) => ({
+  label: other.business.name,
+  detail:
+    other.role === "dueño"
+      ? `Dueña · ${other.branches.length} ${other.branches.length === 1 ? "sucursal" : "sucursales"}`
+      : `Empleada · ${other.employee?.jobTitle ?? ""}`,
+  href: entryHref(other),
+  current: other.business.id === m?.business.id,
+}));
+
+// Al cambiar de sucursal se queda en la misma sección (de Turnos a Turnos), si el rol la puede ver.
+const section = m && branch ? currentPath.slice(branchHref(m.business, branch).length).replace(/^\//, "") : "";
+const branchOptions =
+  m && branch
+    ? m.branches.map((other) => ({
+        label: other.name,
+        detail: other.address,
+        href: branchHref(m.business, other, branchSections(m.role).includes(section) ? section : "registrar-venta"),
+        current: other.id === branch.id,
+      }))
+    : [];
 ---
 
 <aside class="sidebar">
   <header class="sidebar-header">
-    <a href="/" class="brand">
+    <a href={m ? entryHref(m) : "/app"} class="brand">
       <Logo class="logo" />
       <span class="brand-text">
         <span class="brand-name">Caja Simple</span>
@@ -59,20 +56,11 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
     </a>
 
     <div class="header-actions">
-      <button
-        type="button"
-        class="theme-toggle"
-        aria-pressed="false"
-        aria-label="Modo oscuro"
-        title="Cambiar tema"
-      >
-        <Moon class="theme-icon icon-moon" size={20} stroke-width={1.75} />
-        <Sun class="theme-icon icon-sun" size={20} stroke-width={1.75} />
-      </button>
+      <ThemeToggle class="sidebar-theme" />
 
       <button
         type="button"
-        class="menu-toggle"
+        class="icon-btn menu-toggle"
         aria-controls="sidebar-panel"
         aria-expanded="false"
         aria-label="Abrir menú"
@@ -87,55 +75,60 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
   </header>
 
   <div class="sidebar-panel" id="sidebar-panel">
+    {
+      m && (
+        <ContextSwitcher
+          id="business-menu"
+          label="Negocio"
+          icon={BriefcaseBusiness}
+          options={businessOptions}
+          footer={{ label: "Tus negocios", href: "/app" }}
+        />
+      )
+    }
+    {branchOptions.length > 1 && <ContextSwitcher id="branch-menu" label="Sucursal" icon={Store} options={branchOptions} />}
+
+    {
+      saleHref && (
+        <a
+          href={saleHref}
+          class="btn btn-primary btn-block sale-cta"
+          aria-current={currentPath === saleHref ? "page" : undefined}
+        >
+          <CirclePlus size={18} stroke-width={2} />
+          Registrar venta
+        </a>
+      )
+    }
+
     <nav class="sidebar-nav" aria-label="Navegación principal">
-      <ul>
-        {
-          navItems.map(({ label, href, icon: Icon }) => (
-            <li>
-              <a
-                href={href}
-                class="nav-link"
-                aria-current={currentPath === href ? "page" : undefined}
-              >
-                <Icon size={20} stroke-width={1.75} />
-                {label}
-              </a>
-            </li>
-          ))
-        }
-      </ul>
+      {
+        navSections.map(({ title, items }, index) => (
+          <div class="nav-section">
+            <p class="nav-section-title" id={`nav-section-${index}`}>
+              {title}
+            </p>
+            <ul aria-labelledby={`nav-section-${index}`}>
+              {items.map(({ label, href, icon: Icon }) => (
+                <li>
+                  <a
+                    href={href}
+                    class="nav-link"
+                    aria-current={currentPath === href ? "page" : undefined}
+                  >
+                    <Icon size={18} stroke-width={1.75} />
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
     </nav>
 
     <footer class="sidebar-footer">
-      {
-        user.avatarUrl ? (
-          <img
-            class="avatar"
-            src={user.avatarUrl}
-            alt=""
-            width="40"
-            height="40"
-          />
-        ) : (
-          <span class="avatar avatar-initials" aria-hidden="true">
-            {initials}
-          </span>
-        )
-      }
-      <div class="user-info">
-        <span class="user-name" title={fullName}>{fullName}</span>
-        <span class="user-email" title={user.email}>{user.email}</span>
-      </div>
-      <form method="post" action="/logout">
-        <button
-          type="submit"
-          class="logout"
-          aria-label="Cerrar sesión"
-          title="Cerrar sesión"
-        >
-          <LogOut size={20} stroke-width={1.75} />
-        </button>
-      </form>
+      <UserCard user={user} />
     </footer>
   </div>
 </aside>
@@ -143,6 +136,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
 <script>
   const sidebar = document.querySelector<HTMLElement>(".sidebar")!;
   const toggle = sidebar.querySelector<HTMLButtonElement>(".menu-toggle")!;
+  const panel = sidebar.querySelector<HTMLElement>(".sidebar-panel")!;
   const mobileQuery = window.matchMedia("(max-width: 768px)");
 
   function setOpen(open: boolean) {
@@ -157,61 +151,41 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
   toggle.addEventListener("click", () => {
     const open = sidebar.dataset.open !== "true";
     setOpen(open);
-    if (open) sidebar.querySelector<HTMLElement>(".nav-link")?.focus();
+    if (open) panel.querySelector<HTMLElement>("button, a")?.focus();
   });
 
-  sidebar.querySelectorAll(".nav-link").forEach((link) => {
+  panel.querySelectorAll("a").forEach((link) => {
     link.addEventListener("click", () => setOpen(false));
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && sidebar.dataset.open === "true") {
-      setOpen(false);
-      toggle.focus();
-    }
+    // Si hay un popover abierto (p. ej. el selector de sucursal), Esc solo cierra ese popover.
+    if (event.key !== "Escape" || sidebar.dataset.open !== "true") return;
+    if (sidebar.querySelector(":popover-open")) return;
+    setOpen(false);
+    toggle.focus();
   });
 
   mobileQuery.addEventListener("change", () => setOpen(false));
-
-  // Tema: la preferencia guardada manda; si no hay, se sigue la del sistema.
-  const THEME_KEY = "caja-simple-theme";
-  const themeToggle = sidebar.querySelector<HTMLButtonElement>(".theme-toggle")!;
-  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-  function isDark() {
-    const theme = document.documentElement.dataset.theme;
-    return theme ? theme === "dark" : darkQuery.matches;
-  }
-
-  function syncThemeToggle() {
-    themeToggle.setAttribute("aria-pressed", String(isDark()));
-  }
-
-  themeToggle.addEventListener("click", () => {
-    const theme = isDark() ? "light" : "dark";
-    document.documentElement.dataset.theme = theme;
-    try {
-      localStorage.setItem(THEME_KEY, theme);
-    } catch {}
-    syncThemeToggle();
-  });
-
-  darkQuery.addEventListener("change", syncThemeToggle);
-  syncThemeToggle();
 </script>
 
 <style>
+  /* Panel flotante: separado del borde, redondeado y con sombra. */
   .sidebar {
     position: sticky;
-    top: 0;
+    top: 0.75rem;
     display: flex;
+    flex-shrink: 0;
     flex-direction: column;
-    gap: 1.5rem;
-    width: 17.5rem;
-    height: 100dvh;
-    padding: 1.25rem 0.875rem;
+    gap: 1rem;
+    width: 17rem;
+    height: calc(100dvh - 1.5rem);
+    margin: 0.75rem;
+    padding: 1rem 0.75rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
     background: var(--color-surface);
-    border-right: 1px solid var(--color-border);
+    box-shadow: var(--shadow-md);
     color: var(--color-text);
   }
 
@@ -220,23 +194,22 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
     align-items: center;
     justify-content: space-between;
     gap: 0.25rem;
-    padding: 0 0 1.25rem 0.5rem;
-    border-bottom: 1px solid var(--color-border);
+    padding-left: 0.25rem;
   }
 
   .brand {
     display: flex;
     min-width: 0;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.625rem;
     color: inherit;
     text-decoration: none;
   }
 
   .logo {
     flex-shrink: 0;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.25rem;
+    height: 2.25rem;
     color: var(--color-primary);
   }
 
@@ -247,7 +220,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
   }
 
   .brand-name {
-    font-size: var(--text-lg);
+    font-size: var(--text-base);
     line-height: 1.25;
     font-weight: var(--font-bold);
     letter-spacing: -0.01em;
@@ -270,7 +243,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.75rem;
     min-height: 0;
   }
 
@@ -285,80 +258,85 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
     gap: 0.25rem;
   }
 
-  .theme-toggle {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    padding: 0;
-    border: none;
-    border-radius: 0.5rem;
-    background: none;
+  .header-actions .sidebar-theme {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  /* Acción principal */
+  .sale-cta {
+    min-height: 2.5rem;
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .sale-cta[aria-current="page"] {
+    box-shadow:
+      0 0 0 2px var(--color-surface),
+      0 0 0 4px var(--color-focus);
+  }
+
+  /* Secciones */
+  .sidebar-nav {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 1rem;
+    min-height: 0;
+    margin: 0 -0.25rem;
+    padding: 0.5rem 0.25rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    transition: scrollbar-color 150ms;
+  }
+
+  /* Barra fina que se resalta al pasar por el menú. */
+  .sidebar-nav:hover,
+  .sidebar-nav:focus-within {
+    scrollbar-color: var(--scrollbar-thumb-hover) var(--scrollbar-track);
+  }
+
+  @supports not (scrollbar-color: auto) {
+    .sidebar-nav::-webkit-scrollbar,
+    .sidebar-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .sidebar-nav::-webkit-scrollbar-thumb,
+    .sidebar-panel::-webkit-scrollbar-thumb {
+      border-width: 2px;
+    }
+  }
+
+  .nav-section-title {
+    margin: 0 0 0.25rem;
+    padding: 0 0.625rem;
     color: var(--color-text-muted);
-    cursor: pointer;
-    transition:
-      background-color 150ms,
-      color 150ms;
-  }
-
-  .theme-toggle:hover {
-    background: var(--color-surface-muted);
-    color: var(--color-text);
-  }
-
-  .theme-icon {
-    position: absolute;
-    transition:
-      transform 400ms cubic-bezier(0.65, 0, 0.35, 1),
-      opacity 250ms ease;
-  }
-
-  /* Luna en tema claro, sol en tema oscuro (el oscuro puede venir del sistema o de data-theme). */
-  .icon-sun {
-    opacity: 0;
-    transform: rotate(-90deg) scale(0.5);
-  }
-
-  :global(:root[data-theme="dark"]) .icon-moon {
-    opacity: 0;
-    transform: rotate(90deg) scale(0.5);
-  }
-
-  :global(:root[data-theme="dark"]) .icon-sun {
-    opacity: 1;
-    transform: none;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme="light"])) .icon-moon {
-      opacity: 0;
-      transform: rotate(90deg) scale(0.5);
-    }
-
-    :global(:root:not([data-theme="light"])) .icon-sun {
-      opacity: 1;
-      transform: none;
-    }
+    font-size: var(--text-xs);
+    line-height: var(--text-xs-lh);
+    font-weight: var(--font-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .sidebar-nav ul {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.125rem;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .nav-link {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.625rem 0.75rem;
+    gap: 0.625rem;
+    padding: 0.5rem 0.625rem;
     border-radius: 0.5rem;
-    font-size: var(--text-base);
-    line-height: var(--text-base-lh);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
     font-weight: var(--font-medium);
     color: inherit;
     text-decoration: none;
@@ -366,6 +344,20 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
     transition:
       background-color 150ms,
       color 150ms;
+  }
+
+  /* Barra de acento del ítem activo */
+  .nav-link::before {
+    content: "";
+    position: absolute;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    left: 0;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--color-primary);
+    transform: scaleY(0);
+    transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   .nav-link svg {
@@ -382,135 +374,50 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
     font-weight: var(--font-semibold);
   }
 
-  .nav-link:focus-visible,
-  .logout:focus-visible,
-  .menu-toggle:focus-visible,
-  .theme-toggle:focus-visible {
-    outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
+  .nav-link[aria-current="page"]::before {
+    transform: scaleY(1);
   }
 
   .sidebar-footer {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
     margin-top: auto;
-    padding: 1rem 0.5rem 0;
-    border-top: 1px solid var(--color-border);
-  }
-
-  .avatar {
-    flex-shrink: 0;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    object-fit: cover;
-  }
-
-  .avatar-initials {
-    display: grid;
-    place-items: center;
-    background: var(--color-primary-soft);
-    color: var(--color-primary);
-    font-size: var(--text-sm);
-    font-weight: var(--font-semibold);
-  }
-
-  .user-info {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .user-name,
-  .user-email {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .user-name {
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
-    font-weight: var(--font-semibold);
-  }
-
-  .user-email {
-    font-size: var(--text-xs);
-    line-height: var(--text-xs-lh);
-    color: var(--color-text-muted);
-  }
-
-  .logout {
-    display: grid;
-    place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    padding: 0;
-    border: none;
-    border-radius: 0.5rem;
-    background: none;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition:
-      background-color 150ms,
-      color 150ms;
-  }
-
-  .logout:hover {
-    background: var(--color-expense-soft);
-    color: var(--color-expense);
   }
 
   @media (max-width: 768px) {
+    /* En móvil el panel deja de flotar: barra superior a todo el ancho. */
     .sidebar {
       --topbar-height: 4rem;
 
+      top: 0;
       z-index: 100;
       width: 100%;
       height: auto;
+      margin: 0;
       padding: 0;
-      border-right: none;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
     }
 
     /* La barra superior queda por encima del panel para que el botón siga visible al abrirlo. */
     .sidebar-header {
       position: relative;
       z-index: 1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
       height: var(--topbar-height);
       padding: 0 0.5rem 0 1rem;
+      border-bottom: 1px solid var(--color-border);
       background: var(--color-surface);
     }
 
-    .logo {
-      width: 2.25rem;
-      height: 2.25rem;
-    }
-
-    .theme-toggle {
+    .header-actions .sidebar-theme {
       width: 2.75rem;
       height: 2.75rem;
     }
 
     .menu-toggle {
       display: grid;
-      place-items: center;
       width: 2.75rem;
       height: 2.75rem;
-      padding: 0;
-      border: none;
-      border-radius: 0.5rem;
-      background: none;
       color: var(--color-text);
-      cursor: pointer;
-    }
-
-    .menu-toggle:hover {
-      background: var(--color-surface-muted);
     }
 
     .menu-icon {
@@ -556,10 +463,12 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
     .sidebar-panel {
       position: fixed;
       inset: 0;
+      gap: 1rem;
       padding: calc(var(--topbar-height) + 1rem) 1rem
-        calc(1.25rem + env(safe-area-inset-bottom));
+        calc(1rem + env(safe-area-inset-bottom));
       overflow-y: auto;
       overscroll-behavior: contain;
+      scrollbar-width: thin;
       background: var(--color-surface);
       opacity: 0;
       transform: translateY(-0.75rem);
@@ -579,10 +488,22 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
         transform 250ms cubic-bezier(0.2, 0.8, 0.2, 1);
     }
 
+    /* El panel completo ya hace scroll; la lista no necesita su propio scroll. */
+    .sidebar-nav {
+      flex: none;
+      overflow: visible;
+    }
+
+    .sale-cta {
+      min-height: 2.75rem;
+      font-size: var(--text-base);
+      line-height: var(--text-base-lh);
+    }
+
     .nav-link {
-      padding: 0.875rem 1rem;
-      font-size: var(--text-lg);
-      line-height: var(--text-lg-lh);
+      padding: 0.75rem 0.875rem;
+      font-size: var(--text-base);
+      line-height: var(--text-base-lh);
     }
 
     :global(html.menu-open) {
@@ -593,7 +514,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
   @media (prefers-reduced-motion: reduce) {
     .menu-bar,
     .sidebar-panel,
-    .theme-icon {
+    .nav-link::before {
       transition: none !important;
     }
   }

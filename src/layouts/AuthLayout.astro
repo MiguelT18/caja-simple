@@ -1,35 +1,45 @@
 ---
+import { ArrowLeft } from "@lucide/astro";
+import "@fontsource/cabin-sketch/latin-700.css";
+import "@fontsource-variable/public-sans";
+import "../styles/auth.css";
 import BaseHead from "../components/BaseHead.astro";
-import Logo from "../components/Logo.astro";
+import Board from "../components/auth/Board.astro";
+import ThemeToggle from "../components/ThemeToggle.astro";
 
 interface Props {
   title: string;
   heading: string;
   description: string;
+  /** Frase de la pizarra que invita a la acción de esta página. */
+  pitch: string;
 }
 
-const { title, heading, description } = Astro.props;
+const { title, heading, description, pitch } = Astro.props;
 ---
 
 <html lang="es">
   <head>
     <BaseHead title={title} />
   </head>
-  <body>
-    <main class="auth-main">
-      <div class="auth-brand">
-        <Logo class="auth-logo" />
-        <span class="auth-brand-text">
-          <span class="auth-brand-name">Caja Simple</span>
-          <span class="auth-brand-tagline">Tu negocio, bajo control</span>
-        </span>
-      </div>
+  <body class="auth-surface">
+    <Board pitch={pitch} />
 
-      <section class="auth-card" aria-labelledby="auth-heading">
+    <main class="auth-main">
+      <ThemeToggle class="auth-theme" />
+
+      <section class="auth-panel" aria-labelledby="auth-heading">
+        <a href="/" class="auth-home">
+          <ArrowLeft size={18} stroke-width={1.75} />
+          Volver al inicio
+        </a>
+
         <header class="auth-header">
           <h1 id="auth-heading">{heading}</h1>
           <p>{description}</p>
         </header>
+
+        <p class="notice" role="status" data-auth-notice></p>
 
         <slot />
 
@@ -41,64 +51,78 @@ const { title, heading, description } = Astro.props;
   </body>
 </html>
 
+<script>
+  import "../scripts/auth-form.ts";
+  import "../scripts/auth-board.ts";
+</script>
+
 <style>
+  body {
+    display: grid;
+    grid-template-columns: minmax(22rem, 37.5rem) 1fr;
+    min-height: 100dvh;
+  }
+
+  /* Formulario */
   .auth-main {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1.5rem;
-    min-height: 100dvh;
-    padding: 2rem 1rem;
+    padding: clamp(1.25rem, 4dvh, 3rem) 2rem;
   }
 
-  .auth-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .auth-logo {
-    width: 2.75rem;
-    height: 2.75rem;
-    color: var(--color-primary);
-  }
-
-  .auth-brand-text {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .auth-brand-name {
-    font-size: var(--text-xl);
-    line-height: 1.2;
-    font-weight: var(--font-bold);
-    letter-spacing: -0.01em;
-  }
-
-  .auth-brand-tagline {
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
-    color: var(--color-text-muted);
-  }
-
-  .auth-card {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-    width: 100%;
-    max-width: 26rem;
-    padding: 2rem;
+  /* Fijo en la esquina superior derecha: siempre a mano, también si el formulario hace scroll. */
+  .auth-main .auth-theme {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 10;
     border: 1px solid var(--color-border);
-    border-radius: 1rem;
     background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .auth-main .auth-theme:hover {
+    background: var(--color-surface-muted);
+  }
+
+  .auth-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    max-width: 26.25rem;
+  }
+
+  .auth-home {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    align-self: flex-start;
+    min-height: 2.75rem;
+    margin: -0.75rem 0 -0.5rem;
+    color: var(--color-text-muted);
+    font-weight: var(--font-medium);
+    text-decoration: none;
+  }
+
+  .auth-home:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
 
   .auth-header {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    text-align: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .auth-header h1 {
+    font-size: var(--text-3xl);
+    line-height: var(--text-3xl-lh);
+    letter-spacing: -0.02em;
   }
 
   .auth-header p {
@@ -106,41 +130,72 @@ const { title, heading, description } = Astro.props;
     color: var(--color-text-muted);
   }
 
+  .auth-panel :global(.auth-form) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .auth-panel :global(.auth-form .btn) {
+    margin-top: 0.5rem;
+  }
+
+  /* Campos compactos para que el registro entre en pantallas de laptop pequeñas; el texto escrito sigue en 16px.
+     Con pantalla táctil vuelven a 44px para que sean fáciles de tocar. */
+  .auth-panel :global(.btn),
+  .auth-panel :global(.input) {
+    min-height: 2.5rem;
+  }
+
+  @media (pointer: coarse) {
+    .auth-panel :global(.btn),
+    .auth-panel :global(.input) {
+      min-height: 2.75rem;
+    }
+  }
+
   .auth-switch {
-    margin: 0;
+    margin: 0.25rem 0 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
     color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
-    text-align: center;
   }
 
   .auth-switch :global(a) {
-    color: var(--color-primary);
-    font-weight: var(--font-semibold);
-    text-decoration: none;
+    color: var(--color-text);
+    font-weight: var(--font-bold);
+    text-decoration: underline;
+    text-decoration-color: var(--color-focus);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.2em;
   }
 
   .auth-switch :global(a:hover) {
-    text-decoration: underline;
+    text-decoration-color: currentColor;
   }
 
   .auth-switch :global(a:focus-visible) {
     border-radius: 0.25rem;
-    outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
   }
 
-  @media (max-width: 480px) {
-    .auth-main {
-      justify-content: flex-start;
-      padding-top: 2.5rem;
+  /* Pantallas medianas y móviles: la pizarra se vuelve una franja arriba. */
+  @media (max-width: 960px) {
+    body {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
     }
 
-    .auth-card {
-      padding: 1.5rem 1rem;
-      border: none;
-      border-radius: 0;
-      background: none;
+    .auth-main {
+      position: relative;
+      align-items: flex-start;
+      padding: 2.5rem 1rem 3rem;
+    }
+
+    /* Arriba está la franja de la pizarra: el botón baja a la fila de «Volver al inicio», a su derecha. */
+    .auth-main .auth-theme {
+      position: absolute;
+      top: 1.875rem;
+      right: 1rem;
     }
   }
 </style>

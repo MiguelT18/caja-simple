@@ -1,0 +1,106 @@
+---
+import { ArrowRight, MapPin } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import Layout from "@/layouts/Layout.astro";
+import { entryHref, myBusinesses } from "@/data/queries";
+
+const memberships = myBusinesses();
+---
+
+<Layout title="Tus negocios">
+  <PageHeader title="Tus negocios" description="Los negocios que tienes y en los que trabajas. Elige uno para entrar." />
+
+  <ul class="business-grid" role="list">
+    {
+      memberships.map((m) => (
+        <li class="card business">
+          <header>
+            <h2 class="card-title">{m.business.name}</h2>
+            <p class="role">
+              {m.role === "dueño" ? (
+                <span class="chip chip-info">Dueña · plan {m.business.plan}</span>
+              ) : (
+                <span class="chip chip-neutral">Empleada · {m.employee?.jobTitle}</span>
+              )}
+            </p>
+          </header>
+          <ul class="branches" role="list" aria-label={`Sucursales de ${m.business.name} a las que tienes acceso`}>
+            {m.branches.map((br) => (
+              <li>
+                <MapPin size={16} stroke-width={1.75} />
+                <span>
+                  <strong>{br.name}</strong> · {br.address}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <a href={entryHref(m)} class="btn btn-secondary btn-block enter">
+            {m.role === "dueño" ? `Entrar a ${m.business.name}` : `Ir a la caja de ${m.branches[0].name}`}
+            <ArrowRight size={18} stroke-width={2} />
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</Layout>
+
+<style>
+  .business-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .business {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.25rem;
+  }
+
+  .business header {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .card-title,
+  .role {
+    margin: 0;
+  }
+
+  .branches {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .branches li {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .branches :global(svg) {
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+  }
+
+  .branches strong {
+    color: var(--color-text);
+    font-weight: var(--font-semibold);
+  }
+
+  .enter {
+    margin-top: auto;
+  }
+
+  @media (max-width: 480px) {
+    .business-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

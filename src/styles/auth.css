@@ -1,0 +1,49 @@
+/*
+ * Mundo de las páginas de acceso: «Pizarra del día». Ver DESIGN.md › Páginas de acceso.
+ * Redefine los tokens de la app solo cuando el <body> es de acceso, así .btn, .input, .field-* y .notice
+ * de global.css toman la pared encalada y la pizarra sin duplicar sus reglas.
+ */
+:root:has(> body.auth-surface) {
+	/* Pared encalada (claro) / pizarra oscura (oscuro) */
+	--color-bg: light-dark(#eef1ec, #121814);
+	--color-surface: light-dark(#ffffff, #1a221d);
+	--color-surface-muted: light-dark(#e3e8e2, #232d27);
+	--color-border: light-dark(#d2d9d3, #2e3a33);
+	--color-border-strong: light-dark(#7f8b84, #66746b);
+	--color-text: light-dark(#18201c, #e9ece6);
+	--color-text-muted: light-dark(#4b5650, #a9b3ac);
+	--color-text-subtle: light-dark(#6b766f, #86918a);
+
+	/* La acción principal es un trozo de pizarra con letra amarilla; en oscuro se invierte. */
+	--color-primary: light-dark(#1f2b25, #f2cf5b);
+	--color-primary-hover: light-dark(#2f4037, #f7dd86);
+	--color-primary-soft: light-dark(rgb(163 111 0 / 0.18), rgb(242 207 91 / 0.22));
+	--color-on-primary: light-dark(#f2cf5b, #1f2b25);
+	--color-focus: light-dark(#9a6800, #f2cf5b);
+
+	/* La pizarra es igual en los dos temas; en oscuro la pared baja de tono para que la pizarra se despegue. */
+	--board: #1f2b25;
+	--board-frame: light-dark(#8b5e3c, #6b4a30);
+	--chalk: #eceae2;
+	--chalk-muted: #c3c9c0;
+	--chalk-yellow: #f2cf5b;
+	--chalk-dust: rgb(236 234 226 / 0.06);
+	--eraser-felt: #6f7470;
+	--eraser-back: #a7774c;
+	/* Polvo de tiza: ruido claro de baja opacidad, en mosaico sobre la pizarra. */
+	--slate-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .93 0 0 0 0 .92 0 0 0 0 .89 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+
+	--font-sans: 'Public Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--font-chalk: 'Cabin Sketch', 'Public Sans Variable', sans-serif;
+
+	/* Altura de una fila de la pizarra; el formulario sigue el mismo ritmo. */
+	--board-row: clamp(2.5rem, 6dvh, 3.25rem);
+
+	--scrollbar-thumb: var(--color-border-strong);
+	caret-color: var(--color-focus);
+}
+
+body.auth-surface ::selection {
+	background: var(--chalk-yellow);
+	color: #1f2b25;
+}

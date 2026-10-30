@@ -1,0 +1,33 @@
+---
+import { Package } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import ProductCatalog from "@/components/app/products/ProductCatalog";
+import Layout from "@/layouts/Layout.astro";
+import { appPaths, branchContext, businessHref, isLowStock } from "@/data/queries";
+
+export const getStaticPaths = () => appPaths.branch("inventario");
+
+const { negocio, sucursal } = Astro.params;
+const ctx = branchContext(negocio!, sucursal!);
+const { branch, products, role, business } = ctx;
+
+const lowCount = products.filter(isLowStock).length;
+---
+
+<Layout title={`Inventario · ${branch.name}`} context={{ membership: ctx.membership, branch }}>
+  <PageHeader
+    title="Inventario"
+    description={`${products.length} productos · ${lowCount} con stock bajo en ${branch.name}`}
+  >
+    {
+      role === "dueño" && (
+        <a href={`${businessHref(business)}/catalogo`} class="btn btn-secondary">
+          <Package size={18} stroke-width={2} />
+          Editar catálogo
+        </a>
+      )
+    }
+  </PageHeader>
+
+  <ProductCatalog client:load mode="branch" products={products} storageKey={`caja-simple-product-categories:${business.id}`} />
+</Layout>

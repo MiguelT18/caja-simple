@@ -1,0 +1,338 @@
+---
+import { Search, ShoppingCart } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import ShiftChip from "@/components/ShiftChip.astro";
+import Layout from "@/layouts/Layout.astro";
+import { appPaths, branchContext } from "@/data/queries";
+import { formatBs } from "@/lib/format";
+
+export const getStaticPaths = () => appPaths.branch("registrar-venta");
+
+const { negocio, sucursal } = Astro.params;
+const ctx = branchContext(negocio!, sucursal!);
+const { branch, products, currentShift } = ctx;
+
+const shift = currentShift;
+---
+
+<Layout title={`Registrar venta · ${branch.name}`} context={{ membership: ctx.membership, branch }}>
+  <PageHeader title="Registrar venta" description={`${branch.name} · toca los productos para agregarlos a la venta`} />
+
+  <div class="sale">
+    <section class="catalog" aria-label="Productos">
+      <label class="search">
+        <Search size={18} stroke-width={1.75} />
+        <span class="visually-hidden">Buscar producto</span>
+        <input type="search" class="input" placeholder="Buscar producto" data-search autocomplete="off" />
+      </label>
+
+      <ul class="product-grid" role="list">
+        {
+          products.map((p) => (
+            <li data-name={p.name.toLowerCase()}>
+              <button type="button" class="product" data-id={p.id} data-name={p.name} data-price={p.price}>
+                <span class="product-name">{p.name}</span>
+                <span class="product-price num">{formatBs(p.price)}</span>
+                <span class="product-stock num">{p.stock} en stock</span>
+              </button>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="empty" data-empty hidden>Ningún producto coincide con tu búsqueda.</p>
+    </section>
+
+    <aside class="card cart" aria-labelledby="cart-title">
+      <header class="cart-head">
+        <h2 id="cart-title" class="card-title">Venta actual</h2>
+        <ShiftChip shift={shift} />
+      </header>
+
+      <p class="cart-empty" data-cart-empty>
+        <ShoppingCart size={20} stroke-width={1.75} />
+        Todavía no agregaste productos.
+      </p>
+      <ul class="cart-lines" role="list" data-cart-lines></ul>
+
+      <p class="cart-total">
+        <span>Total</span>
+        <span class="num" data-total aria-live="polite">{formatBs(0)}</span>
+      </p>
+
+      <p class="notice" data-notice role="status"></p>
+      <button type="button" class="btn btn-primary btn-block" data-confirm disabled>Confirmar venta</button>
+      <button type="button" class="btn btn-secondary btn-block" data-clear disabled>Vaciar</button>
+    </aside>
+  </div>
+</Layout>
+
+<script>
+  const money = new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatBs = (n: number) => `Bs ${money.format(n)}`;
+
+  const cart = new Map<string, { name: string; price: number; qty: number }>();
+  const lines = document.querySelector<HTMLUListElement>("[data-cart-lines]")!;
+  const emptyCart = document.querySelector<HTMLElement>("[data-cart-empty]")!;
+  const total = document.querySelector<HTMLElement>("[data-total]")!;
+  const notice = document.querySelector<HTMLElement>("[data-notice]")!;
+  const confirm = document.querySelector<HTMLButtonElement>("[data-confirm]")!;
+  const clear = document.querySelector<HTMLButtonElement>("[data-clear]")!;
+
+  function qtyButton(label: string, text: string, onClick: () => void) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "icon-btn qty-btn";
+    button.textContent = text;
+    button.setAttribute("aria-label", label);
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
+  function render() {
+    lines.replaceChildren();
+    let sum = 0;
+    for (const [id, item] of cart) {
+      sum += item.price * item.qty;
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.className = "line-name";
+      name.textContent = item.name;
+      const qty = document.createElement("span");
+      qty.className = "qty num";
+      qty.textContent = String(item.qty);
+      const amount = document.createElement("span");
+      amount.className = "line-amount num";
+      amount.textContent = formatBs(item.price * item.qty);
+      const step = (delta: number) => () => {
+        item.qty += delta;
+        if (item.qty <= 0) cart.delete(id);
+        render();
+      };
+      li.append(
+        name,
+        qtyButton(`Quitar un ${item.name}`, "−", step(-1)),
+        qty,
+        qtyButton(`Agregar un ${item.name}`, "+", step(1)),
+        amount,
+      );
+      lines.append(li);
+    }
+    emptyCart.hidden = cart.size > 0;
+    total.textContent = formatBs(sum);
+    confirm.disabled = clear.disabled = cart.size === 0;
+  }
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".product")) {
+    button.addEventListener("click", () => {
+      const { id, name, price } = button.dataset;
+      const item = cart.get(id!) ?? { name: name!, price: Number(price), qty: 0 };
+      item.qty += 1;
+      cart.set(id!, item);
+      notice.textContent = "";
+      render();
+    });
+  }
+
+  clear.addEventListener("click", () => {
+    cart.clear();
+    render();
+  });
+
+  // shortcut: todavía no hay backend; cuando exista, aquí se guarda la venta.
+  confirm.addEventListener("click", () => {
+    notice.textContent = "El registro de ventas aún no está conectado. La venta no se guardó.";
+  });
+
+  const search = document.querySelector<HTMLInputElement>("[data-search]")!;
+  const empty = document.querySelector<HTMLElement>("[data-empty]")!;
+  search.addEventListener("input", () => {
+    const query = search.value.trim().toLowerCase();
+    let visible = 0;
+    for (const li of document.querySelectorAll<HTMLLIElement>(".product-grid li")) {
+      li.hidden = !li.dataset.name!.includes(query);
+      if (!li.hidden) visible++;
+    }
+    empty.hidden = visible > 0;
+  });
+</script>
+
+<style>
+  .sale {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .search {
+    position: relative;
+    display: block;
+    margin-bottom: 1rem;
+    color: var(--color-text-muted);
+  }
+
+  .search :global(svg) {
+    position: absolute;
+    top: 50%;
+    left: 0.875rem;
+    translate: 0 -50%;
+    pointer-events: none;
+  }
+
+  .search .input {
+    padding-left: 2.75rem;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .product {
+    display: grid;
+    align-content: start;
+    gap: 0.25rem;
+    width: 100%;
+    height: 100%;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color 150ms,
+      background-color 150ms;
+  }
+
+  .product:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-muted);
+  }
+
+  .product:active {
+    scale: 0.98;
+  }
+
+  .product-name {
+    font-weight: var(--font-semibold);
+  }
+
+  .product-price {
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+  }
+
+  .product-stock {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .empty {
+    color: var(--color-text-muted);
+  }
+
+  .cart {
+    position: sticky;
+    top: 1.5rem;
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  .cart-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .cart-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin: 0;
+    padding: 1.5rem 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .cart-empty[hidden] {
+    display: none;
+  }
+
+  .cart-lines {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  .cart-lines:empty {
+    display: none;
+  }
+
+  .cart-lines :global(li) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 1.75rem auto 5.5rem;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .cart-lines :global(.qty-btn) {
+    width: 2rem;
+    height: 2rem;
+    font-size: var(--text-lg);
+  }
+
+  .cart-lines :global(.qty) {
+    text-align: center;
+    font-weight: var(--font-semibold);
+  }
+
+  .cart-lines :global(.line-amount) {
+    text-align: right;
+  }
+
+  .cart-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin: 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+    font-weight: var(--font-semibold);
+  }
+
+  .cart-total .num {
+    font-size: var(--text-4xl);
+    line-height: var(--text-4xl-lh);
+    font-weight: var(--font-bold);
+  }
+
+  @media (max-width: 960px) {
+    .sale {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cart {
+      position: static;
+    }
+  }
+</style>

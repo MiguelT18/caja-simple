@@ -1,0 +1,210 @@
+---
+import { CircleCheck, Clock, TriangleAlert } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import ShiftChip from "@/components/ShiftChip.astro";
+import Layout from "@/layouts/Layout.astro";
+import { appPaths, branchContext, fullName } from "@/data/queries";
+import { formatBs, initials } from "@/lib/format";
+
+export const getStaticPaths = () => appPaths.branch("turnos");
+
+const { negocio, sucursal } = Astro.params;
+const ctx = branchContext(negocio!, sucursal!);
+const { branch, employees, shiftTotals, shifts } = ctx;
+---
+
+<Layout title={`Turnos · ${branch.name}`} context={{ membership: ctx.membership, branch }}>
+  <PageHeader title="Turnos" description={`Horarios, responsables y cuadre de hoy en ${branch.name}`} />
+
+  <section class="shift-list">
+    {
+      shifts.map((shift) => {
+        const t = shiftTotals(shift.id);
+        const staff = employees.filter((e) => e.shiftId === shift.id);
+        return (
+          <article class="card shift">
+            <header class="shift-head">
+              <ShiftChip shift={shift} />
+              <span class="hours num">
+                {shift.start}–{shift.end}
+              </span>
+              {t.close.status === "en-curso" ? (
+                <span class="chip chip-info">
+                  <Clock size={14} stroke-width={2} />
+                  En curso
+                </span>
+              ) : (
+                <span class="chip chip-neutral">Cerrado</span>
+              )}
+            </header>
+
+            <div class="shift-body">
+              <div>
+                <h2 class="label">A cargo</h2>
+                <ul class="staff" role="list">
+                  {staff.map((e) => (
+                    <li>
+                      <span class="avatar-initials" aria-hidden="true">
+                        {initials(e.firstName, e.lastName)}
+                      </span>
+                      <span>
+                        {fullName(e)}
+                        <span class="role">{e.jobTitle}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <dl class="cash">
+                <div>
+                  <dt>Apertura</dt>
+                  <dd class="num">{formatBs(t.close.opening)}</dd>
+                </div>
+                <div>
+                  <dt>Ventas</dt>
+                  <dd class="num amount-income">{formatBs(t.sales, "+")}</dd>
+                </div>
+                <div>
+                  <dt>Gastos</dt>
+                  <dd class="num amount-expense">{formatBs(t.expenses, "−")}</dd>
+                </div>
+                <div class="strong">
+                  <dt>Esperado</dt>
+                  <dd class="num">{formatBs(t.expected)}</dd>
+                </div>
+                <div>
+                  <dt>Contado</dt>
+                  <dd class="num">
+                    {t.close.difference === undefined ? "Por contar" : formatBs(t.expected + t.close.difference)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {t.close.difference === 0 && (
+              <p class="status chip-income">
+                <CircleCheck size={16} stroke-width={2} />
+                La caja cuadró
+              </p>
+            )}
+            {t.close.difference !== undefined && t.close.difference !== 0 && (
+              <p class="status chip-warning">
+                <TriangleAlert size={16} stroke-width={2} />
+                <span>Descuadre de <span class="num">{formatBs(t.close.difference)}</span></span>
+              </p>
+            )}
+          </article>
+        );
+      })
+    }
+  </section>
+</Layout>
+
+<style>
+  .shift-list {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .shift {
+    display: grid;
+    gap: 1.25rem;
+    padding: 1.25rem;
+  }
+
+  .shift-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .hours {
+    margin-right: auto;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .shift-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+    gap: 1.5rem 3rem;
+  }
+
+  .label {
+    margin: 0 0 0.75rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-medium);
+  }
+
+  .staff {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .staff li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .role {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .cash {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .cash div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .cash dt {
+    color: var(--color-text-muted);
+  }
+
+  .cash dd {
+    margin: 0;
+  }
+
+  .cash .strong {
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--color-border);
+    font-weight: var(--font-semibold);
+  }
+
+  .cash .strong dt {
+    color: var(--color-text);
+  }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  @media (max-width: 760px) {
+    .shift-body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>
