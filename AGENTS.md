@@ -1,6 +1,6 @@
 # Caja Simple
 
-App web para llevar la caja de negocios pequeños con una o varias sucursales: ventas, gastos, productos, turnos y cuadre de caja. Astro 7, sin framework de UI, interfaz en español. Todavía no hay backend: los datos son de demostración y la autenticación no está conectada.
+App web para llevar la caja de negocios pequeños con una o varias sucursales: ventas, gastos, productos, turnos y cuadre de caja. Astro 7 renderizado en el servidor (adaptador de Vercel), interfaz en español. Datos y autenticación en Supabase; las islas interactivas de `/app` usan React y shadcn/ui.
 
 ## Qué leer según la tarea
 
@@ -10,7 +10,7 @@ App web para llevar la caja de negocios pequeños con una o varias sucursales: v
 | [`PRODUCT.md`](PRODUCT.md) | Antes de decidir qué construir o cómo redactar: usuarios, propósito, voz, principios. |
 | [`DESIGN.md`](DESIGN.md) | Antes de tocar UI: tokens, color, tipografía, íconos, navegación y el mundo de las páginas de acceso. |
 | [`docs/modelo-de-datos.md`](docs/modelo-de-datos.md) | Antes de tocar `src/data/` o `/app/*`: persona → negocios → sucursales → inventario, roles y rutas. |
-| [`docs/planes-de-suscripcion.md`](docs/planes-de-suscripcion.md) | Si tocas precios o planes (`src/data/plans.ts`). |
+| [`docs/planes-de-suscripcion.md`](docs/planes-de-suscripcion.md) | Si tocas precios, planes o sus límites (`src/data/plans.ts`, migración `plan_limits`). |
 
 No repitas en este archivo lo que ya dicen esos documentos. Enlázalos.
 
@@ -20,7 +20,27 @@ No repitas en este archivo lo que ya dicen esos documentos. Enlázalos.
 pnpm install
 astro dev --background   # servidor de dev en segundo plano; también: astro dev stop | status | logs
 pnpm build               # verificación mínima antes de dar algo por terminado
+pnpm astro check         # tipos (usa TypeScript 6: astro check no soporta la 7)
 ```
+
+Supabase (proyecto en la nube; no hay base local). Las variables van en `.env` (ver `.env.example`); `SUPABASE_DB_PASSWORD` es solo para la CLI:
+
+```sh
+pnpm dlx supabase migration new <nombre>                     # migración nueva en supabase/migrations/
+pnpm dlx supabase db push --db-url "$DB_URL"                 # aplicarla
+pnpm dlx supabase db advisors --db-url "$DB_URL"             # revisar seguridad y rendimiento
+pnpm dlx supabase gen types typescript --db-url "$DB_URL" --schema public > src/lib/database.types.ts
+# DB_URL = postgresql://postgres.<ref>:$SUPABASE_DB_PASSWORD@aws-0-us-east-1.pooler.supabase.com:5432/postgres
+```
+
+Notificaciones push (Edge Function `send-push`; necesita `pnpm dlx supabase login` una vez). Las claves están en `.env`:
+
+```sh
+pnpm dlx supabase secrets set --project-ref <ref> VAPID_PUBLIC_KEY="$PUBLIC_VAPID_PUBLIC_KEY" VAPID_PRIVATE_KEY="$VAPID_PRIVATE_KEY" PUSH_WEBHOOK_SECRET="$PUSH_WEBHOOK_SECRET" VAPID_SUBJECT="mailto:<contacto>"
+pnpm dlx supabase functions deploy send-push --project-ref <ref>
+```
+
+La base llama a la función con la URL y el secreto guardados en Vault (`project_url`, `push_webhook_secret`); ver `docs/modelo-de-datos.md` › Tu cuenta.
 
 No hay tests ni linter. Para verificar, compila y revisa la página en el navegador, en tema claro y oscuro y a 390px de ancho.
 
@@ -29,25 +49,34 @@ No hay tests ni linter. Para verificar, compila y revisa la página en el navega
 ```text
 src/
 ├── pages/
-│   ├── app/          # la app con sesión: /app (Tus negocios), /app/[negocio]/…, /app/[negocio]/sucursales/[sucursal]/… (ver docs/modelo-de-datos.md)
-│   └── auth/         # /auth/iniciar-sesion, /auth/crear-cuenta
+│   ├── index.astro   # / (landing) · planes.astro: /planes
+│   ├── app/          # la app con sesión: /app (Tus negocios), /app/cuenta, /app/[negocio]/…, /app/[negocio]/sucursales/[sucursal]/… (ver docs/modelo-de-datos.md)
+│   ├── auth/         # /auth/iniciar-sesion, /auth/crear-cuenta, /auth/verificar (código de la 2FA)
+│   └── api/auth/     # login, signup, google, callback, verify, logout (endpoints de Supabase Auth)
+├── actions/          # Astro Actions: todas las escrituras de /app (validan con zod; RLS autoriza)
+├── middleware.ts     # cliente de Supabase por petición, sesión y protección de /app
 ├── layouts/
-│   ├── Layout.astro      # app: Sidebar + <main>
+│   ├── Layout.astro      # app: <body class="app-surface">, Sidebar + <main> en paneles y, en una sucursal, la barra del turno
+│   ├── SiteLayout.astro  # públicas (/ y /planes): encabezado y pie según haya sesión, estilos en styles/site.css
 │   └── AuthLayout.astro  # acceso: <body class="auth-surface">, pizarra + formulario, carga auth-form.ts
-├── components/       # Sidebar, ContextSwitcher (negocio y sucursal), UserCard, ThemeToggle, Logo, BaseHead; auth/ = pizarra y campos; landing/
+├── components/       # Sidebar (con la biblioteca de sucursales), PageHeader (encabezado con degradado), ContextSwitcher, NotificationBell, UserCard, ThemeToggle, Logo, BaseHead; app/ = ShiftBar, MediaCard, BranchCard, Modal, FormInput…; auth/ = pizarra y campos; landing/
 ├── data/
-│   ├── queries.ts    # única entrada a los datos para las páginas: negocios, rol, contexto de negocio/sucursal y getStaticPaths
+│   ├── queries.ts    # única entrada a los datos para las páginas: negocios, rol, contexto de negocio/sucursal
 │   ├── navigation.ts # enlaces del Sidebar según rol (agrega aquí las rutas nuevas de /app)
-│   ├── mock.ts       # tipos y datos de demostración: negocios, sucursales, catálogo, inventario… (TODO: backend)
+│   ├── types.ts      # tipos de dominio (Business, Branch, Product…)
 │   └── plans.ts      # planes y precios orientativos
-├── scripts/          # JS del navegador: auth-form.ts (validación), auth-board.ts (reloj de la pizarra)
+├── lib/              # supabase.ts (cliente de servidor), database.types.ts (generado), auth.ts, format.ts
+├── scripts/          # JS del navegador: auth-form.ts (validación y envío), action-forms.ts (formularios → Actions), nav-skeleton.ts (esqueleto al navegar en /app), auth-board.ts
 └── styles/
     ├── tokens.css    # todos los valores de diseño; colores con light-dark()
     ├── global.css    # base y clases compartidas: .btn, .icon-btn, .input, .field-*, .notice, .num
+    ├── app-surface.css # redefine los tokens y los controles solo bajo body.app-surface (mundo de /app)
     └── auth.css      # redefine los tokens solo bajo body.auth-surface
 ```
 
-`/` (landing) está en construcción. Su dirección de diseño está en `.impeccable/surfaces/src-pages-index-astro.md`.
+Fuera de `src/`: `supabase/migrations/` (esquema), `supabase/functions/send-push/` (Edge Function, Deno; excluida del tsconfig) y `public/sw.js` + `public/manifest.webmanifest` (avisos push).
+
+`/` (landing) y `/planes` (planes y precios) se renderizan con la sesión: sin ella invitan a crear cuenta; con ella llevan a `/app`. La dirección de diseño de la landing está en `.impeccable/surfaces/src-pages-index-astro.md`.
 
 ## Convenciones
 
@@ -65,7 +94,8 @@ src/
   - Nada se comunica solo con color.
   - `aria-*` correctos en los controles personalizados (popover, menú, toggles).
 - **Datos falsos:** no inventes clientes, métricas ni testimonios. Si hace falta mostrar algo, rotúlalo como «Ejemplo».
-- **Pendientes:** los `TODO:` del código marcan lo que espera al backend (auth, sesión, sucursal activa).
+- **Datos y permisos:** las páginas leen solo por `src/data/queries.ts` y escriben solo por `src/actions/`. La autorización real es RLS en la base (ver `docs/modelo-de-datos.md`): nunca la reemplaces con chequeos en el cliente. Cambios de esquema, siempre con una migración nueva. Toda tabla nueva lleva RLS y la política restrictiva «Exige la verificación en dos pasos» (`private.mfa_ok()`).
+- **Formularios de /app:** en páginas Astro, `<form data-action="nombreDeLaAccion">` con `FormInput` y `Modal` (`src/components/app/`); en islas React, `actions.x()` directo.
 
 ## Herramientas
 

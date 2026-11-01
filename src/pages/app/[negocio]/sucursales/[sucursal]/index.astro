@@ -1,5 +1,5 @@
 ---
-import { CircleCheck, Clock, TriangleAlert } from "@lucide/astro";
+import { CircleCheck, Clock, Store, TriangleAlert } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import BarCompareChart from "@/components/app/charts/BarCompareChart";
@@ -7,21 +7,17 @@ import DonutChart from "@/components/app/charts/DonutChart";
 import WeekChart from "@/components/app/charts/WeekChart";
 import MovementsTable from "@/components/app/MovementsTable";
 import Layout from "@/layouts/Layout.astro";
-import { appPaths, branchContext, branchHref, isLowStock, sum } from "@/data/queries";
-import { formatBs } from "@/lib/format";
-
-export const getStaticPaths = () => appPaths.branch("");
+import { branchColor, branchContext, shiftBarData, branchHref, isLowStock } from "@/data/queries";
+import { formatBs, plural, shiftHours } from "@/lib/format";
 
 const { negocio, sucursal } = Astro.params;
-const ctx = branchContext(negocio!, sucursal!);
-const { branch, employeeById, expenses, products, saleTotal, sales, salesByCategory, shiftById, shiftTotals, shifts, weekSummary } = ctx;
-
-const salesTotal = sum(sales.map(saleTotal));
-const expensesTotal = sum(expenses.map((g) => g.amount));
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+if (!ctx || ctx.role !== "dueño") return Astro.rewrite("/404");
+const { branch, expenses, products, sales, salesByCategory, salesTotal, expensesTotal, shiftById, shiftTotals, shifts, weekSummary } = ctx;
 const balance = salesTotal - expensesTotal;
 
 const movements = [
-  ...sales.map((s) => ({ ...s, label: `Venta · ${s.items.length} productos`, amount: saleTotal(s), kind: "sale" as const })),
+  ...sales.map((s) => ({ ...s, label: `Venta · ${s.items} ${s.items === 1 ? "producto" : "productos"}`, amount: s.total, kind: "sale" as const })),
   ...expenses.map((g) => ({ ...g, label: g.concept, amount: g.amount, kind: "expense" as const })),
 ]
   .sort((a, b) => b.time.localeCompare(a.time))
@@ -32,7 +28,7 @@ const movements = [
       time: m.time,
       label: m.label,
       shift: { name: shift.name, tone: shift.tone },
-      by: employeeById(m.employeeId).firstName,
+      by: m.recordedBy.firstName,
       amount: m.amount,
       kind: m.kind,
     };
@@ -44,23 +40,31 @@ const byShift = shifts.map((shift) => {
 });
 
 const lowStock = products.filter(isLowStock);
+const color = branchColor(ctx.membership, branch.id);
+const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural(ctx.employees.length, "persona", "personas"), branch.address]
+  .filter(Boolean)
+  .join(" · ");
 ---
 
-<Layout title={`Resumen · ${branch.name}`} context={{ membership: ctx.membership, branch }}>
-  <PageHeader title="Resumen" description={`Hoy en ${branch.name}`} />
+<Layout title={`Resumen · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
+  <PageHeader tint={color} title={branch.name} description={meta}>
+    <span slot="cover" class="cover-art" style={`--branch: ${color}`}>
+      <Store size={64} stroke-width={1.5} />
+    </span>
+  </PageHeader>
 
   <section class="kpis" aria-label="Totales de hoy">
-    <div class="card kpi">
+    <div class="kpi">
       <p class="kpi-label">Ventas</p>
       <p class="kpi-value num amount-income">{formatBs(salesTotal, "+")}</p>
-      <p class="kpi-note">{sales.length} ventas</p>
+      <p class="kpi-note">{sales.length} {sales.length === 1 ? "venta" : "ventas"}</p>
     </div>
-    <div class="card kpi">
+    <div class="kpi">
       <p class="kpi-label">Gastos</p>
       <p class="kpi-value num amount-expense">{formatBs(expensesTotal, "−")}</p>
-      <p class="kpi-note">{expenses.length} gastos</p>
+      <p class="kpi-note">{expenses.length} {expenses.length === 1 ? "gasto" : "gastos"}</p>
     </div>
-    <div class="card kpi">
+    <div class="kpi">
       <p class="kpi-label">Saldo del día</p>
       <p class:list={["kpi-value num", { "amount-expense": balance < 0 }]}>{formatBs(balance)}</p>
       <p class="kpi-note">Ventas menos gastos</p>
@@ -73,11 +77,11 @@ const lowStock = products.filter(isLowStock);
       shifts.map((shift) => {
         const t = shiftTotals(shift.id);
         return (
-          <article class="card shift-card">
+          <article class:list={["card shift-card", { live: t.close.status === "en-curso" }]}>
             <header class="shift-card-head">
               <ShiftChip shift={shift} />
               <span class="muted num">
-                {shift.start}–{shift.end}
+                {shiftHours(shift)}
               </span>
             </header>
             <dl class="rows">
@@ -94,9 +98,18 @@ const lowStock = products.filter(isLowStock);
                 <dd class="num">{formatBs(t.expected)}</dd>
               </div>
             </dl>
-            {t.close.status === "en-curso" ? (
-              <p class="status chip-info">
+            {t.close.status === "pendiente" ? (
+              <p class="status chip-neutral">
                 <Clock size={16} stroke-width={2} />
+                Sin abrir hoy
+              </p>
+            ) : t.close.status === "en-curso" ? (
+              <p class="status status-live">
+                <span class="eq" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </span>
                 Turno en curso
               </p>
             ) : t.close.difference === 0 ? (
@@ -148,8 +161,12 @@ const lowStock = products.filter(isLowStock);
     </section>
 
     <section>
-      <h2 class="section-title">Stock bajo</h2>
-      <ul class="card stock-list" role="list">
+      <div class="shelf-head">
+        <h2>Stock bajo</h2>
+        <a href={branchHref(ctx.business, branch, "inventario")} class="shelf-link">Ver inventario</a>
+      </div>
+      {lowStock.length === 0 && <p class="card empty-state">Ningún producto está por debajo de su stock mínimo.</p>}
+      <ul class="card stock-list" role="list" hidden={lowStock.length === 0}>
         {
           lowStock.map((p) => (
             <li>
@@ -162,7 +179,6 @@ const lowStock = products.filter(isLowStock);
           ))
         }
       </ul>
-      <a href={branchHref(ctx.business, branch, "inventario")} class="more-link">Ver inventario</a>
     </section>
   </div>
 </Layout>
@@ -187,40 +203,23 @@ const lowStock = products.filter(isLowStock);
     gap: 1rem;
   }
 
-  .kpis {
+  .cover-art {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, color-mix(in oklab, var(--branch) 55%, var(--color-surface)), color-mix(in oklab, var(--branch) 20%, var(--color-surface)));
+    color: var(--color-text);
   }
 
-  .kpi {
-    padding: 1.25rem;
-  }
+  /* Cifras del día en fila, sin tarjetas: el número manda. */
 
-  .kpi p {
-    margin: 0;
-  }
 
-  .kpi p + p {
-    margin-top: 0.25rem;
-  }
 
-  .kpi-label {
-    color: var(--color-text-muted);
-    font-weight: var(--font-medium);
-  }
 
-  .kpi-value {
-    font-size: var(--text-3xl);
-    line-height: var(--text-3xl-lh);
-    font-weight: var(--font-bold);
-    letter-spacing: -0.01em;
-  }
 
-  .kpi-note {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-  }
+
+
 
   .shift-grid {
     display: grid;
@@ -233,6 +232,16 @@ const lowStock = products.filter(isLowStock);
     flex-direction: column;
     gap: 1rem;
     padding: 1.25rem;
+  }
+
+  /* El turno abierto se marca con un anillo ámbar, además del texto «Turno en curso». */
+  .shift-card.live {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+  }
+
+  .status-live {
+    color: var(--color-primary);
+    padding-left: 0;
   }
 
   .shift-card-head {
@@ -312,19 +321,6 @@ const lowStock = products.filter(isLowStock);
     color: var(--color-warning);
   }
 
-  .more-link {
-    display: inline-block;
-    margin-top: 0.75rem;
-    border-radius: 0.25rem;
-    color: var(--color-primary);
-    font-size: var(--text-sm);
-    font-weight: var(--font-semibold);
-    text-decoration: none;
-  }
-
-  .more-link:hover {
-    text-decoration: underline;
-  }
 
   @media (max-width: 1100px) {
     .chart-grid {
@@ -337,9 +333,9 @@ const lowStock = products.filter(isLowStock);
   }
 
   @media (max-width: 900px) {
-    .kpis,
     .shift-grid {
       grid-template-columns: minmax(0, 1fr);
     }
+
   }
 </style>

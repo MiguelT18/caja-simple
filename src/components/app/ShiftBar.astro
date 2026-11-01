@@ -1,0 +1,411 @@
+---
+// Barra del turno, abajo en toda página de sucursal (como el reproductor de una app de música): el turno abierto
+// con su horario avanzando, lo vendido y el esperado en caja, y el botón para registrar una venta.
+// Sin turno abierto, invita a abrir uno. Los datos salen de shiftBarData() (src/data/queries.ts).
+import { Clock, LockOpen, Moon, Plus, Sun, Sunset, TriangleAlert } from "@lucide/astro";
+import type { ShiftBarData } from "@/data/queries";
+import { duration, formatBs, overnight, shiftProgress } from "@/lib/format";
+
+interface Props {
+  data: ShiftBarData;
+}
+
+const { data } = Astro.props;
+const shift = data.shift;
+const progress = shift && data.openedOn ? shiftProgress(shift, data.openedOn) : undefined;
+const Icon = shift ? { morning: Sun, afternoon: Sunset, night: Moon }[shift.tone] : Clock;
+const percent = progress ? (progress.elapsed / progress.total) * 100 : 0;
+// Si el botón llevaría a la página actual («Registrar venta» o «Turnos»), no se muestra: la página ya tiene esa acción.
+const here = Astro.url.pathname.replace(/\/$/, "");
+---
+
+<aside class="shift-bar" aria-label={shift ? "Turno en curso" : "Turno"} data-shift-bar>
+  <div class="now">
+    <span class:list={["art", shift && `art-${shift.tone}`]} aria-hidden="true">
+      <Icon size={22} stroke-width={1.75} />
+    </span>
+    <div class="now-text">
+      <p class="now-title">{shift ? `Turno ${shift.name.toLowerCase()}` : "Sin turno abierto"}</p>
+      <p class="now-sub">
+        {
+          shift && (
+            <span class="live">
+              <span class="eq" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+              En curso
+            </span>
+          )
+        }
+        <span class="branch">{data.branchName}</span>
+      </p>
+    </div>
+  </div>
+
+  {
+    shift && progress ? (
+      <>
+        <div
+          class="progress"
+          data-progress
+          data-start={shift.start}
+          data-end={shift.end}
+          data-opened={data.openedOn}
+        >
+          <span class="num time">{shift.start}</span>
+          <div
+            class="track"
+            role="progressbar"
+            aria-label="Horario del turno"
+            aria-valuemin="0"
+            aria-valuemax={progress.total}
+            aria-valuenow={progress.elapsed}
+            aria-valuetext={`${duration(progress.elapsed)} de ${duration(progress.total)}`}
+          >
+            <span class="fill" style={`--p: ${percent}%`} />
+          </div>
+          <span class="num time">
+            {shift.end}
+            {overnight(shift) && <span class="next-day" title="Termina al día siguiente">+1</span>}
+          </span>
+          <p class="late" data-late hidden={!progress.late}>
+            <TriangleAlert size={14} stroke-width={1.75} />
+            Pasó la hora de cierre
+          </p>
+        </div>
+
+        <div class="cash">
+          <dl class="figures">
+            <div>
+              <dt>Ventas</dt>
+              <dd class="num amount-income">{formatBs(data.sales ?? 0, "+")}</dd>
+            </div>
+            <div>
+              <dt>Esperado en caja</dt>
+              <dd class="num">{formatBs(data.expected ?? 0)}</dd>
+            </div>
+          </dl>
+          {here !== data.saleHref && (
+            <a class="sale" href={data.saleHref} title="Registrar venta">
+              <span class="play-btn">
+                <Plus size={24} stroke-width={1.75} />
+              </span>
+              <span class="sale-label">Registrar venta</span>
+            </a>
+          )}
+        </div>
+      </>
+    ) : (
+      here !== data.shiftsHref && (
+        <a class="btn btn-primary open" href={data.shiftsHref}>
+          <LockOpen size={18} stroke-width={1.75} />
+          Abrir turno
+        </a>
+      )
+    )
+  }
+</aside>
+
+<script>
+  import { duration, shiftProgress } from "@/lib/format";
+
+  // El horario avanza solo: se recalcula cada minuto en hora de Bolivia.
+  const box = document.querySelector<HTMLElement>("[data-shift-bar] [data-progress]");
+  if (box) {
+    const { start = "", end = "", opened = "" } = box.dataset;
+    const track = box.querySelector<HTMLElement>("[role=progressbar]")!;
+    const fill = box.querySelector<HTMLElement>(".fill")!;
+    const late = box.querySelector<HTMLElement>("[data-late]")!;
+    const update = () => {
+      const p = shiftProgress({ start, end }, opened);
+      fill.style.setProperty("--p", `${(p.elapsed / p.total) * 100}%`);
+      track.setAttribute("aria-valuenow", String(p.elapsed));
+      track.setAttribute("aria-valuetext", `${duration(p.elapsed)} de ${duration(p.total)}`);
+      late.hidden = !p.late;
+    };
+    setInterval(update, 60_000);
+  }
+</script>
+
+<style>
+  .shift-bar {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(14rem, 1fr) minmax(16rem, 1.4fr) minmax(14rem, 1fr);
+    align-items: center;
+    gap: 1.5rem;
+    min-height: 4.75rem;
+    padding: 0.625rem 1rem 0.625rem 0.625rem;
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  .now {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    min-width: 0;
+  }
+
+  /* Portada del turno: el ícono del tono sobre su color. */
+  .art {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 0.375rem;
+    background: var(--color-surface-hover);
+    color: var(--color-text-muted);
+  }
+
+  .art-morning {
+    background: var(--color-shift-morning-soft);
+    color: var(--color-shift-morning);
+  }
+
+  .art-afternoon {
+    background: var(--color-shift-afternoon-soft);
+    color: var(--color-shift-afternoon);
+  }
+
+  .art-night {
+    background: var(--color-shift-night-soft);
+    color: var(--color-shift-night);
+  }
+
+  .now-text {
+    display: grid;
+    min-width: 0;
+  }
+
+  .now-title,
+  .now-sub {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .now-title {
+    font-size: var(--text-base);
+    font-weight: var(--font-bold);
+  }
+
+  .now-sub {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .live {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--color-primary);
+    font-weight: var(--font-bold);
+  }
+
+  .branch {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Horario como el tiempo de una canción: inicio, barra y fin. */
+  .progress {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .time {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+  }
+
+  .next-day {
+    margin-left: 0.125rem;
+  }
+
+  .track {
+    height: 0.25rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--color-border-strong);
+  }
+
+  .fill {
+    display: block;
+    width: var(--p);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-primary);
+    transition: width 600ms var(--ease-out);
+  }
+
+  .late {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    margin: 0;
+    color: var(--color-warning);
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+  }
+
+  .cash {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+
+  .figures {
+    display: flex;
+    gap: 1.25rem;
+    margin: 0;
+  }
+
+  .figures div {
+    display: grid;
+    text-align: right;
+  }
+
+  .figures dt {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+
+  .figures dd {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+    white-space: nowrap;
+  }
+
+  .sale {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.75rem;
+    color: inherit;
+    font-weight: var(--font-bold);
+    text-decoration: none;
+  }
+
+  .sale:hover .play-btn {
+    transform: scale(1.04);
+    background: var(--color-primary-hover);
+  }
+
+  .open {
+    grid-column: 3;
+    justify-self: end;
+  }
+
+  /* Escritorio angosto: el texto del botón se va (queda en title y en el nombre del enlace). */
+  @media (max-width: 1180px) {
+    .sale-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  @media (max-width: 960px) and (min-width: 769px) {
+    .shift-bar {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+      gap: 1rem;
+    }
+
+    .figures div:first-child {
+      display: none;
+    }
+  }
+
+  /* Móvil: mini-reproductor sobre el borde inferior, con el horario como una línea fina abajo. */
+  @media (max-width: 768px) {
+    .shift-bar {
+      position: fixed;
+      right: 0.5rem;
+      bottom: calc(0.5rem + env(safe-area-inset-bottom));
+      left: 0.5rem;
+      z-index: 50;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.75rem;
+      min-height: 0;
+      padding: 0.5rem 0.5rem 0.75rem;
+      overflow: hidden;
+      border-radius: var(--radius-panel);
+      background: var(--color-surface-hover);
+      box-shadow: var(--shadow-md);
+    }
+
+    .art {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+
+    .now-title {
+      font-size: var(--text-sm);
+    }
+
+    .now-sub {
+      font-size: var(--text-xs);
+    }
+
+    .progress {
+      position: absolute;
+      right: 0.5rem;
+      bottom: 0.25rem;
+      left: 0.5rem;
+      display: block;
+    }
+
+    .progress .time,
+    .late {
+      display: none;
+    }
+
+    .track {
+      height: 0.1875rem;
+    }
+
+    .figures div:first-child {
+      display: none;
+    }
+
+    .cash {
+      gap: 0.75rem;
+    }
+
+    .play-btn {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+
+    .open {
+      grid-column: 2;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fill {
+      transition: none;
+    }
+  }
+</style>

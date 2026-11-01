@@ -29,14 +29,16 @@ erDiagram
 
 | Entidad | Pertenece a | Campos clave |
 |---|---|---|
-| Persona | — | nombre, correo. Es la cuenta: un solo acceso para todos sus negocios. |
+| Persona | — | nombre, correo, foto. Es la cuenta: un solo acceso para todos sus negocios. Se edita en `/app/cuenta`. |
 | Negocio | su dueña (Persona) | nombre, slug, plan (Gratis / Negocio / Sucursales). |
 | Sucursal | Negocio | nombre, slug, dirección. |
-| Turno | Sucursal | nombre, inicio, fin, tono (mañana / tarde / noche). Cada sucursal define los suyos. |
+| Turno | Sucursal | nombre, inicio, fin, tono (mañana / tarde / noche), archivado. Cada sucursal define los suyos. Si el fin es menor que el inicio, termina al día siguiente. |
 | Producto | Negocio | nombre, categoría, código de barras, imagen. Es el **catálogo del negocio**: se define una sola vez. |
 | Categoría | Negocio | nombre. Agrupa los productos del catálogo. |
 | Inventario | Sucursal × Producto | precio, stock, stock mínimo. Si no existe la fila, esa sucursal no vende el producto. |
-| Empleado | Negocio | sucursal, turno, puesto, estado (activo / invitado), persona (si ya tiene cuenta). |
+| Empleado | Negocio | correo, persona (cuenta existente), sucursal, turno, puesto, estado (invitado / activo). El nombre se lee del perfil de la persona. |
+| Notificación | Persona | tipo, negocio, invitación (si aplica), datos del aviso, leída. |
+| Suscripción push | Persona | endpoint y claves de un navegador donde activó los avisos. |
 | Venta | Sucursal | turno, empleado, hora, líneas (producto, cantidad). El precio sale del inventario de esa sucursal. |
 | Gasto | Sucursal | turno, empleado, hora, concepto, categoría, monto. |
 | Cierre de turno | Sucursal × Turno | apertura, estado (en curso / cerrado), diferencia (contado − esperado). |
@@ -44,11 +46,13 @@ erDiagram
 ## Reglas
 
 - El producto es del negocio; el precio, el stock y el mínimo son de cada sucursal.
-- Los turnos son de cada sucursal: dos sucursales del mismo negocio pueden tener horarios distintos.
+- Los turnos son de cada sucursal: dos sucursales del mismo negocio pueden tener horarios distintos. Se eligen al crear el negocio o la sucursal (los tres de siempre, o una copia de otra sucursal) y se editan en Turnos.
+- Un turno no se borra: se archiva (`archived_at`), así las ventas viejas siguen mostrando su nombre. La sucursal conserva al menos un turno activo.
+- Un turno tiene a lo sumo un cierre en curso. Lo vendido pasada la medianoche en un turno nocturno cuenta para el día en que se abrió el turno (`business_date` del cierre).
 - Toda venta y todo gasto pertenecen a una sucursal, un turno y un empleado.
 - Esperado en caja = apertura + ventas − gastos del turno.
 - Los montos van en bolivianos (Bs) y se muestran con signo (ver DESIGN.md).
-- El plan es de cada negocio y lo paga su dueña, según sus sucursales. Trabajar como empleado nunca cuesta (ver `planes-de-suscripcion.md`).
+- El plan es de cada negocio y lo paga su dueña, según sus sucursales. Trabajar como empleado nunca cuesta. El plan lo cambia solo un administrador; la dueña puede editar únicamente el nombre del negocio. Los límites (sucursales, un negocio Gratis por persona, historial de 60 días en las políticas de lectura y aviso de descuadre) los aplica la base: ver «Límites en la app» en `planes-de-suscripcion.md`.
 
 ## Roles y permisos
 
@@ -60,23 +64,52 @@ erDiagram
 | Registrar venta, Gastos, Turnos | ✓ | ✓ (solo sus sucursales) |
 | Inventario | ✓ (edita) | ✓ (consulta) |
 
-## Rutas de la app (objetivo)
+## Rutas de la app
 
 | Ruta | Rol |
 |---|---|
 | `/app` | todos: lista de negocios con el rol en cada uno |
+| `/app/cuenta` | todas: perfil, contraseña, verificación en dos pasos y push |
 | `/app/[negocio]` | dueña: resumen consolidado |
 | `/app/[negocio]/sucursales` | dueña |
 | `/app/[negocio]/catalogo` | dueña |
 | `/app/[negocio]/empleados` | dueña |
+| `/app/[negocio]/configuracion` | dueña: nombre del negocio, sucursales, uso del plan y eliminar |
+| `/app/[negocio]/plan` | dueña: planes, precios y métodos de pago |
 | `/app/[negocio]/sucursales/[sucursal]` | dueña: resumen de la sucursal |
 | `/app/[negocio]/sucursales/[sucursal]/{registrar-venta,gastos,inventario,turnos}` | dueña y empleada |
 
-El sitio es estático: el negocio y la sucursal van en la URL (`getStaticPaths`), no en `localStorage`.
+El negocio y la sucursal van en la URL, no en `localStorage`. Las páginas se renderizan en el servidor: el middleware carga la sesión y los negocios de la persona, y una página a la que su rol no tiene acceso responde 404.
+
+## Base de datos (Supabase)
+
+- Esquema en `supabase/migrations/`. Cada entidad de arriba es una tabla de `public`; `sale_totals` es una vista (`security_invoker`) con el total de cada venta.
+- **RLS en todas las tablas.** Las funciones de apoyo viven en el schema `private` (no expuesto): `is_owner`, `is_member`, `owns_branch`, `can_use_branch`, `shares_business`.
+  - La dueña puede todo en su negocio.
+  - La empleada lee el catálogo; lee y escribe ventas, gastos y cierres solo en su sucursal; lee el inventario sin editarlo.
+  - Una persona solo ve el perfil (nombre) de quienes comparten negocio con ella.
+- **Invitaciones:** la dueña invita con correo, puesto, sucursal y turno. El correo tiene que ser de una cuenta confirmada (si no, la base responde «No hay ninguna cuenta…»). La fila queda `invitado` y la persona no ve el negocio hasta aceptar desde su bandeja (`respond_invitation`); si rechaza, la fila se borra y la dueña puede volver a invitar.
+- **Sugerencias al invitar** (`search_people`): mientras la dueña escribe el correo, la base devuelve hasta 6 cuentas confirmadas cuyo correo empieza con lo escrito (desde 3 caracteres), con nombre y foto. Solo responde a la dueña de ese negocio y deja fuera a ella misma y a quien ya está en el equipo.
+- **Notificaciones** (`notifications`): las crean funciones de `private`, nunca la API; cada persona solo lee, borra y marca como leídos sus avisos (`update` solo de `read_at`). Tipos: `invitation` (a la invitada), `invitation_answer` (a la dueña), `cash_mismatch` (a la dueña, al cerrar un turno con diferencia, salvo que lo cierre ella) y `low_stock` (a la dueña, cuando una venta deja el stock en el mínimo o debajo; una vez por cruce). `data` guarda nombres y montos del momento.
+- **Triggers:** al registrarse se crea `profiles`. Cada línea de venta toma el precio del inventario y descuenta el stock; ventas y gastos exigen que su turno esté abierto y toman la fecha del cierre (`private.require_open_shift`).
+- **RPC:** `register_sale` (venta y líneas en una transacción) y `create_business` (negocio, primera sucursal y turnos).
+- **Storage:** buckets privados `product-images` y `branch-images`, ruta `<business_id>/<id>.<ext>`; las fotos se muestran con URL firmada. El bucket `avatars` es público (la foto de perfil se ve en el panel, el combo de invitar y Empleados), ruta `<user_id>/<timestamp>.<ext>`, y cada quien escribe solo en su carpeta.
+
+## Tu cuenta (`/app/cuenta`)
+
+- **Perfil:** la persona edita `first_name`, `last_name` y `avatar_url` (grant por columna). El correo sale de `auth.users` y no se edita desde la app. Si quita su foto, quedan las iniciales.
+- **Contraseña:** `auth.updateUser`. Quien entró con Google puede crear una.
+- **Verificación en dos pasos (TOTP):** se activa con un QR y un código, y se desactiva con otro código. Al entrar, si la persona tiene un factor verificado, el login, la vuelta de Google y el middleware la mandan a `/auth/verificar` hasta que escriba el código. La autorización real es una política **restrictiva** `«Exige la verificación en dos pasos»` con `private.mfa_ok()` en **todas las tablas de `public` y en `storage.objects`**: sin `aal2`, esa sesión no lee ni escribe nada. **Toda tabla nueva tiene que llevar esa política.**
+- **Notificaciones push:** cada aviso nuevo de `notifications` dispara `private.push_notification()`, que con `pg_net` llama a la Edge Function `send-push` (`supabase/functions/send-push`). La URL del proyecto y el secreto de la llamada están en Vault (`project_url`, `push_webhook_secret`). La función lee `push_subscriptions` de esa persona, manda el aviso con VAPID y borra las suscripciones vencidas. El navegador muestra el aviso con `public/sw.js`; en iPhone solo funciona con la app agregada a la pantalla de inicio (`public/manifest.webmanifest`).
+- El «hoy» del negocio es la fecha en `America/La_Paz` (`business_date`).
+- Si una persona borra su cuenta, sus ventas, gastos y cierres se quedan; solo se pierde quién los registró.
+- **Eliminar** (desde Configuración, solo la dueña, escribiendo el nombre para confirmar):
+  - **Una sucursal:** se van en cascada sus turnos, ventas, gastos, cierres, inventario y empleados asignados (`sales` y `expenses` también cuelgan de `branches`). La última no se puede borrar (trigger `branches_keep_one`): para cerrarla, se elimina el negocio.
+  - **El negocio:** se va todo lo suyo. Antes, el trigger `businesses_clear_sales` borra sus ventas, porque `sale_items.product_id` no tiene cascada (así un producto con ventas no se puede borrar suelto). La acción quita sus fotos de Storage antes del borrado, porque las políticas de Storage necesitan que el negocio exista.
 
 ## Límites actuales
 
-- `shortcut:` los datos son de ejemplo y viven en memoria (`src/data/mock.ts`); no hay control de acceso real. Cuando exista backend, el rol se valida en el servidor.
 - `shortcut:` un empleado está en una sola sucursal y un solo turno; no hay rotación ni traspasos de stock entre sucursales.
-- `shortcut:` el sitio es estático, así que el negocio y la sucursal van en la URL y `getStaticPaths` genera solo las rutas que el rol puede ver. Con backend, eso pasa a un middleware que valida la sesión.
-- `shortcut:` las categorías del catálogo se guardan en el navegador (`localStorage`, una clave por negocio).
+- `shortcut:` las notificaciones llegan a la bandeja y por push, sin correo, sin elegir qué tipos de aviso y sin botón de prueba; no se borran solas.
+- `shortcut:` eliminar es definitivo (no hay papelera) y no hay anulación de ventas desde la app.
+- `shortcut:` el plan se activa a mano; no hay vencimiento, recordatorios ni cobro automático.

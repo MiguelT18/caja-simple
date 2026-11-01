@@ -35,6 +35,8 @@
 	--color-income-soft: light-dark(#e8f5ec, #1a2e22);
 	--color-expense: light-dark(#b4233c, #f27a8c);
 	--color-expense-soft: light-dark(#fcebee, #3a1c22);
+	/* Fondo del QR de la verificación en dos pasos: claro en los dos temas, si no las apps no lo leen. */
+	--color-qr-bg: #ffffff;
 	--color-warning: light-dark(#8a6100, #e8c35a);
 	--color-warning-soft: light-dark(#fef6d8, #33290f);
 	--color-info: light-dark(#2b6cb0, #7ab3f0);

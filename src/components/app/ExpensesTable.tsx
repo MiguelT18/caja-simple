@@ -1,4 +1,4 @@
-import type { ShiftTone } from "@/data/mock";
+import type { ShiftTone } from "@/data/types";
 import { formatBs } from "@/lib/format";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pager, usePage } from "./Pager";
@@ -20,9 +20,10 @@ const dayLabel = new Intl.DateTimeFormat("es-BO", { weekday: "short", day: "nume
 /** Historial de gastos, 10 por página. */
 export default function ExpensesTable({ rows, pageSize = 10 }: { rows: ExpenseRow[]; pageSize?: number }) {
   const pager = usePage(rows, pageSize);
+  if (rows.length === 0) return <p className="card empty-state">No hay gastos en los últimos 7 días.</p>;
   return (
     <div>
-      <div className="card table-wrap">
+      <div className="table-wrap">
         <Table>
           <TableHeader>
             <TableRow>

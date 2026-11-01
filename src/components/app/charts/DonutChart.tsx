@@ -6,10 +6,13 @@ import { MoneyTooltip } from "./MoneyTooltip";
 interface Props {
   items: { name: string; value: number }[];
   totalLabel: string;
+  /** Texto cuando no hay datos. */
+  empty?: string;
 }
 
 /** Torta con hueco: el total al centro y una leyenda con nombre, monto y porcentaje (nada solo con color). */
-export default function DonutChart({ items, totalLabel }: Props) {
+export default function DonutChart({ items, totalLabel, empty = "Todavía no hay datos." }: Props) {
+  if (items.length === 0) return <p className="empty-state">{empty}</p>;
   const total = items.reduce((a, b) => a + b.value, 0);
   // Claves simples para las variables CSS; los nombres pueden llevar espacios o tildes.
   const config: ChartConfig = Object.fromEntries(

@@ -2,20 +2,20 @@
 import PageHeader from "@/components/PageHeader.astro";
 import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
-import { appPaths, businessContext } from "@/data/queries";
+import { plural } from "@/lib/format";
+import { businessContext } from "@/data/queries";
 
-export const getStaticPaths = () => appPaths.business();
-
-const ctx = businessContext(Astro.params.negocio!);
-const { business, catalog } = ctx;
+const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
+if (!ctx) return Astro.rewrite("/404");
+const { business, catalog, categories } = ctx;
 const lowCount = catalog.filter((p) => p.soldIn.some((s) => s.low)).length;
 ---
 
 <Layout title={`Catálogo · ${business.name}`} context={{ membership: ctx.membership }}>
   <PageHeader
     title="Catálogo"
-    description={`${catalog.length} productos de ${business.name} · ${lowCount} con stock bajo en alguna sucursal. El precio y el stock los lleva cada sucursal.`}
+    description={`${plural(catalog.length, "producto", "productos")} de ${business.name} · ${lowCount} con stock bajo en alguna sucursal. El precio y el stock los lleva cada sucursal.`}
   />
 
-  <ProductCatalog client:load mode="business" products={catalog} storageKey={`caja-simple-product-categories:${business.id}`} />
+  <ProductCatalog client:load products={catalog} categories={categories} businessId={business.id} canEdit />
 </Layout>

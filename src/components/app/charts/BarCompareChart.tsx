@@ -13,6 +13,7 @@ interface Props {
 
 /** Barras horizontales de ventas y gastos por fila (turnos o sucursales). */
 export default function BarCompareChart({ rows }: Props) {
+  if (rows.every((r) => r.sales === 0 && r.expenses === 0)) return <p className="empty-state">Sin ventas ni gastos hoy.</p>;
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: `${rows.length * 3.5 + 3}rem` }}>
       <BarChart data={rows} layout="vertical" accessibilityLayer margin={{ left: 0, right: 8 }}>

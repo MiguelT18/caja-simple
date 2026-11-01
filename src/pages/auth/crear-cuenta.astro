@@ -12,11 +12,11 @@ import PasswordField from "../../components/auth/PasswordField.astro";
   description="Empieza a controlar tu negocio"
   pitch="Abre tu caja hoy. Empezar es gratis."
 >
-  <GoogleButton label="Registrarse con Google" />
+  <GoogleButton label="Registrarse con Google" action="/api/auth/google" />
 
   <AuthDivider />
 
-  <form class="auth-form" method="post" novalidate data-auth-form>
+  <form class="auth-form" method="post" action="/api/auth/signup" novalidate data-auth-form>
     <div class="field-row">
       <FormField
         id="firstName"

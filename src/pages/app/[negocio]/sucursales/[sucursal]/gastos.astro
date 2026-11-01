@@ -4,15 +4,18 @@ import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import DonutChart from "@/components/app/charts/DonutChart";
 import ExpensesTable from "@/components/app/ExpensesTable";
+import FormInput from "@/components/app/FormInput.astro";
+import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
-import { appPaths, branchContext, expensesByCategory, fullName, sum } from "@/data/queries";
+import { branchColor, branchContext, shiftBarData, branchHref, expensesByCategory, fullName, sum } from "@/data/queries";
 import { formatBs } from "@/lib/format";
 
-export const getStaticPaths = () => appPaths.branch("gastos");
-
 const { negocio, sucursal } = Astro.params;
-const ctx = branchContext(negocio!, sucursal!);
-const { branch, employeeById, expenseHistory, expenses, shiftById, shifts } = ctx;
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+if (!ctx) return Astro.rewrite("/404");
+const { branch, business, currentShift, expenseHistory, expenses, shiftById, shifts } = ctx;
+// Categorías ya usadas, como sugerencias del campo.
+const usedCategories = [...new Set(expenseHistory.map((g) => g.category))].sort();
 
 const weekTotal = sum(expenseHistory.map((g) => g.amount));
 const todayTotal = sum(expenses.map((g) => g.amount));
@@ -30,16 +33,51 @@ const rows = expenseHistory.map((g) => {
     concept: g.concept,
     category: g.category,
     shift: { name: shift.name, tone: shift.tone },
-    by: fullName(employeeById(g.employeeId)),
+    by: fullName(g.recordedBy),
     amount: g.amount,
   };
 });
 ---
 
-<Layout title={`Gastos · ${branch.name}`} context={{ membership: ctx.membership, branch }}>
-  <PageHeader title="Gastos" description={`Salidas de dinero de los últimos 7 días en ${branch.name}`}>
-    <button type="button" class="btn btn-secondary"><Plus size={18} stroke-width={2} />Registrar gasto</button>
+<Layout title={`Gastos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
+  <PageHeader tint={branchColor(ctx.membership, branch.id)} title="Gastos" description={`Salidas de dinero de los últimos 7 días en ${branch.name}`}>
+    {
+      currentShift ? (
+        <button type="button" class="btn btn-secondary" data-open-dialog="expense">
+          <Plus size={18} stroke-width={2} />
+          Registrar gasto
+        </button>
+      ) : (
+        <a class="btn btn-secondary" href={branchHref(business, branch, "turnos")}>
+          Abre un turno para registrar gastos
+        </a>
+      )
+    }
   </PageHeader>
+
+  {
+    currentShift && (
+      <Modal
+        id="expense"
+        title="Registrar gasto"
+        description={`Sale de la caja del turno ${currentShift.name.toLowerCase()}.`}
+        action="createExpense"
+        submitLabel="Guardar gasto"
+        hidden={{ branchId: branch.id, shiftId: currentShift.id }}
+      >
+        <FormInput form="expense-form" name="concept" label="Concepto" placeholder="Ej.: Pago al proveedor de leche" required maxlength={120} />
+        <div class="field-row-2">
+          <FormInput form="expense-form" name="category" label="Categoría" placeholder="Ej.: Proveedores" list="expense-categories" required maxlength={40} />
+          <FormInput form="expense-form" name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" label="Monto (Bs)" required />
+        </div>
+        <datalist id="expense-categories">
+          {["Proveedores", "Servicios", "Transporte", "Insumos", ...usedCategories]
+            .filter((c, i, all) => all.indexOf(c) === i)
+            .map((c) => <option value={c} />)}
+        </datalist>
+      </Modal>
+    )
+  }
 
   <div class="top">
     <dl class="card totals">

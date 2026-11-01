@@ -1,0 +1,58 @@
+---
+import AuthLayout from "../../layouts/AuthLayout.astro";
+import FormField from "../../components/auth/FormField.astro";
+import { safeNext } from "@/middleware";
+
+if (!Astro.locals.userId) return Astro.redirect("/auth/iniciar-sesion");
+const next = safeNext(Astro.url.searchParams.get("next"));
+---
+
+<AuthLayout
+  title="Verificación en dos pasos"
+  heading="Escribe tu código"
+  description="Abre tu app de autenticación y escribe los 6 números de Caja Simple."
+  pitch="Un paso más y entras a tu caja."
+>
+  <form class="auth-form" method="post" action={`/api/auth/verify?next=${encodeURIComponent(next)}`} novalidate data-auth-form>
+    <FormField
+      id="code"
+      label="Código de 6 dígitos"
+      inputmode="numeric"
+      autocomplete="one-time-code"
+      maxlength={6}
+      minlength={6}
+      required
+      autofocus
+      data-required-message="Escribe el código de tu app"
+      data-minlength-message="El código tiene 6 números"
+    />
+    <button type="submit" class="btn btn-primary btn-block">Verificar</button>
+  </form>
+  <!-- Fuera del <p> de abajo: un form no puede ir dentro de un párrafo. -->
+  <form id="verify-logout" method="post" action="/api/auth/logout"></form>
+
+  <Fragment slot="switch">
+    ¿No tienes tu teléfono? <button type="submit" form="verify-logout" class="link-btn">Usar otra cuenta</button>
+  </Fragment>
+</AuthLayout>
+
+<style>
+  /* Se ve como los enlaces de .auth-switch (AuthLayout); es botón porque cerrar sesión va por POST. */
+  .link-btn {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    font-weight: var(--font-bold);
+    text-decoration: underline;
+    text-decoration-color: var(--color-focus);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+  }
+
+  .link-btn:hover {
+    text-decoration-color: currentColor;
+  }
+</style>

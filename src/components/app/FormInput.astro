@@ -1,0 +1,36 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends Omit<HTMLAttributes<"input">, "form"> {
+  /** id del formulario: los ids del campo y su error se derivan de él (ver scripts/action-forms.ts). */
+  form: string;
+  name: string;
+  label: string;
+  hint?: string;
+  /** Si se pasa, el campo es un <select>. */
+  options?: { value: string; label: string; selected?: boolean }[];
+}
+
+const { form, name, label, hint, options, type = "text", ...rest } = Astro.props;
+const id = `${form}-${name}`;
+const describedBy = [hint && `${id}-hint`, `${id}-error`].filter(Boolean).join(" ");
+---
+
+<div class="field">
+  <label class="field-label" for={id}>{label}</label>
+  {
+    options ? (
+      <select class="input" id={id} name={name} aria-describedby={describedBy} required={rest.required}>
+        {options.map((o) => (
+          <option value={o.value} selected={o.selected}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    ) : (
+      <input class="input" id={id} name={name} type={type} aria-describedby={describedBy} {...rest} />
+    )
+  }
+  {hint && <p class="field-hint" id={`${id}-hint`}>{hint}</p>}
+  <p class="field-error" id={`${id}-error`}></p>
+</div>

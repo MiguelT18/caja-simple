@@ -1,7 +1,20 @@
 // Precios orientativos (ver docs/planes-de-suscripcion.md): hay que validarlos con dueños reales.
 
+export type PlanName = "Gratis" | "Negocio" | "Sucursales";
+
+// Lo que la app aplica de cada plan; null = sin tope. La base es la que manda
+// (migración plan_limits): esto solo lo muestra y tiene que coincidir con ella.
+export const planLimits: Record<PlanName, { branches: number | null; historyDays: number | null; cashAlerts: boolean }> = {
+  Gratis: { branches: 1, historyDays: 60, cashAlerts: false },
+  Negocio: { branches: 1, historyDays: null, cashAlerts: true },
+  Sucursales: { branches: null, historyDays: null, cashAlerts: true },
+};
+
+// Enlace del botón «Mejorar plan» (WhatsApp, formulario…). Sin él, la página de plan solo explica el proceso.
+export const upgradeUrl: string | undefined = import.meta.env.PUBLIC_UPGRADE_URL || undefined;
+
 export interface Plan {
-  name: string;
+  name: PlanName;
   audience: string;
   price: string;
   period?: string;

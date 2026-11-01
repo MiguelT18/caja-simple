@@ -1,0 +1,148 @@
+---
+// Campo de foto con vista previa antes de guardar: manda `image` (archivo) y `removeImage`.
+// Lo usan el diálogo de sucursal (fachada, 16:9) y Tu cuenta (perfil, redonda).
+import { ImagePlus, Store, UserRound } from "@lucide/astro";
+
+interface Props {
+  /** id del formulario que lo contiene (para los ids del campo y su error). */
+  form: string;
+  label: string;
+  /** URL de la foto actual, si tiene. */
+  image?: string;
+  round?: boolean;
+}
+
+const { form, label, image, round = false } = Astro.props;
+const Placeholder = round ? UserRound : Store;
+---
+
+<div class:list={["field", { round }]} data-photo-field>
+  <span class="field-label" id={`${form}-image-label`}>{label}</span>
+  <div class="photo-row">
+    <div class="photo-preview">
+      <img src={image} alt="" hidden={!image} data-photo-preview />
+      <Placeholder size={28} stroke-width={1.5} aria-hidden="true" />
+    </div>
+    <div class="photo-actions">
+      <label class="btn btn-secondary photo-pick">
+        <ImagePlus size={18} stroke-width={1.75} />
+        {image ? "Cambiar foto" : "Elegir foto"}
+        <input
+          class="sr-only"
+          id={`${form}-image`}
+          type="file"
+          name="image"
+          accept="image/jpeg,image/png,image/webp"
+          aria-labelledby={`${form}-image-label`}
+          aria-describedby={`${form}-image-hint ${form}-image-error`}
+          data-photo-input
+        />
+      </label>
+      {
+        image && (
+          <label class="photo-remove">
+            <input type="checkbox" name="removeImage" value="true" data-photo-remove />
+            Quitar foto
+          </label>
+        )
+      }
+    </div>
+  </div>
+  <p class="field-hint" id={`${form}-image-hint`}>Opcional · JPG, PNG o WebP, hasta 2 MB</p>
+  <p class="field-error" id={`${form}-image-error`}></p>
+</div>
+
+<script>
+  // Vista previa de la foto elegida antes de guardar.
+  for (const field of document.querySelectorAll<HTMLElement>("[data-photo-field]")) {
+    const input = field.querySelector<HTMLInputElement>("[data-photo-input]")!;
+    const preview = field.querySelector<HTMLImageElement>("[data-photo-preview]")!;
+    const remove = field.querySelector<HTMLInputElement>("[data-photo-remove]");
+    const original = preview.getAttribute("src");
+    let objectUrl: string | undefined;
+
+    const show = (src: string | null) => {
+      if (src) preview.src = src;
+      preview.hidden = !src;
+    };
+
+    input.addEventListener("change", () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      const file = input.files?.[0];
+      objectUrl = file ? URL.createObjectURL(file) : undefined;
+      if (remove && file) remove.checked = false;
+      show(objectUrl ?? original);
+    });
+
+    remove?.addEventListener("change", () => {
+      if (remove.checked) input.value = "";
+      show(remove.checked ? null : original);
+    });
+  }
+</script>
+
+<style>
+  .photo-row {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .photo-preview {
+    display: grid;
+    place-items: center;
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: 0.75rem;
+    background: var(--color-surface-muted);
+    color: var(--color-text-subtle);
+  }
+
+  .photo-preview img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Foto de perfil: círculo chico al lado de los botones. */
+  .round .photo-row {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .round .photo-preview {
+    width: 4.5rem;
+    aspect-ratio: 1;
+    border-radius: 50%;
+  }
+
+  .photo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+  }
+
+  .photo-pick:focus-within {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .photo-remove {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .photo-remove input {
+    width: 1.125rem;
+    height: 1.125rem;
+    accent-color: var(--color-primary);
+  }
+</style>

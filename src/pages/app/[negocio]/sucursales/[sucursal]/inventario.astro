@@ -3,24 +3,32 @@ import { Package } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
-import { appPaths, branchContext, businessHref, isLowStock } from "@/data/queries";
-
-export const getStaticPaths = () => appPaths.branch("inventario");
+import { plural } from "@/lib/format";
+import { branchColor, branchContext, shiftBarData, businessHref, isLowStock } from "@/data/queries";
 
 const { negocio, sucursal } = Astro.params;
-const ctx = branchContext(negocio!, sucursal!);
-const { branch, products, role, business } = ctx;
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+if (!ctx) return Astro.rewrite("/404");
+const { branch, products, role, business, categories } = ctx;
+const isOwner = role === "dueño";
+
+// Productos del catálogo que esta sucursal todavía no vende (solo la dueña los agrega).
+const { data: catalog } = isOwner
+  ? await Astro.locals.supabase.from("products").select("id, name").eq("business_id", business.id).order("name")
+  : { data: [] };
+const addable = (catalog ?? []).filter((p) => !products.some((x) => x.id === p.id));
 
 const lowCount = products.filter(isLowStock).length;
 ---
 
-<Layout title={`Inventario · ${branch.name}`} context={{ membership: ctx.membership, branch }}>
+<Layout title={`Inventario · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
   <PageHeader
+    tint={branchColor(ctx.membership, branch.id)}
     title="Inventario"
-    description={`${products.length} productos · ${lowCount} con stock bajo en ${branch.name}`}
+    description={`${plural(products.length, "producto", "productos")} · ${lowCount} con stock bajo en ${branch.name}`}
   >
     {
-      role === "dueño" && (
+      isOwner && (
         <a href={`${businessHref(business)}/catalogo`} class="btn btn-secondary">
           <Package size={18} stroke-width={2} />
           Editar catálogo
@@ -29,5 +37,5 @@ const lowCount = products.filter(isLowStock).length;
     }
   </PageHeader>
 
-  <ProductCatalog client:load mode="branch" products={products} storageKey={`caja-simple-product-categories:${business.id}`} />
+  <ProductCatalog client:load products={products} categories={categories} businessId={business.id} branchId={branch.id} canEdit={isOwner} addable={addable} />
 </Layout>

@@ -16,6 +16,8 @@ interface Props {
 }
 
 const { title, heading, description, pitch } = Astro.props;
+// Mensaje de un intento anterior sin JavaScript, o de la vuelta de Google o del correo.
+const error = Astro.url.searchParams.get("error");
 ---
 
 <html lang="es">
@@ -39,7 +41,7 @@ const { title, heading, description, pitch } = Astro.props;
           <p>{description}</p>
         </header>
 
-        <p class="notice" role="status" data-auth-notice></p>
+        <p class="notice" role="status" data-auth-notice>{error}</p>
 
         <slot />
 

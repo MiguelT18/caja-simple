@@ -1,12 +1,16 @@
 ---
 interface Props {
   label: string;
+  /** Endpoint que inicia el acceso con Google (puede llevar ?next=). */
+  action: string;
 }
 
-const { label } = Astro.props;
+const { label, action } = Astro.props;
 ---
 
-<button type="button" class="btn btn-secondary btn-block" data-google-auth>
-  <img src="/google.svg" alt="" width="20" height="20" />
-  {label}
-</button>
+<form method="post" action={action}>
+  <button type="submit" class="btn btn-secondary btn-block">
+    <img src="/google.svg" alt="" width="20" height="20" />
+    {label}
+  </button>
+</form>

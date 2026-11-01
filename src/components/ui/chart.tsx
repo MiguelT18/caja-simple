@@ -55,6 +55,24 @@ function ChartContainer({
 }) {
   const uniqueId = React.useId()
   const chartId = `chart-${id ?? uniqueId.replace(/:/g, "")}`
+  // El servidor no conoce el ancho real: hasta montarse se muestra un esqueleto del mismo tamaño,
+  // en vez de un gráfico de 320×200 que salta al hidratarse.
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => setMounted(true), [])
+
+  if (!mounted) {
+    return (
+      <div
+        aria-hidden="true"
+        className={cn(
+          "skeleton aspect-video",
+          className,
+          className?.includes("aspect-square") && "skeleton-circle"
+        )}
+        style={props.style}
+      />
+    )
+  }
 
   return (
     <ChartContext.Provider value={{ config }}>

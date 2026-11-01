@@ -15,6 +15,7 @@ interface Props {
 
 /** Barras de ventas y gastos por día. */
 export default function WeekChart({ days }: Props) {
+  if (days.every((d) => d.sales === 0 && d.expenses === 0)) return <p className="empty-state">Sin ventas ni gastos en los últimos 7 días.</p>;
   const data = days.map((d) => ({ ...d, label: dayLabel.format(new Date(`${d.date}T12:00:00Z`)) }));
   return (
     <ChartContainer config={config} className="aspect-auto h-64 w-full">

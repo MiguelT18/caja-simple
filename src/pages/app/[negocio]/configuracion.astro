@@ -1,0 +1,346 @@
+---
+import { ArrowRight, CircleCheck, CircleMinus, MapPin, Pencil, Plus, Trash } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import BranchDialogs from "@/components/app/BranchDialogs.astro";
+import FormInput from "@/components/app/FormInput.astro";
+import Modal from "@/components/app/Modal.astro";
+import Layout from "@/layouts/Layout.astro";
+import { businessContext, businessHref } from "@/data/queries";
+import { planLimits } from "@/data/plans";
+import { plural } from "@/lib/format";
+
+const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
+if (!ctx) return Astro.rewrite("/404");
+const { business, branchSummary } = ctx;
+const base = businessHref(business);
+const limits = planLimits[business.plan];
+const canAddBranch = limits.branches === null || branchSummary.length < limits.branches;
+
+const usage = [
+  {
+    label: "Sucursales",
+    value: limits.branches === null ? `${branchSummary.length} · sin tope` : `${branchSummary.length} de ${limits.branches}`,
+    ok: canAddBranch,
+  },
+  {
+    label: "Historial a la vista",
+    value: limits.historyDays === null ? "Completo" : `Últimos ${limits.historyDays} días`,
+    ok: limits.historyDays === null,
+  },
+  { label: "Aviso de caja descuadrada", value: limits.cashAlerts ? "Sí" : "No incluido", ok: limits.cashAlerts },
+];
+const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleados asignados";
+---
+
+<Layout title={`Configuración · ${business.name}`} context={{ membership: ctx.membership }}>
+  <PageHeader title="Configuración" description={`Datos, sucursales y plan de ${business.name}.`} />
+
+  <div class="settings">
+    <section class="card block" aria-labelledby="business-title">
+      <div class="block-head">
+        <h2 class="card-title" id="business-title">Negocio</h2>
+      </div>
+      <form id="business-form" class="business-form" data-action="renameBusiness" novalidate>
+        <input type="hidden" name="id" value={business.id} />
+        <FormInput form="business-form" name="name" label="Nombre del negocio" value={business.name} required maxlength={80} />
+        <p class="field-hint">
+          Dirección en la app: <span class="slug">{base}</span>. No cambia al renombrar, así tus enlaces siguen funcionando.
+        </p>
+        <p class="notice notice-error" role="alert" data-form-notice></p>
+        <button type="submit" class="btn btn-primary">Guardar nombre</button>
+      </form>
+    </section>
+
+    <section class="card block" aria-labelledby="branches-title">
+      <div class="block-head">
+        <h2 class="card-title" id="branches-title">Sucursales</h2>
+        {
+          canAddBranch && (
+            <button type="button" class="btn btn-secondary" data-open-dialog="branch-new">
+              <Plus size={18} stroke-width={2} />
+              Agregar sucursal
+            </button>
+          )
+        }
+      </div>
+      <ul class="rows" role="list">
+        {
+          branchSummary.map(({ branch, shifts, employees }) => (
+            <li>
+              <div class="row-text">
+                <p class="row-title">{branch.name}</p>
+                <p class="row-meta">
+                  {branch.address && (
+                    <span>
+                      <MapPin size={14} stroke-width={1.75} />
+                      {branch.address}
+                    </span>
+                  )}
+                  <span>
+                    {plural(shifts.length, "turno", "turnos")} · {plural(employees, "empleado", "empleados")}
+                  </span>
+                </p>
+              </div>
+              <button type="button" class="btn btn-secondary" data-open-dialog={`branch-${branch.id}`}>
+                <Pencil size={16} stroke-width={1.75} />
+                Editar<span class="sr-only"> {branch.name}</span>
+              </button>
+            </li>
+          ))
+        }
+      </ul>
+      {
+        !canAddBranch && (
+          <p class="notice">
+            Tu plan {business.plan} incluye {plural(limits.branches!, "sucursal", "sucursales")}. <a href={`${base}/plan`}>Ver planes →</a>
+          </p>
+        )
+      }
+    </section>
+
+    <section class="card block" aria-labelledby="plan-title">
+      <div class="block-head">
+        <h2 class="card-title" id="plan-title">Plan {business.plan}</h2>
+        <a href={`${base}/plan`} class="btn btn-secondary">
+          Ver planes y precios
+          <ArrowRight size={18} stroke-width={2} />
+        </a>
+      </div>
+      <dl class="usage">
+        {
+          usage.map((row) => (
+            <div>
+              <dt>{row.label}</dt>
+              <dd>
+                {row.ok ? <CircleCheck size={16} stroke-width={1.75} /> : <CircleMinus size={16} stroke-width={1.75} />}
+                <span class="num">{row.value}</span>
+              </dd>
+            </div>
+          ))
+        }
+      </dl>
+      {limits.historyDays !== null && <p class="field-hint">Lo anterior no se borra: vuelve a aparecer cuando pasas a un plan pago.</p>}
+    </section>
+
+    <a href="/app/cuenta" class="card block account-link">
+      <span>
+        <span class="row-title">Tu cuenta</span>
+        <span class="row-meta">Tu foto, tu contraseña, la verificación en dos pasos y los avisos en tu teléfono.</span>
+      </span>
+      <ArrowRight size={18} stroke-width={2} />
+    </a>
+
+    <section class="card block danger" aria-labelledby="danger-title">
+      <div class="block-head">
+        <h2 class="card-title" id="danger-title">Eliminar</h2>
+      </div>
+      <p class="field-hint">Eliminar es definitivo: no hay papelera ni forma de recuperarlo.</p>
+      <ul class="rows" role="list">
+        {
+          branchSummary.length > 1 &&
+            branchSummary.map(({ branch }) => (
+              <li>
+                <div class="row-text">
+                  <p class="row-title">Sucursal {branch.name}</p>
+                  <p class="row-meta">Se borran {lost}.</p>
+                </div>
+                <button type="button" class="btn btn-secondary danger-btn" data-open-dialog={`delete-branch-${branch.id}`}>
+                  <Trash size={16} stroke-width={1.75} />
+                  Eliminar<span class="sr-only"> {branch.name}</span>
+                </button>
+              </li>
+            ))
+        }
+        <li>
+          <div class="row-text">
+            <p class="row-title">Negocio {business.name}</p>
+            <p class="row-meta">
+              Se borran sus {plural(branchSummary.length, "sucursal", "sucursales")}, el catálogo y todo su historial. Tus empleados pierden el acceso.
+            </p>
+          </div>
+          <button type="button" class="btn btn-secondary danger-btn" data-open-dialog="delete-business">
+            <Trash size={16} stroke-width={1.75} />
+            Eliminar negocio
+          </button>
+        </li>
+      </ul>
+      {branchSummary.length === 1 && <p class="field-hint">Un negocio necesita al menos una sucursal: para cerrar la única, elimina el negocio.</p>}
+    </section>
+  </div>
+
+  <BranchDialogs business={business} branchSummary={branchSummary} canAddBranch={canAddBranch} />
+
+  {
+    branchSummary.length > 1 &&
+      branchSummary.map(({ branch }) => (
+        <Modal
+          id={`delete-branch-${branch.id}`}
+          title={`Eliminar ${branch.name}`}
+          description={`Se borran ${lost}. No se puede deshacer.`}
+          action="deleteBranch"
+          submitLabel="Eliminar sucursal"
+          danger
+          hidden={{ id: branch.id }}
+        >
+          <FormInput form={`delete-branch-${branch.id}-form`} name="confirm" label={`Escribe «${branch.name}» para confirmar`} autocomplete="off" required />
+        </Modal>
+      ))
+  }
+
+  <Modal
+    id="delete-business"
+    title={`Eliminar ${business.name}`}
+    description="Se borran todas sus sucursales, el catálogo, las ventas, los gastos y los cierres de caja. Tus empleados pierden el acceso. No se puede deshacer."
+    action="deleteBusiness"
+    submitLabel="Eliminar negocio"
+    redirect="/app"
+    danger
+    hidden={{ id: business.id }}
+  >
+    <FormInput form="delete-business-form" name="confirm" label={`Escribe «${business.name}» para confirmar`} autocomplete="off" required />
+  </Modal>
+</Layout>
+
+<style>
+  .settings {
+    display: grid;
+    gap: 1.25rem;
+    max-width: 48rem;
+  }
+
+  .block {
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  .block-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .business-form {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .business-form .btn {
+    justify-self: start;
+  }
+
+  .slug {
+    color: var(--color-text);
+    font-weight: var(--font-medium);
+    overflow-wrap: anywhere;
+  }
+
+  .rows {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rows li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    padding: 0.875rem 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .row-text {
+    flex: 1 1 16rem;
+    min-width: 0;
+  }
+
+  .row-title,
+  .row-meta {
+    margin: 0;
+  }
+
+  .row-title {
+    font-weight: var(--font-semibold);
+    overflow-wrap: anywhere;
+  }
+
+  .row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .row-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .notice a {
+    color: inherit;
+    font-weight: var(--font-semibold);
+  }
+
+  .usage {
+    display: grid;
+    margin: 0;
+  }
+
+  .usage div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .usage dt {
+    color: var(--color-text-muted);
+  }
+
+  .usage dd {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-weight: var(--font-semibold);
+  }
+
+  .account-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .account-link > span {
+    display: grid;
+    gap: 0.125rem;
+  }
+
+  .account-link:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  .danger {
+    border-color: color-mix(in srgb, var(--color-expense) 45%, var(--color-border));
+  }
+
+  .danger .card-title,
+  .danger-btn {
+    color: var(--color-expense);
+  }
+
+  .danger-btn:hover:not(:disabled) {
+    background: var(--color-expense-soft);
+  }
+</style>

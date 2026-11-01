@@ -1,0 +1,262 @@
+---
+import { Plus, X } from "@lucide/astro";
+
+interface ShiftDraft {
+  name: string;
+  start: string;
+  end: string;
+  tone: "morning" | "afternoon" | "night";
+}
+
+interface Props {
+  /** id del formulario que lo contiene (para ids únicos y el error). */
+  form: string;
+  /** Puntos de partida: el primero se muestra al abrir. Ej.: «Los de siempre», «Copiar de Sucursal Norte». */
+  presets: { label: string; shifts: ShiftDraft[] }[];
+}
+
+const { form, presets } = Astro.props;
+const tones = [
+  { value: "morning", label: "Mañana" },
+  { value: "afternoon", label: "Tarde" },
+  { value: "night", label: "Noche" },
+];
+---
+
+<!-- Lista de turnos de una sucursal nueva. Los campos se repiten (shiftName, shiftStart…), uno por fila, como espera la acción. -->
+<fieldset class="shifts-editor" data-shifts-editor data-presets={JSON.stringify(presets.map((p) => p.shifts))}>
+  <legend class="field-label">Turnos</legend>
+  <p class="field-hint">
+    Los horarios de esta sucursal. Si un turno termina después de medianoche (por ejemplo 22:00 a 06:00), cuenta para el
+    día en que se abre.
+  </p>
+
+  {
+    presets.length > 1 && (
+      <div class="field preset">
+        <label class="field-label" for={`${form}-preset`}>Partir de</label>
+        <select class="input" id={`${form}-preset`} data-preset>
+          {presets.map((p, i) => (
+            <option value={i}>{p.label}</option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  <ol class="shift-rows" data-rows>
+    {
+      presets[0].shifts.map((s, i) => (
+        <li class="shift-row" data-row>
+          <div class="field name">
+            <label class="field-label" for={`${form}-shift-${i}-name`}>Nombre</label>
+            <input class="input" id={`${form}-shift-${i}-name`} name="shiftName" value={s.name} required maxlength="40" />
+          </div>
+          <div class="field">
+            <label class="field-label" for={`${form}-shift-${i}-start`}>Empieza</label>
+            <input class="input" id={`${form}-shift-${i}-start`} name="shiftStart" type="time" value={s.start} required />
+          </div>
+          <div class="field end">
+            <label class="field-label" for={`${form}-shift-${i}-end`}>Termina</label>
+            <input class="input" id={`${form}-shift-${i}-end`} name="shiftEnd" type="time" value={s.end} required />
+          </div>
+          <div class="field tone">
+            <label class="field-label" for={`${form}-shift-${i}-tone`}>Momento</label>
+            <select class="input" id={`${form}-shift-${i}-tone`} name="shiftTone">
+              {tones.map((t) => (
+                <option value={t.value} selected={t.value === s.tone}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button type="button" class="icon-btn remove" data-remove aria-label={`Quitar turno ${s.name}`}>
+            <X size={18} stroke-width={1.75} />
+          </button>
+          <p class="overnight" data-overnight hidden={!(s.end < s.start)}>Termina al día siguiente</p>
+        </li>
+      ))
+    }
+  </ol>
+
+  <template data-row-template>
+    <li class="shift-row" data-row>
+      <div class="field name">
+        <label class="field-label" for={`${form}-shift-__i__-name`}>Nombre</label>
+        <input class="input" id={`${form}-shift-__i__-name`} name="shiftName" required maxlength="40" />
+      </div>
+      <div class="field">
+        <label class="field-label" for={`${form}-shift-__i__-start`}>Empieza</label>
+        <input class="input" id={`${form}-shift-__i__-start`} name="shiftStart" type="time" required />
+      </div>
+      <div class="field end">
+        <label class="field-label" for={`${form}-shift-__i__-end`}>Termina</label>
+        <input class="input" id={`${form}-shift-__i__-end`} name="shiftEnd" type="time" required />
+      </div>
+      <div class="field tone">
+        <label class="field-label" for={`${form}-shift-__i__-tone`}>Momento</label>
+        <select class="input" id={`${form}-shift-__i__-tone`} name="shiftTone">
+          {tones.map((t) => <option value={t.value}>{t.label}</option>)}
+        </select>
+      </div>
+      <button type="button" class="icon-btn remove" data-remove aria-label="Quitar turno">
+        <X size={18} stroke-width={1.75} />
+      </button>
+      <p class="overnight" data-overnight hidden>Termina al día siguiente</p>
+    </li>
+  </template>
+
+  <button type="button" class="btn btn-secondary add" data-add>
+    <Plus size={18} stroke-width={2} />
+    Agregar turno
+  </button>
+  <p class="field-error" id={`${form}-shiftName-error`}></p>
+</fieldset>
+
+<style>
+  .shifts-editor {
+    container-type: inline-size;
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  legend {
+    padding: 0;
+    margin-bottom: 0.25rem;
+  }
+
+  .preset {
+    max-width: 20rem;
+  }
+
+  .shift-rows {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .shift-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)) auto;
+    align-items: end;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+  }
+
+  .shift-row .field-label {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .remove {
+    margin-bottom: 0.25rem;
+  }
+
+  .overnight {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .overnight::before {
+    content: "☾ " / "";
+  }
+
+  .add {
+    justify-self: start;
+  }
+
+  /* Según el ancho del formulario (diálogo o página), no de la pantalla. */
+  @container (max-width: 560px) {
+    /* Las horas necesitan ancho: comparten su fila en mitades iguales y el resto va a lo ancho. */
+    .shift-row {
+      position: relative;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .shift-row .name {
+      grid-column: 1 / -1;
+      margin-right: 2.75rem;
+    }
+
+    .shift-row .tone {
+      grid-column: 1 / -1;
+    }
+
+    .remove {
+      position: absolute;
+      top: 2.125rem;
+      right: 0.75rem;
+    }
+  }
+</style>
+
+<script>
+  type Draft = { name: string; start: string; end: string; tone: string };
+
+  for (const editor of document.querySelectorAll<HTMLElement>("[data-shifts-editor]")) {
+    const rows = editor.querySelector<HTMLOListElement>("[data-rows]")!;
+    const template = editor.querySelector<HTMLTemplateElement>("[data-row-template]")!;
+    const presets: Draft[][] = JSON.parse(editor.dataset.presets ?? "[]");
+    let counter = rows.children.length;
+
+    const syncRow = (row: HTMLElement) => {
+      const start = row.querySelector<HTMLInputElement>("[name=shiftStart]")!.value;
+      const end = row.querySelector<HTMLInputElement>("[name=shiftEnd]")!.value;
+      const name = row.querySelector<HTMLInputElement>("[name=shiftName]")!.value;
+      row.querySelector<HTMLElement>("[data-overnight]")!.hidden = !(start && end && end < start);
+      row.querySelector<HTMLElement>("[data-remove]")!.setAttribute("aria-label", name ? `Quitar turno ${name}` : "Quitar turno");
+    };
+
+    const addRow = (draft?: Draft) => {
+      const fragment = template.content.cloneNode(true) as DocumentFragment;
+      const index = String(counter++);
+      for (const el of fragment.querySelectorAll<HTMLElement>("[id], [for]")) {
+        if (el.id) el.id = el.id.replace("__i__", index);
+        const target = el.getAttribute("for");
+        if (target) el.setAttribute("for", target.replace("__i__", index));
+      }
+      const row = fragment.querySelector<HTMLElement>("[data-row]")!;
+      row.querySelector<HTMLInputElement>("[name=shiftName]")!.value = draft?.name ?? "";
+      row.querySelector<HTMLInputElement>("[name=shiftStart]")!.value = draft?.start ?? "";
+      row.querySelector<HTMLInputElement>("[name=shiftEnd]")!.value = draft?.end ?? "";
+      row.querySelector<HTMLSelectElement>("[name=shiftTone]")!.value = draft?.tone ?? "morning";
+      rows.append(row);
+      syncRow(row);
+      return row;
+    };
+
+    editor.querySelector("[data-add]")!.addEventListener("click", () => {
+      addRow().querySelector<HTMLInputElement>("[name=shiftName]")!.focus();
+    });
+
+    editor.addEventListener("click", (event) => {
+      const button = (event.target as Element).closest("[data-remove]");
+      if (!button) return;
+      const row = button.closest<HTMLElement>("[data-row]")!;
+      const next = row.nextElementSibling ?? row.previousElementSibling;
+      row.remove();
+      // El foco no se pierde: pasa a la fila vecina o al botón de agregar.
+      (next?.querySelector<HTMLElement>("[data-remove]") ?? editor.querySelector<HTMLElement>("[data-add]"))!.focus();
+    });
+
+    editor.addEventListener("input", (event) => {
+      const row = (event.target as Element).closest<HTMLElement>("[data-row]");
+      if (row) syncRow(row);
+    });
+
+    editor.querySelector<HTMLSelectElement>("[data-preset]")?.addEventListener("change", (event) => {
+      rows.replaceChildren();
+      for (const draft of presets[Number((event.target as HTMLSelectElement).value)] ?? []) addRow(draft);
+    });
+  }
+</script>

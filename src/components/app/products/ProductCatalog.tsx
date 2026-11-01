@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { FolderInput, Package, Pencil, Plus, ScanBarcode, Search, Tags, Trash2, TriangleAlert } from "lucide-react";
-import type { Product } from "@/data/mock";
+import { actions } from "astro:actions";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FolderInput, ImagePlus, Package, Pencil, Plus, ScanBarcode, Search, Tags, Trash2, TriangleAlert } from "lucide-react";
+import type { Category, Product } from "@/data/types";
 import type { CatalogEntry } from "@/data/queries";
 import { formatBs } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -20,18 +22,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pager, usePage } from "../Pager";
-import {
-  addCategory,
-  categoryOf,
-  deleteCategory,
-  initialState,
-  loadState,
-  moveProduct,
-  nameError,
-  renameCategory,
-  saveState,
-  type CategoryState,
-} from "./categories";
 
 const ALL = "all";
 const NONE = "none";
@@ -39,31 +29,49 @@ const PAGE_SIZE = 12;
 
 // Negocio: el producto del catálogo con dónde se vende. Sucursal: el producto con su precio y stock ahí.
 type Item = Product | CatalogEntry;
-type Mode = "business" | "branch";
+
+interface Props {
+  products: Item[];
+  categories: Category[];
+  businessId: string;
+  /** Solo en la sucursal: dónde se edita el inventario. */
+  branchId?: string;
+  /** Solo la dueña edita: en el negocio el catálogo, en la sucursal el precio y el stock. */
+  canEdit: boolean;
+  /** En la sucursal: productos del catálogo que todavía no se venden ahí. */
+  addable?: { id: string; name: string }[];
+}
 
 const isLow = (p: Item) => ("soldIn" in p ? p.soldIn.some((s) => s.low) : p.stock <= p.minStock);
 const colorOf = (index: number) => `var(--color-branch-${(index % 6) + 1})`;
+const nameError = (categories: Category[], name: string, exceptId?: string) => {
+  const clean = name.trim();
+  if (!clean) return "Escribe un nombre para la categoría.";
+  if (clean.length > 40) return "Usa 40 caracteres o menos.";
+  const taken = categories.some((c) => c.id !== exceptId && c.name.toLowerCase() === clean.toLowerCase());
+  return taken ? `Ya existe la categoría «${clean}».` : null;
+};
 
-export default function ProductCatalog({ products, mode, storageKey }: { products: Item[]; mode: Mode; storageKey: string }) {
-  // Las categorías son del negocio: se editan en el catálogo y en la sucursal solo filtran.
-  const canEdit = mode === "business";
-  const [state, setState] = useState<CategoryState>(() => initialState(products));
-  const [loaded, setLoaded] = useState(false);
+export default function ProductCatalog({ products: initialProducts, categories: initialCategories, businessId, branchId, canEdit, addable = [] }: Props) {
+  const mode = branchId ? "branch" : "business";
+  const [products, setProducts] = useState(initialProducts);
+  const [categories, setCategories] = useState(initialCategories);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string>(ALL);
   const [lowOnly, setLowOnly] = useState(false);
+  const [error, setError] = useState("");
+  const [editing, setEditing] = useState<Item | "new" | null>(null);
 
-  // Se lee del navegador después de montar, así el HTML del servidor y el primer render coinciden.
-  useEffect(() => {
-    setState(loadState(storageKey, initialState(products)));
-    setLoaded(true);
-  }, [products, storageKey]);
+  async function move(product: Item, categoryId: string | null) {
+    const { error } = await actions.moveProduct({ productId: product.id, categoryId });
+    if (error) return setError(error.message);
+    const category = categories.find((c) => c.id === categoryId);
+    setProducts((list) => list.map((p) => (p.id === product.id ? { ...p, categoryId: category?.id, category: category?.name } : p)));
+  }
 
-  useEffect(() => {
-    if (loaded && canEdit) saveState(storageKey, state);
-  }, [state, loaded, canEdit, storageKey]);
+  const categoryOf = (p: Item) => (p.categoryId && categories.some((c) => c.id === p.categoryId) ? p.categoryId : null);
 
-  const withCategory = useMemo(() => products.map((p) => ({ product: p, categoryId: categoryOf(state, p) })), [products, state]);
+  const withCategory = useMemo(() => products.map((p) => ({ product: p, categoryId: categoryOf(p) })), [products, categories]);
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
@@ -72,7 +80,7 @@ export default function ProductCatalog({ products, mode, storageKey }: { product
   }, [withCategory]);
 
   // Si se borra la categoría filtrada, vuelve a «Todas».
-  const activeFilter = filter === ALL || filter === NONE || state.categories.some((c) => c.id === filter) ? filter : ALL;
+  const activeFilter = filter === ALL || filter === NONE || categories.some((c) => c.id === filter) ? filter : ALL;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -116,14 +124,38 @@ export default function ProductCatalog({ products, mode, storageKey }: { product
               autoComplete="off"
             />
           </label>
-          {canEdit && <CategoryManager state={state} setState={setState} counts={counts} />}
+          {canEdit && mode === "business" && (
+            <>
+              <CategoryManager
+                businessId={businessId}
+                categories={categories}
+                setCategories={setCategories}
+                onDeleted={(id) =>
+                  setProducts((list) => list.map((p) => (p.categoryId === id ? { ...p, categoryId: undefined, category: undefined } : p)))
+                }
+                counts={counts}
+              />
+              <Button className="h-11" onClick={() => setEditing("new")}>
+                <Plus />
+                Agregar producto
+              </Button>
+            </>
+          )}
+          {canEdit && mode === "branch" && addable.length > 0 && (
+            <AddToBranch businessId={businessId} branchId={branchId!} addable={addable} />
+          )}
         </div>
+        {error && (
+          <p className="notice notice-error m-0" role="alert">
+            {error}
+          </p>
+        )}
 
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar productos">
           <FilterChip active={activeFilter === ALL} onClick={() => setFilter(ALL)} count={products.length}>
             Todas
           </FilterChip>
-          {state.categories.map((c, i) => (
+          {categories.map((c, i) => (
             <FilterChip
               key={c.id}
               active={activeFilter === c.id}
@@ -147,7 +179,27 @@ export default function ProductCatalog({ products, mode, storageKey }: { product
         </div>
       </div>
 
-      {visible.length === 0 ? (
+      {products.length === 0 ? (
+        <div className="card flex flex-col items-center gap-3 px-6 py-12 text-center">
+          <Package className="size-8 text-muted-foreground" aria-hidden="true" />
+          <p className="m-0 font-semibold">
+            {mode === "business" ? "Tu catálogo está vacío" : "Esta sucursal todavía no vende productos"}
+          </p>
+          <p className="m-0 max-w-md text-sm text-muted-foreground">
+            {mode === "business"
+              ? "Agrega los productos que vendes. Después, en el inventario de cada sucursal, les pones precio y stock."
+              : canEdit
+                ? "Elige productos de tu catálogo y ponles precio y stock para esta sucursal."
+                : "La dueña del negocio todavía no agregó productos a esta sucursal."}
+          </p>
+          {canEdit && mode === "business" && (
+            <Button onClick={() => setEditing("new")}>
+              <Plus />
+              Agregar producto
+            </Button>
+          )}
+        </div>
+      ) : visible.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 px-6 py-12 text-center">
           <Package className="size-8 text-muted-foreground" aria-hidden="true" />
           <p className="m-0 font-semibold">Ningún producto coincide con estos filtros</p>
@@ -158,15 +210,16 @@ export default function ProductCatalog({ products, mode, storageKey }: { product
       ) : (
         <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4 p-0">
           {pager.pageItems.map(({ product, categoryId }) => {
-            const index = state.categories.findIndex((c) => c.id === categoryId);
+            const index = categories.findIndex((c) => c.id === categoryId);
             return (
               <li key={product.id}>
                 <ProductCard
                   product={product}
-                  category={index >= 0 ? state.categories[index] : null}
+                  category={index >= 0 ? categories[index] : null}
                   color={index >= 0 ? colorOf(index) : "var(--color-text-subtle)"}
-                  state={state}
-                  onMove={canEdit ? (id) => setState((s) => moveProduct(s, product.id, id)) : undefined}
+                  categories={categories}
+                  onMove={canEdit && mode === "business" ? (id) => move(product, id) : undefined}
+                  onEdit={canEdit ? () => setEditing(product) : undefined}
                 />
               </li>
             );
@@ -175,6 +228,17 @@ export default function ProductCatalog({ products, mode, storageKey }: { product
       )}
 
       <Pager {...pager} onPage={pager.setPage} noun="productos" />
+      {editing && mode === "business" && (
+        <ProductForm
+          businessId={businessId}
+          categories={categories}
+          product={editing === "new" ? undefined : editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      {editing && editing !== "new" && mode === "branch" && !("soldIn" in editing) && (
+        <InventoryForm businessId={businessId} branchId={branchId!} product={editing} onClose={() => setEditing(null)} />
+      )}
       {filtered && visible.length > 0 && (
         <p className="mt-3 mb-0 text-sm text-muted-foreground">
           Mostrando {visible.length} de {products.length} productos.{" "}
@@ -213,7 +277,7 @@ function FilterChip({
           ? warning
             ? "border-transparent bg-[var(--color-warning-soft)] text-[var(--color-warning)]"
             : "border-transparent bg-[var(--color-text)] text-[var(--color-bg)]"
-          : "border-border bg-card text-foreground hover:bg-muted",
+          : "border-transparent bg-[var(--color-surface-hover)] text-foreground hover:bg-[var(--color-border-strong)]/40",
       )}
     >
       {color && <span className="size-2 rounded-full" style={{ background: color }} aria-hidden="true" />}
@@ -223,34 +287,73 @@ function FilterChip({
   );
 }
 
+/** Foto del producto: esqueleto mientras llega, fundido al cargar y el ícono si no hay foto o falla. */
+function ProductImage({ src, color }: { src?: string; color: string }) {
+  const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
+  const img = useRef<HTMLImageElement>(null);
+  // Si ya estaba en caché, onLoad pudo dispararse antes de hidratar.
+  useEffect(() => {
+    if (img.current?.complete) setState(img.current.naturalWidth ? "loaded" : "error");
+  }, [src]);
+
+  if (!src || state === "error") {
+    return (
+      <div className="grid size-full place-items-center" style={{ color }}>
+        <Package className="size-10" strokeWidth={1.5} aria-hidden="true" />
+      </div>
+    );
+  }
+  return (
+    <>
+      {state === "loading" && <span className="skeleton absolute inset-0 rounded-none" aria-hidden="true" />}
+      <img
+        ref={img}
+        src={src}
+        alt=""
+        className={cn("relative size-full object-cover transition-opacity duration-300 motion-reduce:transition-none", state === "loading" && "opacity-0")}
+        loading="lazy"
+        onLoad={() => setState("loaded")}
+        onError={() => setState("error")}
+      />
+    </>
+  );
+}
+
 function ProductCard({
   product,
   category,
   color,
-  state,
+  categories,
   onMove,
+  onEdit,
 }: {
   product: Item;
   category: { id: string; name: string } | null;
   color: string;
-  state: CategoryState;
+  categories: Category[];
   onMove?: (categoryId: string | null) => void;
+  onEdit?: () => void;
 }) {
   const low = isLow(product);
   return (
-    <Card className="h-full gap-0 overflow-hidden py-0 shadow-sm">
+    <Card className="h-full gap-0 overflow-hidden py-0 hover:bg-[var(--color-surface-hover)]">
       <div
         className="relative aspect-[16/10]"
         style={{
           background: `color-mix(in srgb, ${color} 12%, var(--color-surface))`,
         }}
       >
-        {product.image ? (
-          <img src={product.image} alt="" className="size-full object-cover" loading="lazy" />
-        ) : (
-          <div className="grid size-full place-items-center" style={{ color }}>
-            <Package className="size-10" strokeWidth={1.5} aria-hidden="true" />
-          </div>
+        <ProductImage src={product.image} color={color} />
+        {onEdit && !onMove && (
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            className="absolute top-2 right-2 bg-card shadow-sm"
+            aria-label={`Editar precio y stock de ${product.name}`}
+            onClick={onEdit}
+          >
+            <Pencil />
+          </Button>
         )}
         {onMove && (
           <DropdownMenu>
@@ -259,16 +362,25 @@ function ProductCard({
                 variant="secondary"
                 size="icon-sm"
                 className="absolute top-2 right-2 bg-card shadow-sm"
-                aria-label={`Mover ${product.name} a otra categoría`}
+                aria-label={`Opciones de ${product.name}`}
               >
                 <FolderInput />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
+              {onEdit && (
+                <>
+                  <DropdownMenuItem onSelect={onEdit}>
+                    <Pencil />
+                    Editar producto
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuLabel>Mover a categoría</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuRadioGroup value={category?.id ?? NONE} onValueChange={(v) => onMove(v === NONE ? null : v)}>
-                {state.categories.map((c) => (
+                {categories.map((c) => (
                   <DropdownMenuRadioItem key={c.id} value={c.id}>
                     {c.name}
                   </DropdownMenuRadioItem>
@@ -307,7 +419,7 @@ function ProductCard({
                 </thead>
                 <tbody>
                   {product.soldIn.map((s) => (
-                    <tr key={s.branch} className="border-t border-border first:border-t-0">
+                    <tr key={s.branchId} className="border-t border-border first:border-t-0">
                       <th scope="row" className="truncate py-1 text-left font-normal text-muted-foreground">
                         {s.branch}
                       </th>
@@ -341,37 +453,52 @@ function ProductCard({
 }
 
 function CategoryManager({
-  state,
-  setState,
+  businessId,
+  categories,
+  setCategories,
+  onDeleted,
   counts,
 }: {
-  state: CategoryState;
-  setState: React.Dispatch<React.SetStateAction<CategoryState>>;
+  businessId: string;
+  categories: Category[];
+  setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
+  onDeleted: (id: string) => void;
   counts: Map<string, number>;
 }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<{
-    id: string;
-    name: string;
-    error: string | null;
-  } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<{ id: string; name: string; error: string | null } | null>(null);
 
-  const add = (e: React.FormEvent) => {
+  const add = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const problem = nameError(state, draft);
+    const problem = nameError(categories, draft);
     setError(problem);
     if (problem) return;
-    setState((s) => addCategory(s, draft));
+    setBusy(true);
+    const { data, error } = await actions.saveCategory({ businessId, name: draft });
+    setBusy(false);
+    if (error) return setError(error.message);
+    setCategories((list) => [...list, data].sort((a, b) => a.name.localeCompare(b.name, "es")));
     setDraft("");
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editing) return;
-    const problem = nameError(state, editing.name, editing.id);
+    const problem = nameError(categories, editing.name, editing.id);
     if (problem) return setEditing({ ...editing, error: problem });
-    setState((s) => renameCategory(s, editing.id, editing.name));
+    const { error } = await actions.saveCategory({ businessId, id: editing.id, name: editing.name });
+    if (error) return setEditing({ ...editing, error: error.message });
+    setCategories((list) => list.map((c) => (c.id === editing.id ? { ...c, name: editing.name.trim() } : c)));
     setEditing(null);
+  };
+
+  const remove = async (c: Category) => {
+    if (!window.confirm(`¿Borrar la categoría «${c.name}»? Sus productos quedan en «Sin categoría».`)) return;
+    const { error } = await actions.deleteCategory({ id: c.id });
+    if (error) return setError(error.message);
+    setCategories((list) => list.filter((x) => x.id !== c.id));
+    onDeleted(c.id);
   };
 
   return (
@@ -404,7 +531,7 @@ function CategoryManager({
               className="h-10 text-base"
               maxLength={40}
             />
-            <Button type="submit" className="h-10">
+            <Button type="submit" className="h-10" disabled={busy}>
               <Plus />
               Agregar
             </Button>
@@ -417,7 +544,7 @@ function CategoryManager({
         </form>
 
         <ul className="m-0 grid max-h-72 list-none gap-1 overflow-y-auto p-0">
-          {state.categories.map((c, i) => (
+          {categories.map((c, i) => (
             <li key={c.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
               <span className="size-2.5 shrink-0 rounded-full" style={{ background: colorOf(i) }} aria-hidden="true" />
               {editing?.id === c.id ? (
@@ -428,13 +555,7 @@ function CategoryManager({
                       value={editing.name}
                       aria-label={`Nuevo nombre para ${c.name}`}
                       aria-invalid={editing.error ? true : undefined}
-                      onChange={(e) =>
-                        setEditing({
-                          ...editing,
-                          name: e.target.value,
-                          error: null,
-                        })
-                      }
+                      onChange={(e) => setEditing({ ...editing, name: e.target.value, error: null })}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") saveEdit();
                         if (e.key === "Escape") setEditing(null);
@@ -460,24 +581,279 @@ function CategoryManager({
                   >
                     <Pencil />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Borrar ${c.name}`}
-                    className="hover:text-destructive"
-                    onClick={() => setState((s) => deleteCategory(s, c.id))}
-                  >
+                  <Button variant="ghost" size="icon-sm" aria-label={`Borrar ${c.name}`} className="hover:text-destructive" onClick={() => remove(c)}>
                     <Trash2 />
                   </Button>
                 </>
               )}
             </li>
           ))}
-          {state.categories.length === 0 && <li className="px-2 py-4 text-sm text-muted-foreground">Todavía no hay categorías.</li>}
+          {categories.length === 0 && <li className="px-2 py-4 text-sm text-muted-foreground">Todavía no hay categorías.</li>}
         </ul>
         <DialogFooter className="text-sm text-muted-foreground sm:justify-start">
           Al borrar una categoría, sus productos quedan en «Sin categoría».
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Campo de formulario con su error; los nombres coinciden con los de la acción. */
+function Field({ id, label, error, hint, children }: { id: string; label: string; error?: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="grid min-w-0 gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {hint && !error && <p className="field-hint">{hint}</p>}
+      {error && (
+        <p id={`${id}-error`} className="field-error">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const selectClass = "input";
+
+/** Envía el formulario a una acción y recarga al guardar. Devuelve errores por campo o el general. */
+function useActionForm(action: (form: FormData) => Promise<{ error?: { message: string; fields?: Record<string, string[] | undefined> } }>) {
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState("");
+  async function onSubmit(e: React.SubmitEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setErrors({});
+    setMessage("");
+    const { error } = await action(new FormData(e.currentTarget));
+    if (!error) return window.location.reload();
+    setBusy(false);
+    if (error.fields) setErrors(Object.fromEntries(Object.entries(error.fields).map(([k, v]) => [k, v?.[0] ?? ""])));
+    else setMessage(error.message);
+  }
+  return { busy, errors, message, onSubmit };
+}
+
+function ProductForm({
+  businessId,
+  categories,
+  product,
+  onClose,
+}: {
+  businessId: string;
+  categories: Category[];
+  product?: Item;
+  onClose: () => void;
+}) {
+  const save = useActionForm((form) => actions.saveProduct(form) as never);
+  const [preview, setPreview] = useState(product?.image);
+  const [removeImage, setRemoveImage] = useState(false);
+
+  async function remove() {
+    if (!product || !window.confirm(`¿Borrar «${product.name}» del catálogo? Se quita de todas las sucursales.`)) return;
+    const form = new FormData();
+    form.set("id", product.id);
+    const { error } = await actions.deleteProduct(form);
+    if (error) return window.alert(error.message);
+    window.location.reload();
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{product ? "Editar producto" : "Agregar producto"}</DialogTitle>
+          <DialogDescription>El precio y el stock se ponen en el inventario de cada sucursal.</DialogDescription>
+        </DialogHeader>
+        <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
+          <input type="hidden" name="businessId" value={businessId} />
+          {product && <input type="hidden" name="id" value={product.id} />}
+          <Field id="product-name" label="Nombre" error={save.errors.name}>
+            <input id="product-name" name="name" className="input" defaultValue={product?.name} required maxLength={80} placeholder="Ej.: Leche entera 1 L" />
+          </Field>
+          <Field id="product-category" label="Categoría">
+            <select id="product-category" name="categoryId" className={selectClass} defaultValue={product?.categoryId ?? ""}>
+              <option value="">Sin categoría</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field id="product-barcode" label="Código de barras" hint="Opcional. Puedes escanearlo con un lector." error={save.errors.barcode}>
+            <input
+              id="product-barcode"
+              name="barcode"
+              className="input"
+              inputMode="numeric"
+              autoComplete="off"
+              defaultValue={product?.barcode}
+              maxLength={14}
+            />
+          </Field>
+          <Field id="product-image" label="Foto" hint="Opcional. JPG, PNG o WebP, hasta 2 MB." error={save.errors.image}>
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-lg border bg-muted text-muted-foreground">
+                {preview && !removeImage ? <img src={preview} alt="" className="size-full object-cover" /> : <ImagePlus className="size-6" aria-hidden="true" />}
+              </span>
+              <input
+                id="product-image"
+                name="image"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="w-full min-w-0 text-sm"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  setRemoveImage(false);
+                  setPreview(file ? URL.createObjectURL(file) : product?.image);
+                }}
+              />
+            </div>
+            {product?.image && !removeImage && (
+              <button type="button" className="justify-self-start text-sm font-semibold text-primary underline-offset-4 hover:underline" onClick={() => setRemoveImage(true)}>
+                Quitar foto
+              </button>
+            )}
+            {removeImage && <input type="hidden" name="removeImage" value="true" />}
+          </Field>
+          {save.message && (
+            <p className="notice notice-error m-0" role="alert">
+              {save.message}
+            </p>
+          )}
+          <DialogFooter className="gap-2 sm:justify-between">
+            {product ? (
+              <Button type="button" variant="ghost" className="text-destructive" onClick={remove}>
+                <Trash2 />
+                Borrar
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={save.busy}>
+                {save.busy ? "Guardando…" : "Guardar"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StockFields({ product, errors }: { product?: Product; errors: Record<string, string> }) {
+  return (
+    <>
+      <Field id="inv-price" label="Precio de venta (Bs)" error={errors.price}>
+        <input id="inv-price" name="price" type="number" inputMode="decimal" step="0.01" min="0" className="input" defaultValue={product?.price} required />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field id="inv-stock" label="Stock" error={errors.stock}>
+          <input id="inv-stock" name="stock" type="number" inputMode="numeric" step="1" min="0" className="input" defaultValue={product?.stock ?? 0} required />
+        </Field>
+        <Field id="inv-min" label="Stock mínimo" hint="Avisa cuando baje de aquí." error={errors.minStock}>
+          <input id="inv-min" name="minStock" type="number" inputMode="numeric" step="1" min="0" className="input" defaultValue={product?.minStock ?? 0} required />
+        </Field>
+      </div>
+    </>
+  );
+}
+
+function InventoryForm({ businessId, branchId, product, onClose }: { businessId: string; branchId: string; product: Product; onClose: () => void }) {
+  const save = useActionForm((form) => actions.saveInventory(form) as never);
+
+  async function remove() {
+    if (!window.confirm(`¿Dejar de vender «${product.name}» en esta sucursal? Sigue en el catálogo.`)) return;
+    const form = new FormData();
+    form.set("branchId", branchId);
+    form.set("productId", product.id);
+    const { error } = await actions.removeInventory(form);
+    if (error) return window.alert(error.message);
+    window.location.reload();
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{product.name}</DialogTitle>
+          <DialogDescription>Precio y stock en esta sucursal.</DialogDescription>
+        </DialogHeader>
+        <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
+          <input type="hidden" name="businessId" value={businessId} />
+          <input type="hidden" name="branchId" value={branchId} />
+          <input type="hidden" name="productId" value={product.id} />
+          <StockFields product={product} errors={save.errors} />
+          {save.message && (
+            <p className="notice notice-error m-0" role="alert">
+              {save.message}
+            </p>
+          )}
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button type="button" variant="ghost" className="text-destructive" onClick={remove}>
+              <Trash2 />
+              Quitar de la sucursal
+            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={save.busy}>
+                {save.busy ? "Guardando…" : "Guardar"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AddToBranch({ businessId, branchId, addable }: { businessId: string; branchId: string; addable: { id: string; name: string }[] }) {
+  const save = useActionForm((form) => actions.saveInventory(form) as never);
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button className="h-11">
+          <Plus />
+          Agregar a la sucursal
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Agregar a la sucursal</DialogTitle>
+          <DialogDescription>Elige un producto del catálogo y ponle precio y stock aquí.</DialogDescription>
+        </DialogHeader>
+        <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
+          <input type="hidden" name="businessId" value={businessId} />
+          <input type="hidden" name="branchId" value={branchId} />
+          <Field id="inv-product" label="Producto" error={save.errors.productId}>
+            <select id="inv-product" name="productId" className={selectClass} required>
+              {addable.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <StockFields errors={save.errors} />
+          {save.message && (
+            <p className="notice notice-error m-0" role="alert">
+              {save.message}
+            </p>
+          )}
+          <DialogFooter>
+            <Button type="submit" disabled={save.busy}>
+              {save.busy ? "Guardando…" : "Agregar"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

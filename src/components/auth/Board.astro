@@ -7,16 +7,10 @@ interface Props {
 }
 
 const { pitch } = Astro.props;
-
-// Valores de respaldo para el primer pintado; `auth-board.ts` los reemplaza con el reloj de quien entra.
-const now = new Date();
-const fallbackDay = now.getDate();
-const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(now)
-  + " · " + new Intl.DateTimeFormat("es", { month: "long" }).format(now);
 ---
 
-<!-- Los trazos de tiza van fuera de los [data-board-*] porque auth-board.ts reemplaza su texto. -->
-<aside class="board" aria-label="Hoy">
+<!-- Los trazos de tiza van fuera de [data-board-greeting] porque auth-board.ts reemplaza su texto. -->
+<aside class="board" aria-label="Caja Simple">
   <svg class="board-defs" aria-hidden="true" focusable="false">
     <filter id="chalk-stroke" x="-20%" y="-60%" width="140%" height="220%">
       <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="wobble" />
@@ -36,7 +30,7 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
       <p class="board-tagline">Tu negocio, bajo control. La caja del día, sin cuaderno ni calculadora.</p>
     </div>
 
-    <div class="board-today chalk" data-board-today>
+    <div class="board-today chalk">
       <span class="board-greeting">
         <span data-board-greeting>Hola</span>
         <svg class="mark mark-underline" viewBox="0 0 200 12" preserveAspectRatio="none" aria-hidden="true">
@@ -45,9 +39,14 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
           </g>
         </svg>
       </span>
-      <span class="board-day num">
-        <span data-board-day>{fallbackDay}</span>
-        <svg class="mark mark-oval" viewBox="0 0 200 140" preserveAspectRatio="none" aria-hidden="true">
+      <!-- La cuenta que la app hace por ti, escrita como en la pizarra del mostrador. Sin cifras. -->
+      <span class="sum-line">ventas</span>
+      <span class="sum-line">− gastos</span>
+      <span class="sum-total">
+        = caja
+        <span class="sum-result">
+          cuadra
+          <svg class="mark mark-oval" viewBox="0 0 200 140" preserveAspectRatio="none" aria-hidden="true">
           <g filter="url(#chalk-stroke)">
             <path
               pathLength="1"
@@ -55,9 +54,9 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
               d="M60 16C110 3 178 18 187 60c9 44-46 72-95 70-52-2-82-30-78-64C18 34 52 13 104 11c16 0 30 2 42 6"
             />
           </g>
-        </svg>
+          </svg>
+        </span>
       </span>
-      <span class="board-date" data-board-date>{fallbackDate}</span>
     </div>
 
     <!-- Caja registradora dibujada en tiza: decoración, sin cifras. -->
@@ -76,16 +75,16 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
 
     <dl class="board-rows chalk">
       <div class="board-row">
-        <dt>Hora</dt>
-        <dd class="num"><time data-board-time></time></dd>
-      </div>
-      <div class="board-row">
         <dt>Ventas y gastos</dt>
         <dd>por sucursal</dd>
       </div>
       <div class="board-row">
         <dt>Cuadre de caja</dt>
         <dd>por turno</dd>
+      </div>
+      <div class="board-row">
+        <dt>Tus empleados</dt>
+        <dd>entran gratis</dd>
       </div>
     </dl>
 
@@ -285,20 +284,32 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
     line-height: 1.1;
   }
 
-  .board-day {
-    position: relative;
-    width: fit-content;
-    margin-left: -0.3em;
-    padding: 0.1em 0.3em 0.06em;
-    font-size: clamp(3.5rem, min(2rem + 7vw, 14dvh), 8.5rem);
-    line-height: 0.95;
-    letter-spacing: -0.02em;
+  .board-greeting {
+    margin-bottom: clamp(0.5rem, 2dvh, 1rem);
   }
 
-  .board-date {
+  .sum-line {
     color: var(--chalk-muted);
-    font-size: clamp(1.25rem, min(1rem + 1vw, 4dvh), 2.25rem);
+    font-size: clamp(1.375rem, min(1rem + 1.2vw, 4.2dvh), 2.25rem);
     line-height: 1.2;
+  }
+
+  /* La raya de la suma: un renglón de tiza encima del resultado. */
+  .sum-total {
+    width: fit-content;
+    margin-top: 0.15em;
+    padding-top: 0.2em;
+    background: var(--chalk-line) top / 100% 3px no-repeat;
+    font-size: clamp(2.25rem, min(1.25rem + 3vw, 8dvh), 4rem);
+    line-height: 1.1;
+  }
+
+  .sum-result {
+    position: relative;
+    display: inline-block;
+    margin-left: 0.1em;
+    padding: 0.05em 0.3em 0.1em;
+    color: var(--chalk-yellow);
   }
 
   /* Trazos y dibujos: todos comparten el filtro de tiza y se dibujan con stroke-dashoffset. */
@@ -454,7 +465,7 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
     fill: var(--eraser-felt);
   }
 
-  /* En pantallas bajas se borra primero la nota (y el dibujo) y luego las filas de capacidades; la hora queda. */
+  /* En pantallas bajas se borra primero la nota (y el dibujo) y luego las filas de capacidades menos la primera. */
   @media (min-width: 961px) and (max-height: 46rem) {
     .board-note,
     .board-tagline,
@@ -481,6 +492,10 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
 
     .chalk > :nth-child(3) {
       animation-delay: 240ms;
+    }
+
+    .chalk > :nth-child(4) {
+      animation-delay: 360ms;
     }
 
     .board-rows > * {
@@ -515,7 +530,7 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
     }
 
     .mark-oval path {
-      animation-delay: 380ms;
+      animation-delay: 600ms;
     }
 
     .doodle-arrow path {
@@ -586,16 +601,15 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
       text-align: right;
     }
 
-    .board-greeting,
-    .board-day,
-    .board-date {
+    .board-greeting {
       margin: 0;
       padding: 0;
       font-size: 1.375rem;
       line-height: 1.2;
     }
 
-    .board-date,
+    .sum-line,
+    .sum-total,
     .board-tagline,
     .board-pitch,
     .board-rows,
@@ -607,9 +621,4 @@ const fallbackDate = new Intl.DateTimeFormat("es", { weekday: "long" }).format(n
     }
   }
 
-  @media (max-width: 480px) {
-    .board-greeting {
-      display: none;
-    }
-  }
 </style>

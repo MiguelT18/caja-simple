@@ -4,6 +4,9 @@ import AuthDivider from "../../components/auth/AuthDivider.astro";
 import FormField from "../../components/auth/FormField.astro";
 import GoogleButton from "../../components/auth/GoogleButton.astro";
 import PasswordField from "../../components/auth/PasswordField.astro";
+
+const next = Astro.url.searchParams.get("next");
+const query = next ? `?next=${encodeURIComponent(next)}` : "";
 ---
 
 <AuthLayout
@@ -12,11 +15,11 @@ import PasswordField from "../../components/auth/PasswordField.astro";
   description="Bienvenido de nuevo a tu caja"
   pitch="Tu caja te espera. Entra y sigue donde la dejaste."
 >
-  <GoogleButton label="Continuar con Google" />
+  <GoogleButton label="Continuar con Google" action={`/api/auth/google${query}`} />
 
   <AuthDivider />
 
-  <form class="auth-form" method="post" novalidate data-auth-form>
+  <form class="auth-form" method="post" action={`/api/auth/login${query}`} novalidate data-auth-form>
     <FormField
       id="email"
       label="Correo electrónico"

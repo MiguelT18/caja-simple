@@ -1,0 +1,9 @@
+{
+  "name": "Caja Simple",
+  "short_name": "Caja Simple",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#faf8f5",
+  "theme_color": "#b45309",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

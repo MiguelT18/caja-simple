@@ -1,0 +1,317 @@
+---
+import { Bell, KeyRound, ShieldCheck, UserRound } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import FormInput from "@/components/app/FormInput.astro";
+import Modal from "@/components/app/Modal.astro";
+import PhotoField from "@/components/app/PhotoField.astro";
+import Layout from "@/layouts/Layout.astro";
+import { accountSettings } from "@/data/queries";
+
+const { user, totpFactorId, hasPassword } = await accountSettings(Astro.locals);
+const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
+---
+
+<Layout title="Tu cuenta">
+  <PageHeader title="Tu cuenta" description="Tu foto, tu nombre y cómo entras. Vale para todos los negocios donde estás." />
+
+  <div class="settings">
+    <section class="card block" aria-labelledby="profile-title">
+      <h2 class="card-title" id="profile-title"><UserRound size={20} stroke-width={1.75} />Perfil</h2>
+      <form id="profile-form" class="stack" data-action="saveProfile" enctype="multipart/form-data" novalidate>
+        <PhotoField form="profile-form" label="Foto de perfil" image={user.avatarUrl} round />
+        <div class="field-row-2">
+          <FormInput form="profile-form" name="firstName" label="Nombre" value={user.firstName} autocomplete="given-name" required maxlength={60} />
+          <FormInput form="profile-form" name="lastName" label="Apellido" value={user.lastName} autocomplete="family-name" maxlength={60} />
+        </div>
+        <p class="field-hint">Correo: <span class="strong">{user.email}</span>. Es con el que entras y no se cambia desde aquí.</p>
+        <p class="notice notice-error" role="alert" data-form-notice></p>
+        <button type="submit" class="btn btn-primary">Guardar perfil</button>
+      </form>
+    </section>
+
+    <section class="card block" aria-labelledby="password-title">
+      <h2 class="card-title" id="password-title"><KeyRound size={20} stroke-width={1.75} />Contraseña</h2>
+      <p class="field-hint">
+        {hasPassword ? "Usa al menos 8 caracteres." : "Entras con Google. Si creas una contraseña, también podrás entrar con tu correo."}
+      </p>
+      <form id="password-form" class="stack" data-action="changePassword" novalidate>
+        <div class="field-row-2">
+          <FormInput form="password-form" name="password" type="password" label="Contraseña nueva" autocomplete="new-password" required minlength={8} />
+          <FormInput form="password-form" name="confirm" type="password" label="Repítela" autocomplete="new-password" required />
+        </div>
+        <p class="notice notice-error" role="alert" data-form-notice></p>
+        <button type="submit" class="btn btn-primary">{hasPassword ? "Cambiar contraseña" : "Crear contraseña"}</button>
+      </form>
+    </section>
+
+    <section class="card block" aria-labelledby="mfa-title">
+      <div class="block-head">
+        <h2 class="card-title" id="mfa-title"><ShieldCheck size={20} stroke-width={1.75} />Verificación en dos pasos</h2>
+        {totpFactorId ? <span class="chip chip-income">Activada</span> : <span class="chip chip-neutral">Desactivada</span>}
+      </div>
+      <p class="field-hint">
+        Además de tu contraseña, al entrar te pedimos un código de 6 números de una app como Google Authenticator o Authy. Así nadie entra a tu caja
+        aunque sepa tu contraseña.
+      </p>
+      {
+        totpFactorId ? (
+          <button type="button" class="btn btn-secondary start" data-open-dialog="totp-disable">
+            Desactivar
+          </button>
+        ) : (
+          <button type="button" class="btn btn-primary start" data-open-dialog="totp-enroll">
+            Activar
+          </button>
+        )
+      }
+    </section>
+
+    <section class="card block" aria-labelledby="push-title">
+      <div class="block-head">
+        <h2 class="card-title" id="push-title"><Bell size={20} stroke-width={1.75} />Notificaciones en este dispositivo</h2>
+        <button type="button" class="switch" role="switch" aria-checked="false" aria-labelledby="push-title" aria-describedby="push-status" disabled data-push-switch>
+          <span class="switch-thumb"></span>
+        </button>
+      </div>
+      <p class="field-hint" id="push-status" aria-live="polite" data-push-status>Revisando si este navegador puede recibir avisos…</p>
+      <p class="field-hint">Te llegan las invitaciones, sus respuestas, la caja descuadrada y el stock bajo, aunque tengas la app cerrada. Se activa en cada dispositivo.</p>
+    </section>
+  </div>
+
+  {
+    totpFactorId ? (
+      <Modal
+        id="totp-disable"
+        title="Desactivar la verificación en dos pasos"
+        description="Escribe el código que muestra tu app ahora. Después solo te pediremos la contraseña."
+        action="disableTotp"
+        submitLabel="Desactivar"
+        danger
+        hidden={{ factorId: totpFactorId }}
+      >
+        <FormInput form="totp-disable-form" name="code" label="Código de 6 dígitos" inputmode="numeric" autocomplete="one-time-code" maxlength={6} required />
+      </Modal>
+    ) : (
+      <Modal
+        id="totp-enroll"
+        title="Activar la verificación en dos pasos"
+        description="1. Escanea el código con tu app de autenticación. 2. Escribe los 6 números que te muestra."
+        action="verifyTotp"
+        submitLabel="Activar"
+        hidden={{ factorId: "" }}
+      >
+        <div class="qr" data-totp-qr>
+          <span class="skeleton qr-skeleton" aria-hidden="true"></span>
+        </div>
+        <p class="field-hint secret">¿No puedes escanear? Escribe esta clave en la app: <code data-totp-secret>…</code></p>
+        <FormInput form="totp-enroll-form" name="code" label="Código de 6 dígitos" inputmode="numeric" autocomplete="one-time-code" maxlength={6} required />
+      </Modal>
+    )
+  }
+
+  <div hidden data-vapid-key={vapidKey}></div>
+
+  <script>
+    import { actions } from "astro:actions";
+
+    // Activar 2FA: al abrir el diálogo se pide a Supabase un factor nuevo y se muestra su QR.
+    const enroll = document.querySelector<HTMLDialogElement>("#totp-enroll");
+    document.querySelector('[data-open-dialog="totp-enroll"]')?.addEventListener("click", async () => {
+      if (!enroll) return;
+      const notice = enroll.querySelector<HTMLElement>("[data-form-notice]")!;
+      const box = enroll.querySelector<HTMLElement>("[data-totp-qr]")!;
+      const skeleton = box.querySelector<HTMLElement>(".qr-skeleton")!;
+      box.querySelector("img")?.remove();
+      skeleton.hidden = false;
+      notice.textContent = "";
+      const { data, error } = await actions.enrollTotp();
+      if (error) {
+        notice.textContent = error.message;
+        return;
+      }
+      enroll.querySelector<HTMLInputElement>('input[name="factorId"]')!.value = data.factorId;
+      enroll.querySelector("[data-totp-secret]")!.textContent = data.secret;
+      const img = Object.assign(new Image(180, 180), { src: data.qr, alt: "Código QR para tu app de autenticación" });
+      box.append(img);
+      skeleton.hidden = true;
+    });
+
+    // Push: el interruptor suscribe o da de baja este navegador.
+    const toggle = document.querySelector<HTMLButtonElement>("[data-push-switch]")!;
+    const status = document.querySelector<HTMLElement>("[data-push-status]")!;
+    const vapidKey = document.querySelector<HTMLElement>("[data-vapid-key]")!.dataset.vapidKey ?? "";
+
+    const set = (on: boolean, message: string, enabled = true) => {
+      toggle.setAttribute("aria-checked", String(on));
+      toggle.disabled = !enabled;
+      status.textContent = message;
+    };
+
+    // La clave pública VAPID viene en base64url; pushManager la quiere en bytes.
+    const keyBytes = (base64: string) => {
+      const raw = atob((base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+      return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+    };
+
+    async function init() {
+      const iphone = /iPhone|iPad/.test(navigator.userAgent) && !matchMedia("(display-mode: standalone)").matches;
+      if (!vapidKey) return set(false, "Los avisos push todavía no están configurados en este servidor.", false);
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        return set(false, iphone ? "En iPhone, primero agrega Caja Simple a tu pantalla de inicio (Compartir → Agregar a inicio) y ábrela desde ahí." : "Este navegador no puede recibir avisos push.", false);
+      }
+      if (Notification.permission === "denied") return set(false, "Bloqueaste los avisos para este sitio. Actívalos en los ajustes del navegador y vuelve a esta página.", false);
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      const subscription = await registration.pushManager.getSubscription();
+      set(Boolean(subscription), subscription ? "Activadas: los avisos te llegan a este dispositivo." : "Desactivadas en este dispositivo.");
+    }
+
+    toggle.addEventListener("click", async () => {
+      const on = toggle.getAttribute("aria-checked") === "true";
+      toggle.disabled = true;
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        if (on) {
+          const subscription = await registration.pushManager.getSubscription();
+          if (subscription) {
+            await actions.deletePushSubscription({ endpoint: subscription.endpoint });
+            await subscription.unsubscribe();
+          }
+          return set(false, "Desactivadas en este dispositivo.");
+        }
+        if ((await Notification.requestPermission()) !== "granted") return init();
+        const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(vapidKey) });
+        const { p256dh, auth } = subscription.toJSON().keys ?? {};
+        const { error } = await actions.savePushSubscription({ endpoint: subscription.endpoint, p256dh: p256dh ?? "", auth: auth ?? "" });
+        if (error) {
+          await subscription.unsubscribe();
+          return set(false, `No se pudo activar: ${error.message}`);
+        }
+        set(true, "Activadas: los avisos te llegan a este dispositivo.");
+      } catch (e) {
+        console.error(e);
+        set(on, "Algo falló al cambiar los avisos. Intenta de nuevo.");
+      }
+    });
+
+    init().catch((e) => {
+      console.error(e);
+      set(false, "No pudimos revisar los avisos de este navegador.", false);
+    });
+  </script>
+</Layout>
+
+<style>
+  .settings {
+    display: grid;
+    gap: 1.25rem;
+    max-width: 48rem;
+  }
+
+  .block {
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  .block-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .card-title :global(svg) {
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+  }
+
+  .stack {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .stack > .btn,
+  .start {
+    justify-self: start;
+  }
+
+  .strong {
+    color: var(--color-text);
+    font-weight: var(--font-medium);
+    overflow-wrap: anywhere;
+  }
+
+  /* Interruptor: el estado también se dice en el texto de abajo, no solo con color. */
+  .switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 3rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 999px;
+    background: var(--color-surface-muted);
+    cursor: pointer;
+    transition: background-color 150ms;
+  }
+
+  .switch-thumb {
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: var(--color-text-muted);
+    transition: transform 150ms;
+  }
+
+  .switch[aria-checked="true"] {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+  }
+
+  .switch[aria-checked="true"] .switch-thumb {
+    background: var(--color-on-primary);
+    transform: translateX(1.25rem);
+  }
+
+  .switch:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .switch,
+    .switch-thumb {
+      transition: none;
+    }
+  }
+
+  .qr {
+    display: grid;
+    place-items: center;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    /* El QR necesita fondo claro para leerse, también en tema oscuro. */
+    background: var(--color-qr-bg);
+  }
+
+  .qr-skeleton {
+    width: 180px;
+    height: 180px;
+  }
+
+  .secret code {
+    color: var(--color-text);
+    font-weight: var(--font-semibold);
+    overflow-wrap: anywhere;
+  }
+</style>

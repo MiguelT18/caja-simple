@@ -2,12 +2,13 @@
 
 Caja de negocios pequeños con una o varias sucursales: ventas, gastos, productos, turnos y cuadre de caja. Hecha con Astro 7.
 
-> Estado: prototipo. Todavía no hay backend: los datos son de demostración y la autenticación no está conectada.
+> Estado: en desarrollo. Datos y autenticación en Supabase; despliegue en Vercel.
 
 ## Desarrollo
 
 ```sh
 pnpm install
+cp .env.example .env   # y completa SUPABASE_URL y SUPABASE_KEY (clave publicable)
 pnpm dev       # http://localhost:4321
 pnpm build     # genera ./dist
 pnpm preview

@@ -1,14 +1,17 @@
 ---
 import BaseHead from '../components/BaseHead.astro';
 import '../styles/app.css';
+import '../styles/app-surface.css';
 import Sidebar from '../components/Sidebar.astro';
-import type { Branch } from '../data/mock';
-import { currentUser, type Membership } from '../data/queries';
+import PageSkeleton from '../components/app/PageSkeleton.astro';
+import ShiftBar from '../components/app/ShiftBar.astro';
+import type { Branch } from '../data/types';
+import { currentUser, type Membership, type ShiftBarData } from '../data/queries';
 
 interface Props {
 	title: string;
-	/** Negocio (y sucursal) de la página; se omite en «Tus negocios». */
-	context?: { membership: Membership; branch?: Branch };
+	/** Negocio (y sucursal) de la página; se omite en «Tus negocios». `shift` muestra la barra del turno. */
+	context?: { membership: Membership; branch?: Branch; shift?: ShiftBarData };
 }
 
 const { title, context } = Astro.props;
@@ -18,34 +21,92 @@ const { title, context } = Astro.props;
 	<head>
 		<BaseHead title={title} />
 	</head>
-	<body>
-		<Sidebar user={currentUser()} context={context} />
+	<body class="app-surface">
+		<Sidebar user={currentUser(Astro.locals)} context={context} />
 		<main>
 			<slot />
 		</main>
+		{context?.shift && <ShiftBar data={context.shift} />}
+		<PageSkeleton />
+		<script>
+			import '../scripts/action-forms.ts';
+			import '../scripts/nav-skeleton.ts';
+		</script>
 	</body>
 </html>
 
 <style is:global>
+	/* Shell: el suelo con dos paneles (navegación y contenido) y, en una sucursal, la barra del turno abajo. */
 	body {
-		display: flex;
-		min-height: 100dvh;
+		display: grid;
+		grid-template-columns: 18.5rem minmax(0, 1fr);
+		grid-template-rows: minmax(0, 1fr);
+		height: 100dvh;
+		gap: 0.5rem;
+		padding: 0.5rem;
+		overflow: hidden;
 	}
 
+	body:has(> .shift-bar) {
+		padding-bottom: 0;
+		row-gap: 0;
+	}
+
+	/* El panel de contenido tiene su propio scroll; los encabezados de página llegan hasta sus bordes. */
 	main {
-		flex: 1;
 		min-width: 0;
-		/* El lateral flotante ya deja margen a su derecha. */
-		padding: 2rem 2rem 2rem 1.25rem;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		--main-pad: clamp(1rem, 2.5vw, 2rem);
+		padding: 0 var(--main-pad) 3rem;
+		border-radius: var(--radius-panel);
+		background: var(--color-surface);
+		scrollbar-width: thin;
+	}
+
+	/* Escala un poco más compacta en escritorio (1rem = 15px) y controles más bajos con mouse;
+	   en móvil y con pantalla táctil queda todo en 16px y 44px. */
+	@media (min-width: 769px) {
+		html {
+			font-size: 93.75%;
+		}
+	}
+
+	@media (min-width: 769px) and (pointer: fine) {
+		.btn,
+		.input {
+			min-height: 2.5rem;
+		}
+	}
+
+	/* Lo que se escribe nunca baja de 16px, aunque la raíz sea de 15px o un componente pida text-sm.
+	   :is() toma la especificidad de input:not(…), así gana sobre .input. */
+	:is(input:not([type='checkbox'], [type='radio']), select, textarea) {
+		font-size: max(16px, var(--text-base));
 	}
 
 	@media (max-width: 768px) {
 		body {
+			display: flex;
 			flex-direction: column;
+			height: auto;
+			min-height: 100dvh;
+			padding: 0;
+			gap: 0;
+			overflow: visible;
+			background: var(--color-surface);
 		}
 
 		main {
-			padding: 1rem;
+			overflow: visible;
+			--main-pad: 1rem;
+			padding: 0 var(--main-pad) 2rem;
+			border-radius: 0;
+		}
+
+		/* Deja lugar para el mini-reproductor fijo. */
+		body:has(> .shift-bar) main {
+			padding-bottom: 6.5rem;
 		}
 	}
 </style>

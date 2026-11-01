@@ -1,20 +1,38 @@
 ---
-import { CircleCheck, Clock, TriangleAlert } from "@lucide/astro";
+import { CircleCheck, LockOpen, Pencil, Plus, Trash, TriangleAlert } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
+import FormInput from "@/components/app/FormInput.astro";
+import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
-import { appPaths, branchContext, fullName } from "@/data/queries";
-import { formatBs, initials } from "@/lib/format";
-
-export const getStaticPaths = () => appPaths.branch("turnos");
+import { branchColor, branchContext, shiftBarData, fullName } from "@/data/queries";
+import { formatBs, initials, overnight, shiftHours } from "@/lib/format";
 
 const { negocio, sucursal } = Astro.params;
-const ctx = branchContext(negocio!, sucursal!);
-const { branch, employees, shiftTotals, shifts } = ctx;
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+if (!ctx) return Astro.rewrite("/404");
+const { branch, currentShift, employees, role, shiftTotals, shifts, today } = ctx;
+const isOwner = role === "dueño";
+const tones = [
+  { value: "morning", label: "Mañana" },
+  { value: "afternoon", label: "Tarde" },
+  { value: "night", label: "Noche" },
+];
 ---
 
-<Layout title={`Turnos · ${branch.name}`} context={{ membership: ctx.membership, branch }}>
-  <PageHeader title="Turnos" description={`Horarios, responsables y cuadre de hoy en ${branch.name}`} />
+<Layout title={`Turnos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
+  <PageHeader tint={branchColor(ctx.membership, branch.id)} title="Turnos" description={`Horarios, responsables y cuadre de hoy en ${branch.name}`}>
+    {
+      isOwner && (
+        <button type="button" class="btn btn-secondary" data-open-dialog="shift-new">
+          <Plus size={18} stroke-width={2} />
+          Agregar turno
+        </button>
+      )
+    }
+  </PageHeader>
+
+  {shifts.length === 0 && <p class="card empty-state">Esta sucursal todavía no tiene turnos.</p>}
 
   <section class="shift-list">
     {
@@ -22,44 +40,57 @@ const { branch, employees, shiftTotals, shifts } = ctx;
         const t = shiftTotals(shift.id);
         const staff = employees.filter((e) => e.shiftId === shift.id);
         return (
-          <article class="card shift">
+          <article class:list={["card shift", { live: t.close.status === "en-curso" }]}>
             <header class="shift-head">
               <ShiftChip shift={shift} />
               <span class="hours num">
-                {shift.start}–{shift.end}
+                {shiftHours(shift, true)}
               </span>
-              {t.close.status === "en-curso" ? (
-                <span class="chip chip-info">
-                  <Clock size={14} stroke-width={2} />
-                  En curso
+              {t.close.status === "en-curso" && (
+                <span class="live-label">
+                  <span class="eq" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                  {t.openedOn === today ? "En curso" : `En curso desde el ${t.openedOn.split("-").reverse().join("/")}`}
                 </span>
-              ) : (
-                <span class="chip chip-neutral">Cerrado</span>
+              )}
+              {t.close.status === "cerrado" && <span class="chip chip-neutral">Cerrado</span>}
+              {t.close.status === "pendiente" && <span class="chip chip-neutral">Sin abrir hoy</span>}
+              {isOwner && (
+                <button type="button" class="icon-btn" data-open-dialog={`shift-${shift.id}`} aria-label={`Editar turno ${shift.name}`}>
+                  <Pencil size={16} stroke-width={1.75} />
+                </button>
               )}
             </header>
 
             <div class="shift-body">
               <div>
                 <h2 class="label">A cargo</h2>
-                <ul class="staff" role="list">
-                  {staff.map((e) => (
-                    <li>
-                      <span class="avatar-initials" aria-hidden="true">
-                        {initials(e.firstName, e.lastName)}
-                      </span>
-                      <span>
-                        {fullName(e)}
-                        <span class="role">{e.jobTitle}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                {staff.length === 0 ? (
+                  <p class="muted">{isOwner ? "Nadie asignado. Asigna personas en Empleados." : "Nadie asignado."}</p>
+                ) : (
+                  <ul class="staff" role="list">
+                    {staff.map((e) => (
+                      <li>
+                        <span class="avatar-initials" aria-hidden="true">
+                          {initials(e.firstName, e.lastName)}
+                        </span>
+                        <span>
+                          {fullName(e)}
+                          <span class="role">{e.status === "invitado" ? "Invitación pendiente" : e.jobTitle}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               <dl class="cash">
                 <div>
                   <dt>Apertura</dt>
-                  <dd class="num">{formatBs(t.close.opening)}</dd>
+                  <dd class="num">{t.close.status === "pendiente" ? "—" : formatBs(t.close.opening)}</dd>
                 </div>
                 <div>
                   <dt>Ventas</dt>
@@ -91,14 +122,114 @@ const { branch, employees, shiftTotals, shifts } = ctx;
             {t.close.difference !== undefined && t.close.difference !== 0 && (
               <p class="status chip-warning">
                 <TriangleAlert size={16} stroke-width={2} />
-                <span>Descuadre de <span class="num">{formatBs(t.close.difference)}</span></span>
+                <span>
+                  Descuadre de <span class="num">{formatBs(t.close.difference)}</span>
+                  {t.close.difference > 0 ? " (sobra)" : " (falta)"}
+                </span>
               </p>
+            )}
+
+            {t.close.status === "pendiente" &&
+              (currentShift ? (
+                <p class="muted">Cierra el turno {currentShift.name.toLowerCase()} antes de abrir este.</p>
+              ) : (
+                <form id={`open-${shift.id}`} class="inline-form" data-action="openShift" novalidate>
+                  <input type="hidden" name="branchId" value={branch.id} />
+                  <input type="hidden" name="shiftId" value={shift.id} />
+                  <FormInput
+                    form={`open-${shift.id}`}
+                    name="opening"
+                    type="number"
+                    inputmode="decimal"
+                    step="0.01"
+                    min="0"
+                    label="Dinero en caja al abrir (Bs)"
+                    hint={overnight(shift) ? "Lo que vendas pasada la medianoche cuenta para hoy." : undefined}
+                    required
+                  />
+                  <button type="submit" class="btn btn-primary">
+                    <LockOpen size={18} stroke-width={2} />
+                    Abrir turno
+                  </button>
+                  <p class="notice notice-error" role="alert" data-form-notice />
+                </form>
+              ))}
+
+            {t.close.status === "en-curso" && t.closeId && (
+              <form
+                id={`close-${shift.id}`}
+                class="inline-form"
+                data-action="closeShift"
+                data-confirm="¿Cerrar el turno? Después ya no se pueden registrar ventas ni gastos en él."
+                novalidate
+              >
+                <input type="hidden" name="closeId" value={t.closeId} />
+                <FormInput
+                  form={`close-${shift.id}`}
+                  name="counted"
+                  type="number"
+                  inputmode="decimal"
+                  step="0.01"
+                  min="0"
+                  label="Dinero contado en caja (Bs)"
+                  hint={`Debería haber ${formatBs(t.expected)}`}
+                  required
+                />
+                <button type="submit" class="btn btn-secondary">Cerrar turno</button>
+                <p class="notice notice-error" role="alert" data-form-notice />
+              </form>
             )}
           </article>
         );
       })
     }
   </section>
+
+  {
+    isOwner &&
+      [undefined, ...shifts].map((shift) => {
+        const id = shift ? `shift-${shift.id}` : "shift-new";
+        return (
+          <Modal
+            id={id}
+            title={shift ? `Editar turno ${shift.name}` : "Agregar turno"}
+            action="saveShift"
+            submitLabel="Guardar"
+            hidden={{ branchId: branch.id, id: shift?.id }}
+          >
+            <FormInput form={`${id}-form`} name="name" label="Nombre" value={shift?.name} required maxlength={40} />
+            <div class="field-row-2">
+              <FormInput form={`${id}-form`} name="start" type="time" label="Empieza" value={shift?.start ?? "07:00"} required />
+              <FormInput form={`${id}-form`} name="end" type="time" label="Termina" value={shift?.end ?? "14:00"} required />
+            </div>
+            <FormInput
+              form={`${id}-form`}
+              name="tone"
+              label="Momento del día"
+              hint="Define el color y el ícono del turno."
+              options={tones.map((t) => ({ ...t, selected: t.value === (shift?.tone ?? "morning") }))}
+            />
+            {shift && (
+              <form
+                slot="after"
+                id={`${id}-delete`}
+                class="delete-form"
+                data-action="deleteShift"
+                data-confirm={`¿Quitar el turno ${shift.name}? Las ventas pasadas lo siguen mostrando.`}
+                novalidate
+              >
+                <input type="hidden" name="id" value={shift.id} />
+                <button type="submit" class="btn btn-secondary danger">
+                  <Trash size={18} stroke-width={1.75} />
+                  Quitar turno
+                </button>
+                <p class="notice notice-error" role="alert" data-form-notice />
+              </form>
+            )}
+          </Modal>
+        );
+      })
+  }
 </Layout>
 
 <style>
@@ -111,6 +242,20 @@ const { branch, employees, shiftTotals, shifts } = ctx;
     display: grid;
     gap: 1.25rem;
     padding: 1.25rem;
+  }
+
+  /* El turno abierto: anillo ámbar y «En curso» con las barras (el texto siempre está). */
+  .shift.live {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+  }
+
+  .live-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-primary);
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
   }
 
   .shift-head {
@@ -189,6 +334,58 @@ const { branch, employees, shiftTotals, shifts } = ctx;
 
   .cash .strong dt {
     color: var(--color-text);
+  }
+
+  .muted {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .inline-form {
+    display: grid;
+    grid-template-columns: minmax(0, 18rem) auto;
+    align-items: end;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .inline-form .notice {
+    grid-column: 1 / -1;
+  }
+
+  /* El botón queda alineado con el input aunque el campo tenga pista debajo. */
+  .inline-form .btn {
+    align-self: start;
+    justify-self: start;
+    margin-top: 1.75rem;
+  }
+
+  @media (max-width: 480px) {
+    .inline-form {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .inline-form .btn {
+      margin-top: 0;
+    }
+  }
+
+  .delete-form {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0 1.25rem;
+    padding: 1rem 0 1.25rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .delete-form .btn {
+    justify-self: start;
+  }
+
+  .danger {
+    color: var(--color-expense);
   }
 
   .status {

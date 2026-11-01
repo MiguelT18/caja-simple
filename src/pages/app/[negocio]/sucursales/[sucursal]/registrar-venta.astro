@@ -1,22 +1,19 @@
 ---
-import { Search, ShoppingCart } from "@lucide/astro";
+import { Plus, Search, ShoppingCart } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import Layout from "@/layouts/Layout.astro";
-import { appPaths, branchContext } from "@/data/queries";
+import { branchColor, branchContext, shiftBarData, branchHref } from "@/data/queries";
 import { formatBs } from "@/lib/format";
 
-export const getStaticPaths = () => appPaths.branch("registrar-venta");
-
 const { negocio, sucursal } = Astro.params;
-const ctx = branchContext(negocio!, sucursal!);
-const { branch, products, currentShift } = ctx;
-
-const shift = currentShift;
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+if (!ctx) return Astro.rewrite("/404");
+const { branch, business, products, currentShift: shift } = ctx;
 ---
 
-<Layout title={`Registrar venta · ${branch.name}`} context={{ membership: ctx.membership, branch }}>
-  <PageHeader title="Registrar venta" description={`${branch.name} · toca los productos para agregarlos a la venta`} />
+<Layout title={`Registrar venta · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
+  <PageHeader tint={branchColor(ctx.membership, branch.id)} title="Registrar venta" description={`${branch.name} · toca los productos para agregarlos a la venta`} />
 
   <div class="sale">
     <section class="catalog" aria-label="Productos">
@@ -26,14 +23,30 @@ const shift = currentShift;
         <input type="search" class="input" placeholder="Buscar producto" data-search autocomplete="off" />
       </label>
 
+      {
+        products.length === 0 && (
+          <p class="card empty-state">
+            Esta sucursal todavía no vende productos.
+            {ctx.role === "dueño" && (
+              <>
+                {" "}
+                <a href={branchHref(business, branch, "inventario")}>Agrégalos en Inventario</a>.
+              </>
+            )}
+          </p>
+        )
+      }
       <ul class="product-grid" role="list">
         {
           products.map((p) => (
             <li data-name={p.name.toLowerCase()}>
-              <button type="button" class="product" data-id={p.id} data-name={p.name} data-price={p.price}>
+              <button type="button" class="product" data-id={p.id} data-name={p.name} data-price={p.price} data-stock={p.stock} disabled={p.stock === 0 || !shift}>
                 <span class="product-name">{p.name}</span>
                 <span class="product-price num">{formatBs(p.price)}</span>
-                <span class="product-stock num">{p.stock} en stock</span>
+                <span class="product-stock num">{p.stock === 0 ? "Sin stock" : `${p.stock} en stock`}</span>
+                <span class="add play-btn" aria-hidden="true">
+                  <Plus size={20} stroke-width={1.75} />
+                </span>
               </button>
             </li>
           ))
@@ -45,8 +58,16 @@ const shift = currentShift;
     <aside class="card cart" aria-labelledby="cart-title">
       <header class="cart-head">
         <h2 id="cart-title" class="card-title">Venta actual</h2>
-        <ShiftChip shift={shift} />
+        {shift && <ShiftChip shift={shift} />}
       </header>
+
+      {
+        !shift && (
+          <p class="notice">
+            No hay un turno abierto. <a href={branchHref(business, branch, "turnos")}>Abre uno en Turnos</a> para registrar ventas.
+          </p>
+        )
+      }
 
       <p class="cart-empty" data-cart-empty>
         <ShoppingCart size={20} stroke-width={1.75} />
@@ -60,17 +81,20 @@ const shift = currentShift;
       </p>
 
       <p class="notice" data-notice role="status"></p>
-      <button type="button" class="btn btn-primary btn-block" data-confirm disabled>Confirmar venta</button>
+      <button type="button" class="btn btn-primary btn-block" data-confirm data-branch={branch.id} data-shift={shift?.id} disabled>
+        Confirmar venta
+      </button>
       <button type="button" class="btn btn-secondary btn-block" data-clear disabled>Vaciar</button>
     </aside>
   </div>
 </Layout>
 
 <script>
+  import { actions } from "astro:actions";
   const money = new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formatBs = (n: number) => `Bs ${money.format(n)}`;
 
-  const cart = new Map<string, { name: string; price: number; qty: number }>();
+  const cart = new Map<string, { name: string; price: number; stock: number; qty: number }>();
   const lines = document.querySelector<HTMLUListElement>("[data-cart-lines]")!;
   const emptyCart = document.querySelector<HTMLElement>("[data-cart-empty]")!;
   const total = document.querySelector<HTMLElement>("[data-total]")!;
@@ -104,6 +128,10 @@ const shift = currentShift;
       amount.className = "line-amount num";
       amount.textContent = formatBs(item.price * item.qty);
       const step = (delta: number) => () => {
+        if (delta > 0 && item.qty >= item.stock) {
+          notice.textContent = `Solo quedan ${item.stock} de ${item.name}.`;
+          return;
+        }
         item.qty += delta;
         if (item.qty <= 0) cart.delete(id);
         render();
@@ -125,7 +153,11 @@ const shift = currentShift;
   for (const button of document.querySelectorAll<HTMLButtonElement>(".product")) {
     button.addEventListener("click", () => {
       const { id, name, price } = button.dataset;
-      const item = cart.get(id!) ?? { name: name!, price: Number(price), qty: 0 };
+      const item = cart.get(id!) ?? { name: name!, price: Number(price), stock: Number(button.dataset.stock), qty: 0 };
+      if (item.qty >= item.stock) {
+        notice.textContent = `Solo quedan ${item.stock} de ${item.name}.`;
+        return;
+      }
       item.qty += 1;
       cart.set(id!, item);
       notice.textContent = "";
@@ -138,10 +170,31 @@ const shift = currentShift;
     render();
   });
 
-  // shortcut: todavía no hay backend; cuando exista, aquí se guarda la venta.
-  confirm.addEventListener("click", () => {
-    notice.textContent = "El registro de ventas aún no está conectado. La venta no se guardó.";
+  confirm.addEventListener("click", async () => {
+    confirm.disabled = clear.disabled = true;
+    notice.textContent = "Guardando venta…";
+    const { error } = await actions.registerSale({
+      branchId: confirm.dataset.branch!,
+      shiftId: confirm.dataset.shift!,
+      items: [...cart].map(([productId, item]) => ({ productId, qty: item.qty })),
+    });
+    if (error) {
+      notice.textContent = error.message;
+      confirm.disabled = clear.disabled = false;
+      return;
+    }
+    // Recarga para mostrar el stock actualizado; el aviso queda para la siguiente vista.
+    sessionStorage.setItem("sale-notice", "Venta registrada.");
+    window.location.reload();
   });
+
+  try {
+    const saved = sessionStorage.getItem("sale-notice");
+    if (saved) {
+      notice.textContent = saved;
+      sessionStorage.removeItem("sale-notice");
+    }
+  } catch {}
 
   const search = document.querySelector<HTMLInputElement>("[data-search]")!;
   const empty = document.querySelector<HTMLElement>("[data-empty]")!;
@@ -201,35 +254,63 @@ const shift = currentShift;
     list-style: none;
   }
 
+  /* Mosaico de producto: superficie elevada; al pasar el mouse se aclara y asoma el botón redondo de agregar. */
   .product {
+    position: relative;
     display: grid;
     align-content: start;
     gap: 0.25rem;
     width: 100%;
     height: 100%;
     padding: 1rem;
-    border: 1px solid var(--color-border);
-    border-radius: 0.75rem;
-    background: var(--color-surface);
+    border: none;
+    border-radius: var(--radius-panel);
+    background: var(--color-surface-muted);
     color: var(--color-text);
     text-align: left;
     cursor: pointer;
-    transition:
-      border-color 150ms,
-      background-color 150ms;
+    transition: background-color 150ms;
   }
 
-  .product:hover {
-    border-color: var(--color-border-strong);
-    background: var(--color-surface-muted);
+  .product:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+  }
+
+  .add {
+    position: absolute;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    opacity: 0;
+    transform: translateY(0.375rem);
+    transition:
+      opacity 200ms var(--ease-out),
+      transform 300ms var(--ease-out);
+  }
+
+  .product:is(:hover, :focus-visible):not(:disabled) .add {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .add {
+      transition: none;
+    }
   }
 
   .product:active {
     scale: 0.98;
   }
 
+  .product:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
   .product-name {
-    font-weight: var(--font-semibold);
+    font-weight: var(--font-bold);
   }
 
   .product-price {

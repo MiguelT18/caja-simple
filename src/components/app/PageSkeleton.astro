@@ -1,0 +1,221 @@
+---
+// Esqueletos del área principal mientras llega la página siguiente (los muestra src/scripts/nav-skeleton.ts).
+// Uno por forma de página; cuál se usa lo decide la ruta destino.
+const rows = Array.from({ length: 8 });
+---
+
+<template data-skeleton="dashboard">
+  <div class="sk-head"><span class="skeleton skeleton-text sk-title"></span><span class="skeleton skeleton-text" style="--w: 14rem"></span></div>
+  <div class="sk-kpis">
+    {[0, 1, 2].map(() => (
+      <div class="sk-kpi">
+        <span class="skeleton skeleton-text" style="--w: 5rem"></span>
+        <span class="skeleton skeleton-text sk-value"></span>
+        <span class="skeleton skeleton-text" style="--w: 4rem"></span>
+      </div>
+    ))}
+  </div>
+  <div class="card sk-card"><span class="skeleton skeleton-text" style="--w: 9rem"></span><span class="skeleton sk-chart"></span></div>
+  <div class="sk-pair">
+    {[0, 1].map(() => (
+      <div class="card sk-card"><span class="skeleton skeleton-text" style="--w: 8rem"></span><span class="skeleton sk-block"></span></div>
+    ))}
+  </div>
+</template>
+
+<template data-skeleton="table">
+  <div class="sk-head"><span class="skeleton skeleton-text sk-title"></span><span class="skeleton skeleton-text" style="--w: 16rem"></span></div>
+  <div class="card sk-table">
+    <div class="sk-toolbar"><span class="skeleton sk-input"></span><span class="skeleton sk-button"></span></div>
+    {rows.map((_, i) => (
+      <div class="sk-row">
+        <span class="skeleton skeleton-text" style={`--w: ${[60, 45, 70, 52][i % 4]}%`}></span>
+        <span class="skeleton skeleton-text" style="--w: 4.5rem"></span>
+      </div>
+    ))}
+  </div>
+</template>
+
+<template data-skeleton="grid">
+  <div class="sk-head"><span class="skeleton skeleton-text sk-title"></span><span class="skeleton skeleton-text" style="--w: 14rem"></span></div>
+  <div class="sk-toolbar sk-filters">
+    {[5, 4, 6, 4.5].map((w) => <span class="skeleton sk-pill" style={`width: ${w}rem`}></span>)}
+  </div>
+  <div class="sk-grid">
+    {Array.from({ length: 6 }).map(() => (
+      <div class="card sk-product">
+        <span class="skeleton sk-image"></span>
+        <div class="sk-product-text"><span class="skeleton skeleton-text" style="--w: 70%"></span><span class="skeleton skeleton-text" style="--w: 40%"></span></div>
+      </div>
+    ))}
+  </div>
+</template>
+
+<template data-skeleton="cards">
+  <div class="sk-head"><span class="skeleton skeleton-text sk-title"></span><span class="skeleton skeleton-text" style="--w: 14rem"></span></div>
+  <div class="sk-grid">
+    {[0, 1, 2].map(() => (
+      <div class="card sk-product">
+        <span class="skeleton sk-image sk-photo"></span>
+        <div class="sk-card">
+          <div class="sk-entity"><span class="skeleton skeleton-circle sk-dot"></span><span class="skeleton skeleton-text" style="--w: 9rem"></span></div>
+          <span class="skeleton skeleton-text" style="--w: 60%"></span>
+          <span class="skeleton sk-button sk-wide"></span>
+        </div>
+      </div>
+    ))}
+  </div>
+</template>
+
+<style>
+  /* Mismo lugar y tamaño que el encabezado con degradado de PageHeader, en tono neutro mientras llega la página. */
+  .sk-head {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 1rem;
+    min-height: clamp(9rem, 18vw, 13rem);
+    margin: 0 calc(-1 * var(--main-pad)) 1.75rem;
+    padding: clamp(2.5rem, 6vw, 4.5rem) var(--main-pad) 1.5rem;
+    background: linear-gradient(180deg, var(--color-surface-muted), var(--color-surface));
+  }
+
+  .sk-title {
+    --w: min(22rem, 70%);
+    height: 3rem;
+  }
+
+  .sk-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 1.25rem;
+  }
+
+  /* Como .kpis: cifras en fila, sin tarjeta. */
+  .sk-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .sk-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .sk-value {
+    --w: 8rem;
+    height: 1.5rem;
+  }
+
+  .sk-chart {
+    height: 16rem;
+  }
+
+  .sk-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .sk-block {
+    height: 9rem;
+  }
+
+  .sk-table {
+    overflow: hidden;
+  }
+
+  .sk-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .sk-input {
+    flex: 1;
+    max-width: 18rem;
+    height: 2.5rem;
+  }
+
+  .sk-button {
+    width: 7rem;
+    height: 2.5rem;
+    margin-left: auto;
+  }
+
+  .sk-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .sk-filters {
+    padding: 0 0 1.25rem;
+  }
+
+  .sk-pill {
+    height: 2rem;
+    border-radius: 999px;
+  }
+
+  .sk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 1rem;
+  }
+
+  .sk-product {
+    overflow: hidden;
+  }
+
+  .sk-image {
+    aspect-ratio: 16 / 10;
+    border-radius: 0;
+  }
+
+  .sk-product-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 1rem;
+  }
+
+  .sk-entity {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .sk-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .sk-photo {
+    aspect-ratio: 16 / 9;
+  }
+
+  .sk-wide {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .sk-grid:has(.sk-photo) {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  }
+
+  @media (max-width: 768px) {
+    .sk-kpis,
+    .sk-pair {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

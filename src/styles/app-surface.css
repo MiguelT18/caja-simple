@@ -1,0 +1,346 @@
+/*
+ * Mundo de la app (/app/*): el de un reproductor de música. Ver DESIGN.md › App.
+ * Redefine los tokens solo cuando el <body> es de la app (lo pone Layout.astro), así .btn, .input, .card,
+ * .table y .modal de global.css toman el suelo oscuro, los paneles y las píldoras sin tocar la landing ni el acceso.
+ */
+:root:has(> body.app-surface) {
+	/* Suelo, panel y superficies elevadas: la jerarquía sale del tono, no de los bordes. */
+	--color-bg: light-dark(#e7e3dd, #0b0908);
+	--color-surface: light-dark(#ffffff, #161311);
+	--color-surface-muted: light-dark(#f3f0eb, #221e1b);
+	--color-surface-hover: light-dark(#e9e5df, #2c2723);
+	--color-border: light-dark(#e4dfd8, #2a2522);
+	--color-border-strong: light-dark(#8a8077, #7d736a);
+	--color-text: light-dark(#1a1613, #f5f1ec);
+	--color-text-muted: light-dark(#5c544c, #b3a99e);
+	--color-text-subtle: light-dark(#6f665e, #8f857b);
+	/* En claro, el ámbar, el verde y el amarillo bajan un tono: el texto chico sobre el suelo y las superficies elevadas llega a AA. */
+	--color-primary: light-dark(#9c4708, #f0a04b);
+	--color-income: light-dark(#246a41, #5cc88a);
+	--color-warning: light-dark(#7a5600, #e8c35a);
+	--shadow-sm: 0 1px 3px light-dark(rgb(26 22 19 / 0.08), rgb(0 0 0 / 0.5));
+	--shadow-md:
+		0 2px 6px light-dark(rgb(26 22 19 / 0.06), rgb(0 0 0 / 0.35)),
+		0 16px 40px -8px light-dark(rgb(26 22 19 / 0.18), rgb(0 0 0 / 0.7));
+	--scrollbar-thumb: light-dark(#c8c1b7, #3f3833);
+	--scrollbar-thumb-hover: light-dark(#a39a8f, #5e5650);
+
+	--font-extrabold: 800;
+	/* Títulos de página: 32px → 56px entre 360px y 1280px (misma interpolación que tokens.css). */
+	--text-display: clamp(2rem, 1.4126rem + 2.6087vw, 3.5rem);
+	--text-display-lh: 1.05;
+	--radius-panel: 0.5rem;
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+	background: var(--color-bg);
+}
+
+.app-surface ::selection {
+	background: color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+
+.app-surface :is(h1, h2) {
+	letter-spacing: -0.02em;
+}
+
+.app-surface h2 {
+	font-size: var(--text-2xl);
+	line-height: var(--text-2xl-lh);
+	font-weight: var(--font-extrabold);
+}
+
+/* Botones en píldora; el primario crece un poco al pasar el mouse, como el de reproducir. */
+.app-surface .btn {
+	border-radius: 999px;
+	font-weight: var(--font-bold);
+	transition:
+		background-color 150ms,
+		border-color 150ms,
+		color 150ms,
+		transform 200ms var(--ease-out);
+}
+
+.app-surface .btn-primary:hover:not(:disabled),
+.app-surface .play-btn:hover {
+	transform: scale(1.04);
+}
+
+.app-surface .btn:active:not(:disabled),
+.app-surface .play-btn:active {
+	transform: scale(0.98);
+}
+
+.app-surface .btn-secondary {
+	background: transparent;
+	border-color: var(--color-border-strong);
+}
+
+.app-surface .btn-secondary:hover:not(:disabled) {
+	background: transparent;
+	border-color: var(--color-text);
+}
+
+.app-surface .icon-btn {
+	border-radius: 50%;
+}
+
+.app-surface .icon-btn:hover {
+	background: var(--color-surface-hover);
+}
+
+/* Campos: fondo elevado y borde de 3:1 como mínimo. */
+.app-surface .input {
+	border-radius: 0.375rem;
+	background: var(--color-surface-muted);
+}
+
+.app-surface .input:hover:not(:focus) {
+	border-color: var(--color-text-muted);
+}
+
+.app-surface .field-label {
+	font-weight: var(--font-semibold);
+}
+
+.app-surface .notice {
+	border-radius: 0.375rem;
+}
+
+/* Tarjetas: superficie elevada sin borde ni sombra. */
+.app-surface .card {
+	border: none;
+	border-radius: var(--radius-panel);
+	background: var(--color-surface-muted);
+	box-shadow: none;
+}
+
+.app-surface .card-title {
+	font-weight: var(--font-bold);
+}
+
+.app-surface .section-title {
+	margin: 2.75rem 0 1rem;
+}
+
+/* Listas como lista de canciones: encabezado atenuado con una línea fina, filas sin borde y hover redondeado. */
+.app-surface .table th {
+	padding: 0.5rem 1rem;
+	border-bottom: 1px solid var(--color-border);
+	background: transparent;
+	font-weight: var(--font-semibold);
+}
+
+.app-surface .table td {
+	border-top: none;
+}
+
+.app-surface .table tbody tr:hover {
+	background: none;
+}
+
+.app-surface .table tbody tr:hover td {
+	background: var(--color-surface-hover);
+}
+
+.app-surface .table tbody td:first-child {
+	border-radius: 0.375rem 0 0 0.375rem;
+}
+
+.app-surface .table tbody td:last-child {
+	border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.app-surface .avatar-initials {
+	background: var(--color-surface-hover);
+	color: var(--color-text);
+	font-weight: var(--font-bold);
+}
+
+.app-surface .modal {
+	border-color: var(--color-border);
+	box-shadow: var(--shadow-md);
+}
+
+.app-surface .modal::backdrop {
+	background: rgb(0 0 0 / 0.6);
+}
+
+.app-surface .modal-head h2 {
+	font-size: var(--text-xl);
+	font-weight: var(--font-extrabold);
+}
+
+/* «Turno en curso» sobre fotos o filas: texto ámbar con las barras, sobre el panel para que se lea encima de una portada. */
+.chip-live {
+	background: var(--color-surface);
+	color: var(--color-primary);
+	font-weight: var(--font-bold);
+}
+
+/* Botón redondo de acción (entrar, registrar): el gesto de «reproducir». */
+.play-btn {
+	display: inline-grid;
+	flex-shrink: 0;
+	place-items: center;
+	width: 3rem;
+	height: 3rem;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+	box-shadow: 0 8px 18px -6px rgb(0 0 0 / 0.45);
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		transform 200ms var(--ease-out),
+		background-color 150ms;
+}
+
+.play-btn:hover {
+	background: var(--color-primary-hover);
+}
+
+/* Estante: título de sección con «Mostrar todo» a la derecha. */
+.shelf-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	margin: 2.75rem 0 1rem;
+}
+
+.shelf-head h2 {
+	margin: 0;
+}
+
+.shelf-link {
+	flex-shrink: 0;
+	color: var(--color-text-muted);
+	font-size: var(--text-sm);
+	font-weight: var(--font-bold);
+	text-decoration: none;
+}
+
+.shelf-link:hover {
+	color: var(--color-text);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+/* Grilla de tarjetas tipo álbum. */
+.media-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr));
+	gap: 1rem;
+}
+
+/* Barras de ecualizador: acompañan a «En curso» (el texto siempre está). Quietas con movimiento reducido. */
+.eq {
+	display: inline-flex;
+	align-items: flex-end;
+	gap: 2px;
+	width: 0.875rem;
+	height: 0.875rem;
+}
+
+.eq > span {
+	flex: 1;
+	height: 40%;
+	border-radius: 1px;
+	background: currentColor;
+}
+
+.eq > span:nth-child(2) {
+	height: 100%;
+}
+
+.eq > span:nth-child(3) {
+	height: 65%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.eq > span {
+		animation: eq 900ms ease-in-out infinite alternate;
+	}
+
+	.eq > span:nth-child(2) {
+		animation-delay: -300ms;
+	}
+
+	.eq > span:nth-child(3) {
+		animation-delay: -600ms;
+	}
+}
+
+@keyframes eq {
+	from {
+		height: 25%;
+	}
+
+	to {
+		height: 100%;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.app-surface .btn,
+	.play-btn {
+		transition: none;
+	}
+
+	.app-surface .btn-primary:hover:not(:disabled),
+	.app-surface .play-btn:hover {
+		transform: none;
+	}
+}
+
+/* Cifras del día en fila, sin tarjetas: el número manda. */
+.kpis {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 1rem 2rem;
+}
+
+.kpi + .kpi {
+	padding-left: 2rem;
+	border-left: 1px solid var(--color-border);
+}
+
+.kpi p {
+	margin: 0;
+}
+
+.kpi p + p {
+	margin-top: 0.25rem;
+}
+
+.kpi-label {
+	color: var(--color-text-muted);
+	font-size: var(--text-sm);
+	font-weight: var(--font-semibold);
+}
+
+.kpi-value {
+	font-size: var(--text-4xl);
+	line-height: var(--text-4xl-lh);
+	font-weight: var(--font-extrabold);
+	letter-spacing: -0.03em;
+}
+
+.kpi-note {
+	color: var(--color-text-muted);
+	font-size: var(--text-sm);
+}
+
+@media (max-width: 900px) {
+	.kpis {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.kpi + .kpi {
+		padding: 1rem 0 0;
+		border-top: 1px solid var(--color-border);
+		border-left: none;
+	}
+}

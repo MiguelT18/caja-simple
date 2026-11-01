@@ -2,45 +2,7 @@ import { SKY_END, SKY_START, skyPoint } from "./sky";
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const money = new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmt = (n: number) => n.toLocaleString("es-BO");
 const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - 2 ** (-10 * t));
-
-// Calculadora de planes por cantidad de locales.
-for (const calc of document.querySelectorAll<HTMLElement>(".calc")) {
-  const [negMin, negMax] = calc.dataset.negocio!.split(",").map(Number);
-  const [extMin, extMax] = calc.dataset.extra!.split(",").map(Number);
-  const value = calc.querySelector("output")!;
-  const price = calc.querySelector<HTMLElement>(".calc-price")!;
-  const detail = calc.querySelector(".calc-detail")!;
-  const [less, more] = calc.querySelectorAll<HTMLButtonElement>("[data-step]");
-  let branches = 1;
-
-  const render = () => {
-    value.textContent = String(branches);
-    less.disabled = branches === 1;
-    more.disabled = branches === 20;
-    if (branches === 1) {
-      price.textContent = "Bs 0";
-      detail.textContent = `Plan Gratis, o Negocio por Bs ${negMin}–${negMax} al mes`;
-      return;
-    }
-    const extra = branches - 1;
-    price.textContent = `Bs ${fmt(negMin + extra * extMin)}–${fmt(negMax + extra * extMax)} al mes`;
-    detail.textContent = `Plan Negocio + ${extra} ${extra === 1 ? "sucursal extra" : "sucursales extra"}`;
-  };
-
-  for (const button of [less, more]) {
-    button.addEventListener("click", () => {
-      branches = Math.min(20, Math.max(1, branches + Number(button.dataset.step)));
-      render();
-      // Reinicia la animación del precio en cada cambio.
-      price.classList.remove("tick");
-      void price.offsetWidth;
-      price.classList.add("tick");
-    });
-  }
-  render();
-}
 
 // Los turnos se encienden al entrar en vista y se apagan al salir, así vuelven a encenderse
 // cada vez que se pasa por ahí; sin JS quedan encendidos. `is-seen` no se quita: el contenido
@@ -64,6 +26,20 @@ if ("IntersectionObserver" in window) {
     shift.classList.add("is-armed");
     observer.observe(shift);
   }
+}
+
+// Volver arriba: se muestra cuando el primer bloque de la página (el hero en /) ya salió de la pantalla.
+const toTop = document.querySelector<HTMLElement>("[data-to-top]");
+const hero = document.querySelector("main > :first-child");
+if (toTop && hero && "IntersectionObserver" in window) {
+  toTop.dataset.hidden = "";
+  new IntersectionObserver(([entry]) => toTop.toggleAttribute("data-hidden", entry.isIntersecting)).observe(hero);
+  // Al llegar arriba, el foco pasa a la marca para que el teclado siga desde el inicio.
+  toTop.addEventListener("click", (event) => {
+    event.preventDefault();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+    document.querySelector<HTMLElement>(".site-header .brand")?.focus({ preventScroll: true });
+  });
 }
 
 // Barra: se esconde al bajar y aparece al subir. Ignora movimientos pequeños para no parpadear.

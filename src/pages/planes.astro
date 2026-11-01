@@ -1,0 +1,356 @@
+---
+// Planes y precios. Con sesión, el plan se cambia desde cada negocio (/app/[negocio]/plan).
+export const prerender = false;
+
+import { Check, Minus, Plus } from "@lucide/astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { extraBranchPrice, negocioPrice, plans } from "../data/plans";
+
+const signupHref = "/auth/crear-cuenta";
+const signedIn = Boolean(Astro.locals.userId);
+---
+
+<SiteLayout
+  title="Planes y precios"
+  description="Pagas por sucursal, no por persona: tus empleados entran gratis. Empieza gratis y cambia de plan cuando tu negocio crezca."
+  active="planes"
+>
+  <section class="plans" aria-labelledby="plans-title">
+    <div class="wrap">
+      <header class="section-head">
+        <h1 id="plans-title">Pagas por sucursal, no por persona</h1>
+        <p>Tus empleados entran siempre gratis. Empieza sin pagar y cambia de plan cuando tu negocio crezca.</p>
+        {signedIn && <p class="plans-signed">El plan es de cada negocio: lo cambias desde la configuración del negocio.</p>}
+      </header>
+
+      <div class="plan-grid">
+        {
+          plans.map((plan, i) => (
+            <article class="plan" aria-labelledby={`plan-${i}`}>
+              <h3 id={`plan-${i}`}>{plan.name}</h3>
+              <p class="plan-audience">{plan.audience}</p>
+              <p class="plan-price">
+                <span class="num">{plan.price}</span>
+                {plan.period && <span class="plan-period">{plan.period}</span>}
+              </p>
+              <ul role="list">
+                {plan.features.map((feature) => (
+                  <li>
+                    <Check size={16} stroke-width={2} />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <a href={signedIn ? "/app" : signupHref} class:list={["btn", i === 0 ? "btn-primary" : "btn-secondary"]}>
+                {signedIn ? (i === 0 ? "Ir a tus negocios" : "Elegir en tu negocio") : i === 0 ? "Crear cuenta gratis" : "Crear cuenta"}
+              </a>
+            </article>
+          ))
+        }
+      </div>
+
+      <div class="calc" data-negocio={negocioPrice.join(",")} data-extra={extraBranchPrice.join(",")}>
+        <div class="calc-input">
+          <span id="calc-label" class="calc-label">¿Cuántos locales tienes?</span>
+          <div class="stepper" role="group" aria-labelledby="calc-label">
+            <button type="button" class="icon-btn" data-step="-1" aria-label="Un local menos">
+              <Minus size={18} stroke-width={2} />
+            </button>
+            <output class="num stepper-value" aria-live="polite">1</output>
+            <button type="button" class="icon-btn" data-step="1" aria-label="Un local más">
+              <Plus size={18} stroke-width={2} />
+            </button>
+          </div>
+        </div>
+        <p class="calc-result" aria-live="polite">
+          <span class="calc-price num">Bs 0</span>
+          <span class="calc-detail">Plan Gratis, o Negocio por Bs {negocioPrice[0]}–{negocioPrice[1]} al mes</span>
+        </p>
+      </div>
+
+      <p class="plans-note">
+        Precios orientativos en Bolivianos; todavía los estamos ajustando con dueños de negocio. El plan anual trae 2
+        meses gratis y se paga con QR bancario.
+      </p>
+    </div>
+  </section>
+</SiteLayout>
+
+<script>
+  const fmt = (n: number) => n.toLocaleString("es-BO");
+
+  // Calculadora de planes por cantidad de locales.
+  for (const calc of document.querySelectorAll<HTMLElement>(".calc")) {
+    const [negMin, negMax] = calc.dataset.negocio!.split(",").map(Number);
+    const [extMin, extMax] = calc.dataset.extra!.split(",").map(Number);
+    const value = calc.querySelector("output")!;
+    const price = calc.querySelector<HTMLElement>(".calc-price")!;
+    const detail = calc.querySelector(".calc-detail")!;
+    const [less, more] = calc.querySelectorAll<HTMLButtonElement>("[data-step]");
+    let branches = 1;
+
+    const render = () => {
+      value.textContent = String(branches);
+      less.disabled = branches === 1;
+      more.disabled = branches === 20;
+      if (branches === 1) {
+        price.textContent = "Bs 0";
+        detail.textContent = `Plan Gratis, o Negocio por Bs ${negMin}–${negMax} al mes`;
+        return;
+      }
+      const extra = branches - 1;
+      price.textContent = `Bs ${fmt(negMin + extra * extMin)}–${fmt(negMax + extra * extMax)} al mes`;
+      detail.textContent = `Plan Negocio + ${extra} ${extra === 1 ? "sucursal extra" : "sucursales extra"}`;
+    };
+
+    for (const button of [less, more]) {
+      button.addEventListener("click", () => {
+        branches = Math.min(20, Math.max(1, branches + Number(button.dataset.step)));
+        render();
+        // Reinicia la animación del precio en cada cambio.
+        price.classList.remove("tick");
+        void price.offsetWidth;
+        price.classList.add("tick");
+      });
+    }
+    render();
+  }
+</script>
+
+<style>
+  h3 {
+    margin: 0;
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-lh);
+    font-weight: var(--font-semibold);
+  }
+
+  .plan ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .plan ul {
+    display: grid;
+    gap: 0.625rem;
+    margin-top: 1.25rem;
+  }
+
+  .plan li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+  }
+
+  .plan li :global(svg) {
+    flex-shrink: 0;
+    margin-top: 0.3em;
+    color: var(--color-income);
+  }
+
+  /* Planes */
+  .plans {
+    padding-block: var(--section-gap);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface-muted);
+  }
+
+  .plan-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+  }
+
+  .plan {
+    display: flex;
+    flex-direction: column;
+    padding: clamp(1.5rem, 1rem + 1.5vw, 2.25rem);
+  }
+
+  .plan + .plan {
+    border-left: 1px solid var(--color-border);
+  }
+
+  .plan h3 {
+    font-size: var(--text-xl);
+    line-height: var(--text-xl-lh);
+    font-weight: var(--font-bold);
+  }
+
+  .plan-audience {
+    margin: 0.25rem 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .plan-price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.375rem;
+    margin: 1.5rem 0 0;
+    font-size: var(--text-3xl);
+    line-height: var(--text-3xl-lh);
+    font-weight: var(--font-bold);
+    letter-spacing: -0.01em;
+  }
+
+  .plan-period {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-medium);
+    letter-spacing: 0;
+  }
+
+  .plan ul {
+    flex: 1;
+    margin-block: 1.5rem 2rem;
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .calc {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    background: var(--color-surface);
+  }
+
+  .calc-input {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .calc-label {
+    font-weight: var(--font-semibold);
+  }
+
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 0.5rem;
+  }
+
+  .stepper .icon-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .stepper .icon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .stepper-value {
+    min-width: 2.5rem;
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+    text-align: center;
+  }
+
+  .calc-result {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin: 0;
+    text-align: right;
+  }
+
+  .calc-price {
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl-lh);
+    font-weight: var(--font-bold);
+  }
+
+  .calc-detail,
+  .plans-note {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .plans-note {
+    max-width: 44rem;
+    margin: 1.5rem 0 0;
+  }
+
+  @media (max-width: 960px) {
+    .plan-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .plan + .plan {
+      border-top: 1px solid var(--color-border);
+      border-left: none;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .calc-result {
+      align-items: flex-start;
+      text-align: left;
+    }
+  }
+
+  /* Movimiento: un momento por zona. Sin preferencia de movimiento reducido, nada de esto corre. */
+  @media (prefers-reduced-motion: no-preference) {
+    .calc-price.tick {
+      animation: tick 280ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  }
+
+  @keyframes tick {
+    from {
+      opacity: 0.35;
+      translate: 0 0.25rem;
+    }
+  }
+
+  /* Móvil */
+  @media (max-width: 640px) {
+    .plan {
+      padding: 1.25rem;
+    }
+    .plan .btn {
+      width: 100%;
+    }
+    .calc {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+      padding: 1.25rem;
+    }
+    .calc-input {
+      justify-content: space-between;
+    }
+  }
+
+  .section-head h1 {
+    max-width: 22ch;
+    margin: 0;
+    font-size: var(--text-4xl);
+    line-height: var(--text-4xl-lh);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .plans-signed {
+    color: var(--color-text);
+    font-weight: var(--font-medium);
+  }
+</style>

@@ -21,7 +21,8 @@
   --radius: 0.75rem;
   --background: var(--color-bg);
   --foreground: var(--color-text);
-  --card: var(--color-surface);
+  /* Las tarjetas son superficies elevadas sobre el panel (ver app-surface.css). */
+  --card: var(--color-surface-muted);
   --card-foreground: var(--color-text);
   --popover: var(--color-surface);
   --popover-foreground: var(--color-text);

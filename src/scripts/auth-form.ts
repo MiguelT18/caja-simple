@@ -5,7 +5,6 @@
 //   data-match / data-match-message → debe coincidir con el campo de ese `name`
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const NOT_CONNECTED_MESSAGE = "La autenticación aún no está conectada. Pronto podrás ingresar.";
 
 const notice = document.querySelector<HTMLElement>("[data-auth-notice]");
 
@@ -75,12 +74,25 @@ document.querySelectorAll<HTMLFormElement>("form[data-auth-form]").forEach((form
       return;
     }
 
-    // TODO: conectar con el proveedor de autenticación.
-    showNotice(NOT_CONNECTED_MESSAGE);
+    void submit(form);
   });
 });
 
-document.querySelectorAll<HTMLButtonElement>("[data-google-auth]").forEach((button) => {
-  // TODO: conectar con el proveedor de autenticación (OAuth de Google).
-  button.addEventListener("click", () => showNotice(NOT_CONNECTED_MESSAGE));
-});
+/** Envía el formulario al endpoint de acceso y sigue su respuesta: redirige o muestra el mensaje. */
+async function submit(form: HTMLFormElement) {
+  const button = form.querySelector<HTMLButtonElement>("button[type=submit]");
+  if (button) button.disabled = true;
+  showNotice("");
+  try {
+    const response = await fetch(form.action, { method: "POST", body: new FormData(form), headers: { Accept: "application/json" } });
+    const result: { redirect?: string; message?: string } = await response.json();
+    if (result.redirect) {
+      window.location.assign(result.redirect);
+      return;
+    }
+    showNotice(result.message ?? "No pudimos completar el acceso. Intenta de nuevo.");
+  } catch {
+    showNotice("No hay conexión. Revisa tu internet e intenta de nuevo.");
+  }
+  if (button) button.disabled = false;
+}

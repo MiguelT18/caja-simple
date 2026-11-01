@@ -25,11 +25,12 @@ Caja Simple lleva la caja de negocios pequeños con una o varias sucursales: reg
 ## Capabilities and Constraints
 
 - Astro 7, español, con modo claro y oscuro.
-- `/` es la landing pública (invita a crear cuenta y muestra los planes); la app vive bajo `/app/*`: `/app` lista tus negocios, `/app/[negocio]` es el resumen del negocio y `/app/[negocio]/sucursales/[sucursal]/…` es el trabajo diario de cada sucursal.
+- `/` es la landing pública y `/planes`, los planes y precios; las dos reconocen la sesión (sin ella invitan a crear cuenta, con ella llevan a la app). La app vive bajo `/app/*`: `/app` lista tus negocios, `/app/[negocio]` es el resumen del negocio y `/app/[negocio]/sucursales/[sucursal]/…` es el trabajo diario de cada sucursal.
 - Rutas de acceso: `/auth/iniciar-sesion` y `/auth/crear-cuenta`, con correo y contraseña o con Google.
-- Cobro: el plan es de cada negocio y lo paga su dueño, por sucursal; trabajar como empleado nunca cuesta. Planes Gratis / Negocio / Sucursales en `src/data/plans.ts`, con precios orientativos todavía sin validar.
+- Cobro: el plan es de cada negocio y lo paga su dueño, por sucursal; trabajar como empleado nunca cuesta. Planes Gratis / Negocio / Sucursales en `src/data/plans.ts`, con precios orientativos todavía sin validar. Los límites de cada plan ya se aplican en la base (ver `docs/planes-de-suscripcion.md`); el plan se activa a mano tras el pago por QR, transferencia o tarjeta.
 - La autenticación todavía no está conectada: el envío muestra un aviso de "aún no conectada" y el OAuth de Google es un TODO.
-- Sin decidir: recuperación de contraseña, invitación de empleados a un negocio.
+- Sin decidir: recuperación de contraseña.
+- Empleados: la dueña invita a una persona que ya tiene cuenta (correo, puesto, sucursal y turno); la persona acepta o rechaza desde su bandeja de notificaciones.
 
 ## Brand Commitments
 

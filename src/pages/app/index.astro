@@ -1,106 +1,141 @@
 ---
-import { ArrowRight, MapPin } from "@lucide/astro";
+import { Plus, Store } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
+import FormInput from "@/components/app/FormInput.astro";
+import MediaCard from "@/components/app/MediaCard.astro";
+import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
-import { entryHref, myBusinesses } from "@/data/queries";
+import { currentUser, entryHref, myBusinesses } from "@/data/queries";
+import { boliviaNow, plural } from "@/lib/format";
 
-const memberships = myBusinesses();
+const memberships = myBusinesses(Astro.locals);
+const hour = boliviaNow().minutes / 60;
+const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
+const firstName = currentUser(Astro.locals).firstName;
+const monogram = (name: string) =>
+  name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0] ?? "")
+    .join("")
+    .toUpperCase();
 ---
 
 <Layout title="Tus negocios">
-  <PageHeader title="Tus negocios" description="Los negocios que tienes y en los que trabajas. Elige uno para entrar." />
+  {
+    memberships.length === 0 ? (
+      <section class="card onboarding" aria-labelledby="onboarding-title">
+        <span class="onboarding-icon" aria-hidden="true">
+          <Store size={24} stroke-width={1.75} />
+        </span>
+        <header>
+          <h1 id="onboarding-title">Crea tu negocio</h1>
+          <p>
+            Empieza con el nombre de tu negocio y su primera sucursal. La sucursal arranca con los turnos de mañana, tarde
+            y noche; los ajustas cuando quieras en Turnos.
+          </p>
+          <p class="hint">Si te invitaron a trabajar en un negocio, aparecerá aquí cuando entres con el correo de la invitación.</p>
+        </header>
+        <form id="onboarding" class="onboarding-form" data-action="createBusiness" data-redirect="/app/{slug}" novalidate>
+          <FormInput form="onboarding" name="name" label="Nombre del negocio" placeholder="Ej.: Almacén López" required maxlength={80} />
+          <div class="field-row-2">
+            <FormInput form="onboarding" name="branchName" label="Primera sucursal" value="Principal" required maxlength={80} />
+            <FormInput form="onboarding" name="branchAddress" label="Dirección" hint="Opcional" maxlength={160} />
+          </div>
+          <p class="notice notice-error" role="alert" data-form-notice />
+          <button type="submit" class="btn btn-primary">Crear negocio</button>
+        </form>
+      </section>
+    ) : (
+      <PageHeader title={firstName ? `${greeting}, ${firstName}` : greeting} description="Los negocios que tienes y en los que trabajas. Elige uno para entrar.">
+        <button type="button" class="btn btn-secondary" data-open-dialog="new-business">
+          <Plus size={18} stroke-width={2} />
+          Crear negocio
+        </button>
+      </PageHeader>
+    )
+  }
 
-  <ul class="business-grid" role="list">
-    {
-      memberships.map((m) => (
-        <li class="card business">
-          <header>
-            <h2 class="card-title">{m.business.name}</h2>
-            <p class="role">
-              {m.role === "dueño" ? (
-                <span class="chip chip-info">Dueña · plan {m.business.plan}</span>
-              ) : (
-                <span class="chip chip-neutral">Empleada · {m.employee?.jobTitle}</span>
-              )}
-            </p>
-          </header>
-          <ul class="branches" role="list" aria-label={`Sucursales de ${m.business.name} a las que tienes acceso`}>
-            {m.branches.map((br) => (
+  <Modal id="new-business" title="Crear negocio" description="Con su primera sucursal, que arranca con los turnos de mañana, tarde y noche." action="createBusiness" submitLabel="Crear negocio" redirect="/app/{slug}">
+    <FormInput form="new-business-form" name="name" label="Nombre del negocio" required maxlength={80} />
+    <FormInput form="new-business-form" name="branchName" label="Primera sucursal" value="Principal" required maxlength={80} />
+    <FormInput form="new-business-form" name="branchAddress" label="Dirección" hint="Opcional" maxlength={160} />
+  </Modal>
+
+  {
+    memberships.length > 0 && (
+      <section aria-labelledby="businesses-title">
+        <h2 id="businesses-title" class="section-title">Tus negocios</h2>
+        <ul class="media-grid business-grid" role="list">
+          {memberships.map((m) => {
+            const owner = m.role === "dueño" || !m.branches[0];
+            return (
               <li>
-                <MapPin size={16} stroke-width={1.75} />
-                <span>
-                  <strong>{br.name}</strong> · {br.address}
-                </span>
+                <MediaCard
+                  href={entryHref(m)}
+                  title={m.business.name}
+                  monogram={monogram(m.business.name)}
+                  subtitle={
+                    m.role === "dueño"
+                      ? `Dueña · plan ${m.business.plan} · ${plural(m.branches.length, "sucursal", "sucursales")}`
+                      : `Empleada · ${[m.employee?.jobTitle, ...m.branches.map((b) => b.name)].filter(Boolean).join(" · ")}`
+                  }
+                  label={owner ? `Entrar a ${m.business.name}` : `Ir a la caja de ${m.branches[0].name}, en ${m.business.name}`}
+                />
               </li>
-            ))}
-          </ul>
-          <a href={entryHref(m)} class="btn btn-secondary btn-block enter">
-            {m.role === "dueño" ? `Entrar a ${m.business.name}` : `Ir a la caja de ${m.branches[0].name}`}
-            <ArrowRight size={18} stroke-width={2} />
-          </a>
-        </li>
-      ))
-    }
-  </ul>
+            );
+          })}
+        </ul>
+      </section>
+    )
+  }
 </Layout>
 
 <style>
-  .business-grid {
+  .onboarding {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
     gap: 1rem;
-    margin: 0;
-    padding: 0;
+    max-width: 32rem;
+    margin: 1rem auto 0;
+    padding: 1.5rem;
   }
 
-  .business {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-    padding: 1.25rem;
-  }
-
-  .business header {
+  .onboarding-icon {
     display: grid;
-    gap: 0.5rem;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
   }
 
-  .card-title,
-  .role {
-    margin: 0;
+  .onboarding h1 {
+    margin: 0 0 0.5rem;
+    font-size: var(--text-2xl);
   }
 
-  .branches {
-    display: grid;
-    gap: 0.5rem;
+  .onboarding p {
     margin: 0;
-    padding: 0;
     color: var(--color-text-muted);
+  }
+
+  .onboarding .hint {
+    margin-top: 0.5rem;
     font-size: var(--text-sm);
   }
 
-  .branches li {
-    display: flex;
-    gap: 0.5rem;
+  .onboarding-form {
+    display: grid;
+    gap: 1rem;
   }
 
-  .branches :global(svg) {
-    flex-shrink: 0;
-    margin-top: 0.125rem;
+  .business-grid {
+    margin: 0;
+    padding: 0;
   }
 
-  .branches strong {
-    color: var(--color-text);
-    font-weight: var(--font-semibold);
-  }
-
-  .enter {
-    margin-top: auto;
-  }
-
-  @media (max-width: 480px) {
-    .business-grid {
-      grid-template-columns: 1fr;
-    }
+  .section-title {
+    margin-top: 0;
   }
 </style>

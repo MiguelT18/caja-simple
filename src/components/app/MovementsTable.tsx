@@ -1,4 +1,4 @@
-import type { ShiftTone } from "@/data/mock";
+import type { ShiftTone } from "@/data/types";
 import { formatBs } from "@/lib/format";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pager, usePage } from "./Pager";
@@ -15,11 +15,20 @@ export interface Movement {
 }
 
 /** Movimientos del día (ventas y gastos), los más recientes primero. */
-export default function MovementsTable({ rows, pageSize = 6 }: { rows: Movement[]; pageSize?: number }) {
+export default function MovementsTable({
+  rows,
+  pageSize = 6,
+  empty = "Todavía no hay ventas ni gastos hoy.",
+}: {
+  rows: Movement[];
+  pageSize?: number;
+  empty?: string;
+}) {
   const pager = usePage(rows, pageSize);
+  if (rows.length === 0) return <p className="card empty-state">{empty}</p>;
   return (
     <div>
-      <div className="card table-wrap">
+      <div className="table-wrap">
         <Table>
           <TableHeader>
             <TableRow>

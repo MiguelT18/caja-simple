@@ -13,6 +13,8 @@ const { title } = Astro.props;
 <meta charset="utf-8" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" href="/favicon.ico" />
+<!-- El manifest permite agregar la app a la pantalla de inicio: en iPhone es requisito para las notificaciones push. -->
+<link rel="manifest" href="/manifest.webmanifest" />
 <meta name="viewport" content="width=device-width" />
 <meta name="generator" content={Astro.generator} />
 <script is:inline>

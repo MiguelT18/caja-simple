@@ -1,5 +1,5 @@
 import { Moon, Sun, Sunset } from "lucide-react";
-import type { ShiftTone } from "@/data/mock";
+import type { ShiftTone } from "@/data/types";
 
 // Misma etiqueta que ShiftChip.astro, para las islas de React.
 const icons = { morning: Sun, afternoon: Sunset, night: Moon };

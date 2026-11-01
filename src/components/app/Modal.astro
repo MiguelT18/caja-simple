@@ -1,0 +1,38 @@
+---
+interface Props {
+  /** id del <dialog>; un botón con data-open-dialog={id} lo abre. El formulario es `${id}-form`. */
+  id: string;
+  title: string;
+  description?: string;
+  /** Nombre de la acción de src/actions. */
+  action: string;
+  submitLabel: string;
+  /** A dónde ir al guardar; sin él, la página se recarga. */
+  redirect?: string;
+  confirm?: string;
+  hidden?: Record<string, string | undefined>;
+  enctype?: string;
+  /** El botón de envío en rojo: para eliminar. */
+  danger?: boolean;
+}
+
+const { id, title, description, action, submitLabel, redirect, confirm, hidden = {}, enctype, danger } = Astro.props;
+---
+
+<dialog id={id} class="modal" aria-labelledby={`${id}-title`}>
+  <form id={`${id}-form`} class="modal-form" method="dialog" data-action={action} data-redirect={redirect} data-confirm={confirm} enctype={enctype} novalidate>
+    <header class="modal-head">
+      <h2 id={`${id}-title`}>{title}</h2>
+      {description && <p>{description}</p>}
+    </header>
+    {Object.entries(hidden).map(([name, value]) => value !== undefined && <input type="hidden" name={name} value={value} />)}
+    <slot />
+    <p class="notice notice-error" role="alert" data-form-notice></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" data-close-dialog>Cancelar</button>
+      <button type="submit" class:list={["btn", danger ? "btn-danger" : "btn-primary"]}>{submitLabel}</button>
+    </div>
+  </form>
+  <!-- Otro formulario del mismo diálogo (ej. «Quitar»): los formularios no se pueden anidar. -->
+  <slot name="after" />
+</dialog>

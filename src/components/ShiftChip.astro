@@ -1,13 +1,18 @@
 ---
 import { Moon, Sun, Sunset } from "@lucide/astro";
-import type { Shift } from "../data/mock";
+import type { Shift } from "../data/types";
+import { shiftHours } from "../lib/format";
 
 interface Props {
   shift: Shift;
+  /** Muestra también el horario del turno. */
+  withTime?: boolean;
 }
 
-const { shift } = Astro.props;
+const { shift, withTime = false } = Astro.props;
 const Icon = { morning: Sun, afternoon: Sunset, night: Moon }[shift.tone];
 ---
 
-<span class={`chip chip-${shift.tone}`}><Icon size={14} stroke-width={2} />{shift.name}</span>
+<span class={`chip chip-${shift.tone}`}>
+  <Icon size={14} stroke-width={2} />{shift.name}{withTime && <span class="num">{shiftHours(shift)}</span>}
+</span>

@@ -1,0 +1,52 @@
+---
+// Diálogos de agregar y editar sucursal (nombre, dirección, foto y, al crearla, turnos). Cada uno se abre con
+// data-open-dialog="branch-new" o "branch-<id>". Los usan Sucursales y Configuración.
+import FormInput from "@/components/app/FormInput.astro";
+import Modal from "@/components/app/Modal.astro";
+import PhotoField from "@/components/app/PhotoField.astro";
+import ShiftsEditor from "@/components/app/ShiftsEditor.astro";
+import { defaultShifts, type businessContext } from "@/data/queries";
+
+type Context = NonNullable<Awaited<ReturnType<typeof businessContext>>>;
+
+interface Props {
+  business: Context["business"];
+  branchSummary: Context["branchSummary"];
+  /** Si el plan admite otra sucursal; sin eso no se arma el diálogo de agregar. */
+  canAddBranch: boolean;
+}
+
+const { business, branchSummary, canAddBranch } = Astro.props;
+// Una sucursal nueva parte de los turnos de la primera; también puede copiar los de otra o usar los de siempre.
+const shiftPresets = [
+  ...branchSummary
+    .filter((b) => b.shifts.length > 0)
+    .map((b) => ({ label: `Copiar de ${b.branch.name}`, shifts: b.shifts.map(({ name, start, end, tone }) => ({ name, start, end, tone })) })),
+  { label: "Los de siempre", shifts: defaultShifts },
+];
+---
+
+{
+  [...(canAddBranch ? [undefined] : []), ...branchSummary].map((stats) => {
+    const branch = stats?.branch;
+    const id = branch ? `branch-${branch.id}` : "branch-new";
+    const form = `${id}-form`;
+    return (
+      <Modal
+        id={id}
+        title={branch ? `Editar ${branch.name}` : "Agregar sucursal"}
+        description={branch ? "Sus turnos se cambian en Turnos de la sucursal." : "Cada sucursal tiene sus propios horarios."}
+        action="saveBranch"
+        submitLabel="Guardar"
+        enctype="multipart/form-data"
+        hidden={{ businessId: business.id, id: branch?.id }}
+      >
+        <FormInput form={form} name="name" label="Nombre" value={branch?.name} placeholder="Ej.: Sucursal Norte" required maxlength={80} />
+        <FormInput form={form} name="address" label="Dirección" value={branch?.address} hint="Opcional" maxlength={160} />
+        <PhotoField form={form} label="Foto de la fachada" image={stats?.image} />
+        {!branch && <ShiftsEditor form={form} presets={shiftPresets} />}
+      </Modal>
+    );
+  })
+}
+

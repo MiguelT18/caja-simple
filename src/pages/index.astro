@@ -1,10 +1,10 @@
 ---
-import { Check, CircleCheck, Minus, Moon, Plus, Store, Sun, Sunset, TriangleAlert, UserRound } from "@lucide/astro";
-import BaseHead from "../components/BaseHead.astro";
-import Logo from "../components/Logo.astro";
-import ThemeToggle from "../components/ThemeToggle.astro";
+// Con la sesión en la petición, las acciones cambian: sin sesión invitan a crear cuenta; con ella, vuelven a la app.
+export const prerender = false;
+
+import { ArrowRight, Check, CircleCheck, Moon, Store, Sun, Sunset, TriangleAlert, UserRound } from "@lucide/astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
 import DaySky from "../components/landing/DaySky.astro";
-import { extraBranchPrice, negocioPrice, plans } from "../data/plans";
 
 const signupHref = "/auth/crear-cuenta";
 
@@ -16,422 +16,236 @@ const daySample = [
 ];
 const dayMax = Math.max(...daySample.map((shift) => shift.amount));
 const loginHref = "/auth/iniciar-sesion";
+const signedIn = Boolean(Astro.locals.userId);
 ---
 
-<html lang="es">
-  <head>
-    <BaseHead title="Lleva la caja de tu negocio" />
-    <meta
-      name="description"
-      content="Registra ventas y gastos por turno, en una o varias sucursales, y sabe cada noche si la caja cuadra. Empieza gratis."
-    />
-  </head>
-  <body class="landing">
-    <header class="site-header">
-      <div class="wrap header-inner">
-        <a href="/" class="brand" aria-label="Caja Simple, inicio">
-          <Logo class="brand-logo" />
-          <span class="brand-name">Caja Simple</span>
-        </a>
-        <nav class="header-nav" aria-label="Principal">
-          <ThemeToggle class="header-theme" />
-          <a href="#planes" class="nav-link nav-plans">Planes</a>
-          <a href={loginHref} class="nav-link"><span class="label-long">Iniciar sesión</span><span class="label-short">Entrar</span></a>
-          <a href={signupHref} class="btn btn-primary">Crear cuenta</a>
-        </nav>
+<SiteLayout
+  title="Lleva la caja de tu negocio"
+  description="Registra ventas y gastos por turno, en una o varias sucursales, y sabe cada noche si la caja cuadra. Empieza gratis."
+>
+    <section class="wrap hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <h1 id="hero-title">De la primera venta al cierre de caja, sin cuaderno.</h1>
+        <p class="lede">
+          Caja Simple lleva la caja de tu negocio: tu gente registra ventas y gastos en su turno, y tú sabes cada
+          noche si la caja cuadra, en uno o en varios locales.
+        </p>
+        <div class="actions">
+          {
+            signedIn ? (
+              <a href="/app" class="btn btn-primary btn-lg">Ir a tus negocios</a>
+            ) : (
+              <a href={signupHref} class="btn btn-primary btn-lg">Crear cuenta gratis</a>
+            )
+          }
+          <a href="/planes" class="btn btn-secondary btn-lg">Ver planes</a>
+        </div>
+        <p class="hero-note">Gratis con una sucursal. Tus empleados nunca pagan.</p>
       </div>
-    </header>
 
-    <main>
-      <section class="wrap hero" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <h1 id="hero-title">De la primera venta al cierre de caja, sin cuaderno.</h1>
-          <p class="lede">
-            Caja Simple lleva la caja de tu negocio: tu gente registra ventas y gastos en su turno, y tú sabes cada
-            noche si la caja cuadra, en uno o en varios locales.
-          </p>
-          <div class="actions">
-            <a href={signupHref} class="btn btn-primary btn-lg">Crear cuenta gratis</a>
-            <a href="#planes" class="btn btn-secondary btn-lg">Ver planes</a>
-          </div>
-          <p class="hero-note">Gratis con una sucursal. Tus empleados nunca pagan.</p>
+      <figure class="day-card" aria-labelledby="day-card-title">
+        <figcaption class="mini-head">
+          <span id="day-card-title" class="mini-title">Hoy en Sucursal Centro</span>
+          <span class="sample">Ejemplo</span>
+        </figcaption>
+        <ul class="day-shifts" role="list">
+          {
+            daySample.map(({ name, icon: Icon, chip, color, amount }, i) => (
+              <li style={`--bar: var(${color}); --share: ${amount / dayMax}; --n: ${i}`}>
+                <span class:list={["chip", chip]}>
+                  <Icon size={14} stroke-width={2} />
+                  {name}
+                </span>
+                <span class="num amount-income" data-count={amount} data-sign="+" data-delay={250 + i * 120}>
+                  +Bs {amount},00
+                </span>
+                <span class="shift-bar" aria-hidden="true"></span>
+              </li>
+            ))
+          }
+        </ul>
+        <dl class="day-totals">
+          <div><dt>Ventas</dt><dd class="num amount-income" data-count="1240" data-sign="+" data-delay="500">+Bs 1.240,00</dd></div>
+          <div><dt>Gastos</dt><dd class="num amount-expense" data-count="310" data-sign="−" data-delay="560">−Bs 310,00</dd></div>
+          <div class="day-balance"><dt>Saldo del día</dt><dd class="num" data-count="930" data-delay="620">Bs 930,00</dd></div>
+        </dl>
+        <p class="status-ok day-status"><CircleCheck size={18} stroke-width={2} />La caja cuadra</p>
+      </figure>
+    </section>
+
+    <section class="day" aria-labelledby="day-title">
+      <div class="wrap">
+        <header class="section-head">
+          <h2 id="day-title">Un día en el local</h2>
+          <p>Cada turno registra lo suyo. Al final del día, los números ya están hechos.</p>
+        </header>
+
+        <div class="day-sky">
+          <DaySky />
         </div>
 
-        <figure class="day-card" aria-labelledby="day-card-title">
+        <ol class="timeline" role="list">
+          <li class="shift" style="--shift: var(--color-shift-morning); --shift-soft: var(--color-shift-morning-soft)">
+            <div class="shift-rail" aria-hidden="true"><span class="shift-dot"><Sun size={18} stroke-width={2} /></span></div>
+            <div class="shift-copy">
+              <p class="shift-name">Turno mañana</p>
+              <h3>Abres el local y registras cada venta</h3>
+              <p>Eliges los productos, ves el total y listo. Más rápido que anotarlo en papel.</p>
+            </div>
+            <figure class="mini" aria-label="Ejemplo de venta registrada">
+              <figcaption class="mini-head">
+                <span class="mini-title">Venta 08:42</span>
+                <span class="sample">Ejemplo</span>
+              </figcaption>
+              <ul class="lines" role="list">
+                <li><span>Pan de batalla <span class="qty num">×10</span></span><span class="num">Bs 5,00</span></li>
+                <li><span>Leche 1 L <span class="qty num">×2</span></span><span class="num">Bs 14,00</span></li>
+                <li><span>Mantequilla 200 g <span class="qty num">×1</span></span><span class="num">Bs 12,50</span></li>
+              </ul>
+              <p class="lines-total"><span>Total</span><span class="num amount-income">+Bs 31,50</span></p>
+            </figure>
+          </li>
+
+          <li class="shift" style="--shift: var(--color-shift-afternoon); --shift-soft: var(--color-shift-afternoon-soft)">
+            <div class="shift-rail" aria-hidden="true"><span class="shift-dot"><Sunset size={18} stroke-width={2} /></span></div>
+            <div class="shift-copy">
+              <p class="shift-name">Turno tarde</p>
+              <h3>Anotas los gastos y cuidas el stock</h3>
+              <p>Cada salida de dinero queda registrada, y te avisa cuando un producto se está acabando.</p>
+            </div>
+            <figure class="mini" aria-label="Ejemplo de gastos y aviso de stock">
+              <figcaption class="mini-head">
+                <span class="mini-title">Gastos del turno</span>
+                <span class="sample">Ejemplo</span>
+              </figcaption>
+              <ul class="lines" role="list">
+                <li><span>Garrafa de gas</span><span class="num amount-expense">−Bs 22,50</span></li>
+                <li><span>Bolsas</span><span class="num amount-expense">−Bs 8,00</span></li>
+              </ul>
+              <p class="stock-alert"><TriangleAlert size={16} stroke-width={2} />Leche 1 L: quedan 3</p>
+            </figure>
+          </li>
+
+          <li class="shift" style="--shift: var(--color-shift-night); --shift-soft: var(--color-shift-night-soft)">
+            <div class="shift-rail" aria-hidden="true"><span class="shift-dot"><Moon size={18} stroke-width={2} /></span></div>
+            <div class="shift-copy">
+              <p class="shift-name">Turno noche</p>
+              <h3>Cierras el turno y sabes si la caja cuadra</h3>
+              <p>Cuentas el efectivo, lo comparas con lo esperado y ves la diferencia al instante.</p>
+            </div>
+            <figure class="mini" aria-label="Ejemplo de cuadre de caja">
+              <figcaption class="mini-head">
+                <span class="mini-title">Cuadre de caja</span>
+                <span class="sample">Ejemplo</span>
+              </figcaption>
+              <dl class="lines">
+                <div><dt>Esperado</dt><dd class="num">Bs 930,00</dd></div>
+                <div><dt>Contado</dt><dd class="num">Bs 930,00</dd></div>
+                <div><dt>Diferencia</dt><dd class="num">Bs 0,00</dd></div>
+              </dl>
+              <p class="status-ok"><CircleCheck size={18} stroke-width={2} />La caja cuadra</p>
+            </figure>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="wrap roles" aria-labelledby="roles-title">
+      <div class="roles-top">
+        <header class="section-head">
+          <h2 id="roles-title">Una sola cuenta, sea cual sea tu papel</h2>
+          <p>
+            La cuenta es tuya, no de tu puesto. Con el mismo acceso puedes trabajar en un negocio y administrar el
+            tuyo.
+          </p>
+        </header>
+
+        <figure class="account-demo" aria-labelledby="account-title">
           <figcaption class="mini-head">
-            <span id="day-card-title" class="mini-title">Hoy en Sucursal Centro</span>
+            <span class="account-person">
+              <span class="avatar-initials" aria-hidden="true">ML</span>
+              <span id="account-title" class="mini-title">María López</span>
+            </span>
             <span class="sample">Ejemplo</span>
           </figcaption>
-          <ul class="day-shifts" role="list">
-            {
-              daySample.map(({ name, icon: Icon, chip, color, amount }, i) => (
-                <li style={`--bar: var(${color}); --share: ${amount / dayMax}; --n: ${i}`}>
-                  <span class:list={["chip", chip]}>
-                    <Icon size={14} stroke-width={2} />
-                    {name}
-                  </span>
-                  <span class="num amount-income" data-count={amount} data-sign="+" data-delay={250 + i * 120}>
-                    +Bs {amount},00
-                  </span>
-                  <span class="shift-bar" aria-hidden="true"></span>
-                </li>
-              ))
-            }
-          </ul>
-          <dl class="day-totals">
-            <div><dt>Ventas</dt><dd class="num amount-income" data-count="1240" data-sign="+" data-delay="500">+Bs 1.240,00</dd></div>
-            <div><dt>Gastos</dt><dd class="num amount-expense" data-count="310" data-sign="−" data-delay="560">−Bs 310,00</dd></div>
-            <div class="day-balance"><dt>Saldo del día</dt><dd class="num" data-count="930" data-delay="620">Bs 930,00</dd></div>
-          </dl>
-          <p class="status-ok day-status"><CircleCheck size={18} stroke-width={2} />La caja cuadra</p>
-        </figure>
-      </section>
-
-      <section class="day" aria-labelledby="day-title">
-        <div class="wrap">
-          <header class="section-head">
-            <h2 id="day-title">Un día en el local</h2>
-            <p>Cada turno registra lo suyo. Al final del día, los números ya están hechos.</p>
-          </header>
-
-          <div class="day-sky">
-            <DaySky />
-          </div>
-
-          <ol class="timeline" role="list">
-            <li class="shift" style="--shift: var(--color-shift-morning); --shift-soft: var(--color-shift-morning-soft)">
-              <div class="shift-rail" aria-hidden="true"><span class="shift-dot"><Sun size={18} stroke-width={2} /></span></div>
-              <div class="shift-copy">
-                <p class="shift-name">Turno mañana</p>
-                <h3>Abres el local y registras cada venta</h3>
-                <p>Eliges los productos, ves el total y listo. Más rápido que anotarlo en papel.</p>
-              </div>
-              <figure class="mini" aria-label="Ejemplo de venta registrada">
-                <figcaption class="mini-head">
-                  <span class="mini-title">Venta 08:42</span>
-                  <span class="sample">Ejemplo</span>
-                </figcaption>
-                <ul class="lines" role="list">
-                  <li><span>Pan de batalla <span class="qty num">×10</span></span><span class="num">Bs 5,00</span></li>
-                  <li><span>Leche 1 L <span class="qty num">×2</span></span><span class="num">Bs 14,00</span></li>
-                  <li><span>Mantequilla 200 g <span class="qty num">×1</span></span><span class="num">Bs 12,50</span></li>
-                </ul>
-                <p class="lines-total"><span>Total</span><span class="num amount-income">+Bs 31,50</span></p>
-              </figure>
-            </li>
-
-            <li class="shift" style="--shift: var(--color-shift-afternoon); --shift-soft: var(--color-shift-afternoon-soft)">
-              <div class="shift-rail" aria-hidden="true"><span class="shift-dot"><Sunset size={18} stroke-width={2} /></span></div>
-              <div class="shift-copy">
-                <p class="shift-name">Turno tarde</p>
-                <h3>Anotas los gastos y cuidas el stock</h3>
-                <p>Cada salida de dinero queda registrada, y te avisa cuando un producto se está acabando.</p>
-              </div>
-              <figure class="mini" aria-label="Ejemplo de gastos y aviso de stock">
-                <figcaption class="mini-head">
-                  <span class="mini-title">Gastos del turno</span>
-                  <span class="sample">Ejemplo</span>
-                </figcaption>
-                <ul class="lines" role="list">
-                  <li><span>Garrafa de gas</span><span class="num amount-expense">−Bs 22,50</span></li>
-                  <li><span>Bolsas</span><span class="num amount-expense">−Bs 8,00</span></li>
-                </ul>
-                <p class="stock-alert"><TriangleAlert size={16} stroke-width={2} />Leche 1 L: quedan 3</p>
-              </figure>
-            </li>
-
-            <li class="shift" style="--shift: var(--color-shift-night); --shift-soft: var(--color-shift-night-soft)">
-              <div class="shift-rail" aria-hidden="true"><span class="shift-dot"><Moon size={18} stroke-width={2} /></span></div>
-              <div class="shift-copy">
-                <p class="shift-name">Turno noche</p>
-                <h3>Cierras el turno y sabes si la caja cuadra</h3>
-                <p>Cuentas el efectivo, lo comparas con lo esperado y ves la diferencia al instante.</p>
-              </div>
-              <figure class="mini" aria-label="Ejemplo de cuadre de caja">
-                <figcaption class="mini-head">
-                  <span class="mini-title">Cuadre de caja</span>
-                  <span class="sample">Ejemplo</span>
-                </figcaption>
-                <dl class="lines">
-                  <div><dt>Esperado</dt><dd class="num">Bs 930,00</dd></div>
-                  <div><dt>Contado</dt><dd class="num">Bs 930,00</dd></div>
-                  <div><dt>Diferencia</dt><dd class="num">Bs 0,00</dd></div>
-                </dl>
-                <p class="status-ok"><CircleCheck size={18} stroke-width={2} />La caja cuadra</p>
-              </figure>
-            </li>
-          </ol>
-        </div>
-      </section>
-
-      <section class="wrap roles" aria-labelledby="roles-title">
-        <div class="roles-top">
-          <header class="section-head">
-            <h2 id="roles-title">Una sola cuenta, sea cual sea tu papel</h2>
-            <p>
-              La cuenta es tuya, no de tu puesto. Con el mismo acceso puedes trabajar en un negocio y administrar el
-              tuyo.
-            </p>
-          </header>
-
-          <figure class="account-demo" aria-labelledby="account-title">
-            <figcaption class="mini-head">
-              <span class="account-person">
-                <span class="avatar-initials" aria-hidden="true">ML</span>
-                <span id="account-title" class="mini-title">María López</span>
+          <ul class="account-list" role="list">
+            <li>
+              <span class="account-icon" aria-hidden="true"><Store size={18} stroke-width={1.75} /></span>
+              <span class="account-biz">
+                <span class="account-name">Panadería El Trigal</span>
+                <span class="account-meta">Sucursal Centro</span>
               </span>
-              <span class="sample">Ejemplo</span>
-            </figcaption>
-            <ul class="account-list" role="list">
-              <li>
-                <span class="account-icon" aria-hidden="true"><Store size={18} stroke-width={1.75} /></span>
-                <span class="account-biz">
-                  <span class="account-name">Panadería El Trigal</span>
-                  <span class="account-meta">Sucursal Centro</span>
-                </span>
-                <span class="chip chip-employee"><UserRound size={14} stroke-width={2} />Empleada</span>
-              </li>
-              <li>
-                <span class="account-icon" aria-hidden="true"><Store size={18} stroke-width={1.75} /></span>
-                <span class="account-biz">
-                  <span class="account-name">Tienda Doña Rosa</span>
-                  <span class="account-meta num">2 sucursales</span>
-                </span>
-                <span class="chip chip-owner"><Store size={14} stroke-width={2} />Dueña</span>
-              </li>
-            </ul>
-          </figure>
-        </div>
-        <div class="role-grid">
-          <div class="role">
-            <h3><UserRound size={20} stroke-width={1.75} />Si trabajas en un local</h3>
-            <ul role="list">
-              <li><Check size={16} stroke-width={2} />Registras ventas y gastos de tu turno</li>
-              <li><Check size={16} stroke-width={2} />Ves solo la sucursal donde trabajas</li>
-              <li><Check size={16} stroke-width={2} />Entras gratis, siempre</li>
-            </ul>
-          </div>
-          <div class="role">
-            <h3><Store size={20} stroke-width={1.75} />Si tienes un negocio</h3>
-            <ul role="list">
-              <li><Check size={16} stroke-width={2} />Ves ventas, gastos y cuadres por turno</li>
-              <li><Check size={16} stroke-width={2} />Manejas productos, empleados y turnos</li>
-              <li><Check size={16} stroke-width={2} />Sumas sucursales cuando creces</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section id="planes" class="plans" aria-labelledby="plans-title">
-        <div class="wrap">
-          <header class="section-head">
-            <h2 id="plans-title">Pagas por sucursal, no por persona</h2>
-            <p>Tus empleados entran siempre gratis. Empieza sin pagar y cambia de plan cuando tu negocio crezca.</p>
-          </header>
-
-          <div class="plan-grid">
-            {
-              plans.map((plan, i) => (
-                <article class="plan" aria-labelledby={`plan-${i}`}>
-                  <h3 id={`plan-${i}`}>{plan.name}</h3>
-                  <p class="plan-audience">{plan.audience}</p>
-                  <p class="plan-price">
-                    <span class="num">{plan.price}</span>
-                    {plan.period && <span class="plan-period">{plan.period}</span>}
-                  </p>
-                  <ul role="list">
-                    {plan.features.map((feature) => (
-                      <li>
-                        <Check size={16} stroke-width={2} />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <a href={signupHref} class:list={["btn", i === 0 ? "btn-primary" : "btn-secondary"]}>
-                    {i === 0 ? "Crear cuenta gratis" : "Crear cuenta"}
-                  </a>
-                </article>
-              ))
-            }
-          </div>
-
-          <div class="calc" data-negocio={negocioPrice.join(",")} data-extra={extraBranchPrice.join(",")}>
-            <div class="calc-input">
-              <span id="calc-label" class="calc-label">¿Cuántos locales tienes?</span>
-              <div class="stepper" role="group" aria-labelledby="calc-label">
-                <button type="button" class="icon-btn" data-step="-1" aria-label="Un local menos">
-                  <Minus size={18} stroke-width={2} />
-                </button>
-                <output class="num stepper-value" aria-live="polite">1</output>
-                <button type="button" class="icon-btn" data-step="1" aria-label="Un local más">
-                  <Plus size={18} stroke-width={2} />
-                </button>
-              </div>
-            </div>
-            <p class="calc-result" aria-live="polite">
-              <span class="calc-price num">Bs 0</span>
-              <span class="calc-detail">Plan Gratis, o Negocio por Bs {negocioPrice[0]}–{negocioPrice[1]} al mes</span>
-            </p>
-          </div>
-
-          <p class="plans-note">
-            Precios orientativos en Bolivianos; todavía los estamos ajustando con dueños de negocio. El plan anual trae 2
-            meses gratis y se paga con QR bancario.
-          </p>
-        </div>
-      </section>
-
-      <section class="wrap closing" aria-labelledby="closing-title">
-        <div class="closing-band">
-          <div class="closing-copy">
-            <p class="status-ok closing-status"><CircleCheck size={18} stroke-width={2} />La caja cuadra</p>
-            <h2 id="closing-title">Empieza con tu próximo turno</h2>
-            <p>Crea tu cuenta, agrega tu sucursal y registra la primera venta hoy.</p>
-          </div>
-          <div class="actions">
-            <a href={signupHref} class="btn btn-primary btn-lg">Crear cuenta gratis</a>
-            <a href={loginHref} class="btn btn-secondary btn-lg">Ya tengo cuenta</a>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <div class="wrap footer-inner">
-        <div class="footer-brand">
-          <a href="/" class="brand brand-sm"><Logo class="brand-logo" /><span class="brand-name">Caja Simple</span></a>
-          <p>Tu negocio, bajo control.</p>
-        </div>
-        <nav class="footer-nav" aria-label="Pie de página">
-          <a href="#planes">Planes</a>
-          <a href={loginHref}>Iniciar sesión</a>
-          <a href={signupHref}>Crear cuenta</a>
-        </nav>
+              <span class="chip chip-employee"><UserRound size={14} stroke-width={2} />Empleada</span>
+            </li>
+            <li>
+              <span class="account-icon" aria-hidden="true"><Store size={18} stroke-width={1.75} /></span>
+              <span class="account-biz">
+                <span class="account-name">Tienda Doña Rosa</span>
+                <span class="account-meta num">2 sucursales</span>
+              </span>
+              <span class="chip chip-owner"><Store size={14} stroke-width={2} />Dueña</span>
+            </li>
+          </ul>
+        </figure>
       </div>
-    </footer>
+      <div class="role-grid">
+        <div class="role">
+          <h3><UserRound size={20} stroke-width={1.75} />Si trabajas en un local</h3>
+          <ul role="list">
+            <li><Check size={16} stroke-width={2} />Registras ventas y gastos de tu turno</li>
+            <li><Check size={16} stroke-width={2} />Ves solo la sucursal donde trabajas</li>
+            <li><Check size={16} stroke-width={2} />Entras gratis, siempre</li>
+          </ul>
+        </div>
+        <div class="role">
+          <h3><Store size={20} stroke-width={1.75} />Si tienes un negocio</h3>
+          <ul role="list">
+            <li><Check size={16} stroke-width={2} />Ves ventas, gastos y cuadres por turno</li>
+            <li><Check size={16} stroke-width={2} />Manejas productos, empleados y turnos</li>
+            <li><Check size={16} stroke-width={2} />Sumas sucursales cuando creces</li>
+          </ul>
+        </div>
+      </div>
+    </section>
 
-    <script>
-      import "../scripts/landing.ts";
-    </script>
-  </body>
-</html>
+    <section class="wrap plans-bridge" aria-labelledby="plans-bridge-title">
+      <div>
+        <h2 id="plans-bridge-title">Pagas por sucursal, no por persona</h2>
+        <p>Tus empleados entran siempre gratis. Empieza sin pagar y cambia de plan cuando tu negocio crezca.</p>
+      </div>
+      <a href="/planes" class="btn btn-secondary btn-lg">Ver planes y precios<ArrowRight size={18} stroke-width={2} /></a>
+    </section>
+
+    <section class="wrap closing" aria-labelledby="closing-title">
+      <div class="closing-band">
+        <div class="closing-copy">
+          <p class="status-ok closing-status"><CircleCheck size={18} stroke-width={2} />La caja cuadra</p>
+          <h2 id="closing-title">Empieza con tu próximo turno</h2>
+          <p>{signedIn ? "Entra a tu negocio y registra la próxima venta." : "Crea tu cuenta, agrega tu sucursal y registra la primera venta hoy."}</p>
+        </div>
+        <div class="actions">
+          {
+            signedIn ? (
+              <a href="/app" class="btn btn-primary btn-lg">Ir a tus negocios</a>
+            ) : (
+              <>
+                <a href={signupHref} class="btn btn-primary btn-lg">Crear cuenta gratis</a>
+                <a href={loginHref} class="btn btn-secondary btn-lg">Ya tengo cuenta</a>
+              </>
+            )
+          }
+        </div>
+      </div>
+    </section>
+</SiteLayout>
 
 <style>
-  .landing {
-    --wrap: 72rem;
-    --section-gap: clamp(3.5rem, 2rem + 5vw, 6rem);
-  }
-
-  .landing ::selection {
-    background: var(--color-primary-soft);
-    color: var(--color-text);
-  }
-
-  html:has(.landing) {
-    scroll-behavior: smooth;
-    scroll-padding-top: 5rem;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    html:has(.landing) {
-      scroll-behavior: auto;
-    }
-  }
-
-  .wrap {
-    width: 100%;
-    max-width: var(--wrap);
-    margin-inline: auto;
-    padding-inline: clamp(1rem, 0.5rem + 2.5vw, 2rem);
-  }
 
   h3 {
     margin: 0;
     font-size: var(--text-lg);
     line-height: var(--text-lg-lh);
     font-weight: var(--font-semibold);
-  }
-
-  .btn-lg {
-    min-height: 3rem;
-    padding-inline: 1.5rem;
-  }
-
-  /* Encabezado */
-  .site-header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    border-bottom: 1px solid var(--color-border);
-    background: color-mix(in srgb, var(--color-bg) 92%, transparent);
-    transition: translate 300ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .header-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    min-height: 4rem;
-  }
-
-  .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.625rem;
-    border-radius: 0.5rem;
-    color: var(--color-text);
-    text-decoration: none;
-  }
-
-  .brand-logo {
-    width: 2rem;
-    height: 2rem;
-    flex-shrink: 0;
-    color: var(--color-primary);
-  }
-
-  .brand-name {
-    font-size: var(--text-lg);
-    font-weight: var(--font-bold);
-    letter-spacing: -0.01em;
-  }
-
-  .header-nav {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .nav-link {
-    padding: 0.5rem 0.75rem;
-    white-space: nowrap;
-    border-radius: 0.5rem;
-    color: var(--color-text-muted);
-    font-weight: var(--font-medium);
-    text-decoration: none;
-    transition:
-      background-color 150ms,
-      color 150ms;
-  }
-
-  .nav-link:hover {
-    background: var(--color-surface-muted);
-    color: var(--color-text);
-  }
-
-  /* Primero de la barra: en móvil queda junto a «Entrar» sin empujar la acción principal. */
-  .header-nav .header-theme {
-    margin-right: 0.25rem;
-  }
-
-  .header-nav .btn {
-    margin-left: 0.5rem;
-    white-space: nowrap;
-  }
-
-  .label-short {
-    display: none;
   }
 
   /* Hero */
@@ -511,8 +325,7 @@ const loginHref = "/auth/iniciar-sesion";
 
   .day-shifts,
   .lines,
-  .role ul,
-  .plan ul {
+  .role ul {
     margin: 0;
     padding: 0;
     list-style: none;
@@ -648,13 +461,6 @@ const loginHref = "/auth/iniciar-sesion";
     color: var(--color-warning);
   }
 
-  /* Secciones */
-  .section-head {
-    max-width: 40rem;
-    margin-bottom: clamp(2rem, 1.5rem + 2vw, 3.5rem);
-  }
-
-  .section-head h2,
   .closing h2 {
     font-size: clamp(1.75rem, 1.29rem + 2.07vw, 2.625rem);
     line-height: 1.12;
@@ -663,7 +469,6 @@ const loginHref = "/auth/iniciar-sesion";
     text-wrap: balance;
   }
 
-  .section-head p,
   .closing p {
     margin: 1rem 0 0;
     color: var(--color-text-muted);
@@ -830,10 +635,6 @@ const loginHref = "/auth/iniciar-sesion";
     margin-bottom: clamp(2rem, 1.5rem + 2vw, 3.5rem);
   }
 
-  .roles-top .section-head {
-    margin-bottom: 0;
-  }
-
   .account-demo {
     margin: 0;
     padding: 1.25rem;
@@ -942,166 +743,22 @@ const loginHref = "/auth/iniciar-sesion";
     line-height: var(--text-xl-lh);
   }
 
-  .role ul,
-  .plan ul {
+  .role ul {
     display: grid;
     gap: 0.625rem;
     margin-top: 1.25rem;
   }
 
-  .role li,
-  .plan li {
+  .role li {
     display: flex;
     align-items: flex-start;
     gap: 0.625rem;
   }
 
-  .role li :global(svg),
-  .plan li :global(svg) {
+  .role li :global(svg) {
     flex-shrink: 0;
     margin-top: 0.3em;
     color: var(--color-income);
-  }
-
-  /* Planes */
-  .plans {
-    padding-block: var(--section-gap);
-    border-top: 1px solid var(--color-border);
-    background: var(--color-surface-muted);
-  }
-
-  .plan-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    overflow: hidden;
-    border: 1px solid var(--color-border);
-    border-radius: 1rem;
-    background: var(--color-surface);
-    box-shadow: var(--shadow-md);
-  }
-
-  .plan {
-    display: flex;
-    flex-direction: column;
-    padding: clamp(1.5rem, 1rem + 1.5vw, 2.25rem);
-  }
-
-  .plan + .plan {
-    border-left: 1px solid var(--color-border);
-  }
-
-  .plan h3 {
-    font-size: var(--text-xl);
-    line-height: var(--text-xl-lh);
-    font-weight: var(--font-bold);
-  }
-
-  .plan-audience {
-    margin: 0.25rem 0 0;
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
-  }
-
-  .plan-price {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.375rem;
-    margin: 1.5rem 0 0;
-    font-size: var(--text-3xl);
-    line-height: var(--text-3xl-lh);
-    font-weight: var(--font-bold);
-    letter-spacing: -0.01em;
-  }
-
-  .plan-period {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
-    font-weight: var(--font-medium);
-    letter-spacing: 0;
-  }
-
-  .plan ul {
-    flex: 1;
-    margin-block: 1.5rem 2rem;
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
-  }
-
-  .calc {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1.5rem;
-    margin-top: 1.5rem;
-    padding: 1.25rem 1.5rem;
-    border: 1px solid var(--color-border);
-    border-radius: 1rem;
-    background: var(--color-surface);
-  }
-
-  .calc-input {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .calc-label {
-    font-weight: var(--font-semibold);
-  }
-
-  .stepper {
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid var(--color-border-strong);
-    border-radius: 0.5rem;
-  }
-
-  .stepper .icon-btn {
-    width: 2.75rem;
-    height: 2.75rem;
-  }
-
-  .stepper .icon-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .stepper-value {
-    min-width: 2.5rem;
-    font-size: var(--text-lg);
-    font-weight: var(--font-bold);
-    text-align: center;
-  }
-
-  .calc-result {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    margin: 0;
-    text-align: right;
-  }
-
-  .calc-price {
-    font-size: var(--text-2xl);
-    line-height: var(--text-2xl-lh);
-    font-weight: var(--font-bold);
-  }
-
-  .calc-detail,
-  .plans-note {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
-  }
-
-  .plans-note {
-    max-width: 44rem;
-    margin: 1.5rem 0 0;
   }
 
   /* Cierre */
@@ -1136,82 +793,19 @@ const loginHref = "/auth/iniciar-sesion";
     margin-top: 0;
   }
 
-  .site-footer {
-    border-top: 1px solid var(--color-border);
-  }
-
-  .footer-inner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding-block: 2rem;
-  }
-
-  .footer-brand {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 1.25rem;
-  }
-
-  .footer-inner p {
-    margin: 0;
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-  }
-
-  .footer-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1.5rem;
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
-  }
-
-  .footer-nav a {
-    border-radius: 0.25rem;
-    color: var(--color-text-muted);
-    text-decoration: underline;
-    text-decoration-color: transparent;
-    text-underline-offset: 0.25em;
-    transition:
-      color 150ms,
-      text-decoration-color 150ms;
-  }
-
-  .footer-nav a:hover {
-    color: var(--color-text);
-    text-decoration-color: currentColor;
-  }
-
-  .brand-sm .brand-logo {
-    width: 1.5rem;
-    height: 1.5rem;
-  }
-
-  .brand-sm .brand-name {
-    font-size: var(--text-base);
-  }
-
   @media (max-width: 960px) {
     .hero {
       grid-template-columns: minmax(0, 1fr);
     }
-
     .day-card {
       max-width: 30rem;
     }
-
     .roles-top {
       grid-template-columns: minmax(0, 1fr);
     }
-
     .account-demo {
       max-width: 26rem;
     }
-
     .shift {
       grid-template-columns: 3rem minmax(0, 1fr);
       row-gap: 1.25rem;
@@ -1221,42 +815,21 @@ const loginHref = "/auth/iniciar-sesion";
     .shift-rail {
       grid-row: span 2;
     }
-
     .mini {
       grid-column: 2;
       max-width: 26rem;
     }
-
-    .plan-grid {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .plan + .plan {
-      border-top: 1px solid var(--color-border);
-      border-left: none;
-    }
   }
 
   @media (max-width: 640px) {
-    .nav-plans {
-      display: none;
-    }
-
     .role-grid {
       grid-template-columns: minmax(0, 1fr);
     }
-
     .role,
     .role + .role {
       padding: 1.5rem 0 0;
       border-left: none;
     }
-
-    .calc-result {
-      align-items: flex-start;
-      text-align: left;
-    }
-
     .closing-band {
       grid-template-columns: minmax(0, 1fr);
       align-items: start;
@@ -1267,91 +840,82 @@ const loginHref = "/auth/iniciar-sesion";
     .shift {
       grid-template-columns: 2.25rem minmax(0, 1fr);
     }
-
     .shift-dot {
       width: 2.25rem;
       height: 2.25rem;
     }
-
     .shift:not(:last-child) .shift-rail::before,
     .shift:not(:last-child) .shift-rail::after {
       top: 2.25rem;
     }
-
     .actions .btn {
       flex: 1 1 100%;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .site-header,
     .shift-dot,
     .mini,
     .shift-rail::before {
       transition: none;
     }
   }
+
   /* Movimiento: un momento por zona. Sin preferencia de movimiento reducido, nada de esto corre. */
   @media (prefers-reduced-motion: no-preference) {
     .hero-copy > *,
     .day-card {
       animation: rise 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
     }
-
     .hero-copy > :nth-child(2) {
       animation-delay: 80ms;
     }
-
     .hero-copy > :nth-child(3) {
       animation-delay: 160ms;
     }
-
     .hero-copy > :nth-child(4) {
       animation-delay: 240ms;
     }
-
     .day-card {
       animation-delay: 200ms;
     }
-
     .shift-bar::before {
       transform-origin: left;
       animation: grow 1000ms cubic-bezier(0.16, 1, 0.3, 1) both;
       animation-delay: calc(350ms + var(--n) * 120ms);
     }
-
     .day-status {
       animation: rise 600ms cubic-bezier(0.16, 1, 0.3, 1) 1200ms both;
     }
 
     /* Cada pieza de turno se «escribe» línea por línea la primera vez que su turno se enciende. */
-    .shift .mini :is(.lines > *, .lines-total, .status-ok, .stock-alert) {
+    .shift .mini :is(.lines > *,
+    .lines-total,
+    .status-ok,
+    .stock-alert) {
       transition:
         opacity 500ms cubic-bezier(0.16, 1, 0.3, 1),
         translate 500ms cubic-bezier(0.16, 1, 0.3, 1);
       transition-delay: calc(150ms + var(--i, 0) * 110ms);
     }
-
     .shift .mini .lines > :nth-child(2) {
       --i: 1;
     }
-
     .shift .mini .lines > :nth-child(3) {
       --i: 2;
     }
-
-    .shift .mini :is(.lines-total, .status-ok, .stock-alert) {
+    .shift .mini :is(.lines-total,
+    .status-ok,
+    .stock-alert) {
       --i: 3;
     }
-
-    .shift.is-armed:not(.is-seen) .mini :is(.lines > *, .lines-total, .status-ok, .stock-alert) {
+    .shift.is-armed:not(.is-seen) .mini :is(.lines > *,
+    .lines-total,
+    .status-ok,
+    .stock-alert) {
       opacity: 0;
       translate: 0 0.5rem;
       transition-delay: 0s;
-    }
-
-    .calc-price.tick {
-      animation: tick 280ms cubic-bezier(0.16, 1, 0.3, 1);
     }
   }
 
@@ -1365,13 +929,6 @@ const loginHref = "/auth/iniciar-sesion";
   @keyframes grow {
     from {
       scale: 0 1;
-    }
-  }
-
-  @keyframes tick {
-    from {
-      opacity: 0.35;
-      translate: 0 0.25rem;
     }
   }
 
@@ -1389,14 +946,7 @@ const loginHref = "/auth/iniciar-sesion";
     clip-path: inset(0 -100vmax);
   }
 
-  /* La barra se esconde al bajar (lo decide landing.ts) y vuelve al subir o al recibir foco de teclado
-     (`:focus-visible`: tras un toque, el foco se queda en el enlace y no debe dejarla fija);
-     la franja del cielo sube con ella para no dejar un hueco. */
-  .landing[data-header="hidden"] .site-header:not(:has(:focus-visible)) {
-    translate: 0 -100%;
-  }
-
-  .landing[data-header="hidden"]:not(:has(.site-header :focus-visible)) .day-sky {
+  :global(.landing[data-header="hidden"]:not(:has(.site-header :focus-visible))) .day-sky {
     top: 0;
   }
 
@@ -1407,125 +957,79 @@ const loginHref = "/auth/iniciar-sesion";
   }
 
   /* Móvil */
-
   @media (max-width: 640px) {
     .day-sky {
       top: 3.5rem;
       height: 5rem;
       margin-bottom: 1.5rem;
     }
-
-    .header-inner {
-      min-height: 3.5rem;
-      gap: 0.5rem;
-    }
-
-    .header-nav .btn {
-      min-height: 2.5rem;
-      margin-left: 0.25rem;
-      padding-inline: 1rem;
-    }
-
-    .nav-link {
-      padding-inline: 0.625rem;
-    }
-
-    .label-long {
-      display: none;
-    }
-
-    .label-short {
-      display: inline;
-    }
-
     .hero h1 {
       font-size: clamp(2rem, 1.2rem + 4vw, 2.5rem);
     }
-
     .lede {
       margin-top: 1rem;
       font-size: var(--text-base);
       line-height: var(--text-base-lh);
     }
-
     .actions {
       margin-top: 1.5rem;
     }
-
     .day-card {
       max-width: none;
       padding: 1.125rem;
     }
-
     .day-balance dd {
       font-size: var(--text-3xl);
       line-height: var(--text-3xl-lh);
     }
-
-    .section-head {
-      margin-bottom: 1.75rem;
-    }
-
-    .section-head p,
     .closing p {
       font-size: var(--text-base);
       line-height: var(--text-base-lh);
     }
-
     .shift-copy h3 {
       font-size: var(--text-xl);
       line-height: var(--text-xl-lh);
     }
-
     .mini,
     .account-demo {
       max-width: none;
     }
-
     .account-list li {
       flex-wrap: wrap;
     }
-
-    .plan {
-      padding: 1.25rem;
-    }
-
-    .plan .btn {
-      width: 100%;
-    }
-
-    .calc {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 1rem;
-      padding: 1.25rem;
-    }
-
-    .calc-input {
-      justify-content: space-between;
-    }
-
     .closing-band {
       padding: 1.5rem;
     }
-
     .closing .actions .btn {
       flex: 1 1 100%;
     }
-
-    .footer-inner {
-      flex-direction: column;
-      align-items: flex-start;
-    }
   }
 
-  @media (max-width: 400px) {
-    .site-header .brand-name {
-      display: none;
-    }
+  .roles-top .section-head {
+    margin-bottom: 0;
   }
 
-  .landing {
-    overflow-x: clip;
+  /* Puente a /planes */
+  .plans-bridge {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem 2rem;
+    padding-block: clamp(2rem, 1rem + 3vw, 3rem);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .plans-bridge h2 {
+    margin: 0;
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl-lh);
+    letter-spacing: -0.01em;
+  }
+
+  .plans-bridge p {
+    max-width: 52ch;
+    margin: 0.5rem 0 0;
+    color: var(--color-text-muted);
   }
 </style>
