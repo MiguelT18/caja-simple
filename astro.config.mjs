@@ -15,6 +15,9 @@ export default defineConfig({
     schema: {
       SUPABASE_URL: envField.string({ context: 'server', access: 'public', url: true }),
       SUPABASE_KEY: envField.string({ context: 'server', access: 'public' }),
+      // Caché opcional (Upstash Redis); sin estas variables la app lee siempre de Supabase.
+      UPSTASH_REDIS_REST_URL: envField.string({ context: 'server', access: 'secret', url: true, optional: true }),
+      UPSTASH_REDIS_REST_TOKEN: envField.string({ context: 'server', access: 'secret', optional: true }),
     },
   },
   vite: {

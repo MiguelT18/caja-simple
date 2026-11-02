@@ -25,6 +25,8 @@ function describe({ kind, data }: Notice) {
       return { title: `Caja descuadrada en ${data.branch}`, body: `Turno ${data.shift}: ${money(Number(data.difference))} de diferencia` };
     case "low_stock":
       return { title: `Stock bajo: ${data.product}`, body: `Quedan ${data.stock} en ${data.branch} (mínimo ${data.minStock})` };
+    case "shift_change":
+      return { title: `${data.person} cambió su turno`, body: `${data.from ? `De ${data.from} a ${data.to}` : `Ahora en ${data.to}`} · ${data.branch}` };
     default:
       return { title: "Caja Simple", body: "Tienes un aviso nuevo" };
   }

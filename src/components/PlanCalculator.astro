@@ -1,0 +1,172 @@
+---
+// Calculadora del precio mensual según la cantidad de locales. La usan /planes y /app/[negocio]/plan.
+import { Minus, Plus } from "@lucide/astro";
+import { extraBranchPrice, negocioPrice } from "../data/plans";
+
+interface Props {
+  // Locales con los que arranca (en la app, las sucursales que ya tiene el negocio).
+  branches?: number;
+}
+
+const MAX = 20;
+const branches = Math.min(MAX, Math.max(1, Astro.props.branches ?? 1));
+---
+
+<div class="calc" data-negocio={negocioPrice.join(",")} data-extra={extraBranchPrice.join(",")} data-branches={branches} data-max={MAX}>
+  <div class="calc-input">
+    <span id="calc-label" class="calc-label">¿Cuántos locales tienes?</span>
+    <div class="stepper" role="group" aria-labelledby="calc-label">
+      <button type="button" class="icon-btn" data-step="-1" aria-label="Un local menos">
+        <Minus size={18} stroke-width={1.75} />
+      </button>
+      <output class="num stepper-value" aria-live="polite">{branches}</output>
+      <button type="button" class="icon-btn" data-step="1" aria-label="Un local más">
+        <Plus size={18} stroke-width={1.75} />
+      </button>
+    </div>
+  </div>
+  <p class="calc-result" aria-live="polite">
+    <span class="calc-price num">Bs 0</span>
+    <span class="calc-detail">Plan Gratis, o Negocio por Bs {negocioPrice[0]}–{negocioPrice[1]} al mes</span>
+  </p>
+</div>
+
+<script>
+  const fmt = (n: number) => n.toLocaleString("es-BO");
+
+  for (const calc of document.querySelectorAll<HTMLElement>(".calc")) {
+    const [negMin, negMax] = calc.dataset.negocio!.split(",").map(Number);
+    const [extMin, extMax] = calc.dataset.extra!.split(",").map(Number);
+    const max = Number(calc.dataset.max);
+    const value = calc.querySelector("output")!;
+    const price = calc.querySelector<HTMLElement>(".calc-price")!;
+    const detail = calc.querySelector(".calc-detail")!;
+    const [less, more] = calc.querySelectorAll<HTMLButtonElement>("[data-step]");
+    let branches = Number(calc.dataset.branches);
+
+    const render = () => {
+      value.textContent = String(branches);
+      less.disabled = branches === 1;
+      more.disabled = branches === max;
+      if (branches === 1) {
+        price.textContent = "Bs 0";
+        detail.textContent = `Plan Gratis, o Negocio por Bs ${negMin}–${negMax} al mes`;
+        return;
+      }
+      const extra = branches - 1;
+      price.textContent = `Bs ${fmt(negMin + extra * extMin)}–${fmt(negMax + extra * extMax)} al mes`;
+      detail.textContent = `Plan Negocio + ${extra} ${extra === 1 ? "sucursal extra" : "sucursales extra"}`;
+    };
+
+    for (const button of [less, more]) {
+      button.addEventListener("click", () => {
+        branches = Math.min(max, Math.max(1, branches + Number(button.dataset.step)));
+        render();
+        // Reinicia la animación del precio en cada cambio.
+        price.classList.remove("tick");
+        void price.offsetWidth;
+        price.classList.add("tick");
+      });
+    }
+    render();
+  }
+</script>
+
+<style>
+  .calc {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    background: var(--color-surface);
+  }
+
+  .calc-input {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .calc-label {
+    font-weight: var(--font-semibold);
+  }
+
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 0.5rem;
+  }
+
+  .stepper .icon-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .stepper .icon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .stepper-value {
+    min-width: 2.5rem;
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+    text-align: center;
+  }
+
+  .calc-result {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin: 0;
+    text-align: right;
+  }
+
+  .calc-price {
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl-lh);
+    font-weight: var(--font-bold);
+  }
+
+  .calc-detail {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .calc-price.tick {
+      animation: tick 280ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  }
+
+  @keyframes tick {
+    from {
+      opacity: 0.35;
+      translate: 0 0.25rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .calc {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+      padding: 1.25rem;
+    }
+    .calc-input {
+      justify-content: space-between;
+    }
+    .calc-result {
+      align-items: flex-start;
+      text-align: left;
+    }
+  }
+</style>

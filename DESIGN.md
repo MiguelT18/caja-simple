@@ -168,6 +168,7 @@ El mundo de la app es el de un reproductor de música con la marca de Caja Simpl
 - **Estante** (`.shelf-head`): título de sección con «Mostrar todo» (`.shelf-link`, `--text-sm` 700, atenuado) a la derecha.
 - **Listas y tablas:** como una lista de canciones. El encabezado va sin fondo, en 600 atenuado y con una línea fina `--color-border` debajo; las filas no tienen borde y al pasar el mouse toman `--color-surface-hover` con las puntas redondeadas (0.375rem). Vale para `.table` y para `Table` de shadcn.
 - **Modales:** borde `--color-border`, `--shadow-md`, fondo detrás negro al 60% y título en `--text-xl` 800.
+- **Diálogos y avisos:** nunca `window.confirm` ni `window.alert`. Todo `.modal` entra subiendo 0.75rem desde `scale(0.97)` con el fondo que se oscurece (220 ms, `cubic-bezier(0.2, 0.8, 0.2, 1)`) y sale en 160 ms; con movimiento reducido solo hay fundido. Para confirmar, `confirmDialog()` de `src/scripts/dialogs.ts` (o `data-confirm` en un formulario de `action-forms.ts`, con `data-confirm-label` y `data-danger`): el foco empieza en «Cancelar» y lo destructivo va en `.btn-danger`. Para los errores sin un lugar en la página, `toast()`: un aviso flotante abajo a la derecha (arriba en móvil) con borde izquierdo del color del tono, que se va solo a los 5 s (8 s si es error) o con su «×».
 
 ## Carga
 

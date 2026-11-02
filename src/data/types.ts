@@ -18,7 +18,11 @@ export interface Business {
   name: string;
   ownerId: string;
   plan: "Gratis" | "Negocio" | "Sucursales";
+  /** Rubro: solo cambia textos y secciones de la app (ver docs/modelo-de-datos.md › Rubros). */
+  kind: BusinessKind;
 }
+
+export type BusinessKind = "tienda" | "ropa" | "restaurante";
 
 export interface Branch {
   id: string;
@@ -65,9 +69,11 @@ export interface CatalogProduct {
 
 /** Producto tal como lo ve una sucursal: el del catálogo con su precio y stock ahí. */
 export interface Product extends Omit<CatalogProduct, "businessId"> {
-  price: number;
-  stock: number;
-  minStock: number;
+  /** null: el precio se escribe al vender (una prenda única). */
+  price: number | null;
+  /** null: sin control de stock (un plato, una prenda por tipo); entonces minStock también es null. */
+  stock: number | null;
+  minStock: number | null;
 }
 
 export interface Employee {
@@ -135,6 +141,7 @@ export type Notification = {
   | { kind: "invitation_answer"; data: { person: string; business: string; accepted: boolean } }
   | { kind: "cash_mismatch"; data: { branch: string; shift: string; date: string; difference: number } }
   | { kind: "low_stock"; data: { product: string; branch: string; stock: number; minStock: number } }
+  | { kind: "shift_change"; data: { person: string; business: string; branch: string; from: string | null; to: string } }
 );
 
 export interface ShiftClose {

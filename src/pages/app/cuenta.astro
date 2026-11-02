@@ -1,13 +1,14 @@
 ---
-import { Bell, KeyRound, ShieldCheck, UserRound } from "@lucide/astro";
+import { Bell, Clock, KeyRound, ShieldCheck, UserRound } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import PhotoField from "@/components/app/PhotoField.astro";
 import Layout from "@/layouts/Layout.astro";
 import { accountSettings } from "@/data/queries";
+import { shiftHours } from "@/lib/format";
 
-const { user, totpFactorId, hasPassword } = await accountSettings(Astro.locals);
+const { user, jobs, totpFactorId, hasPassword } = await accountSettings(Astro.locals);
 const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
 ---
 
@@ -43,6 +44,41 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
         <button type="submit" class="btn btn-primary">{hasPassword ? "Cambiar contraseña" : "Crear contraseña"}</button>
       </form>
     </section>
+
+    {
+      jobs.length > 0 && (
+        <section class="card block" aria-labelledby="jobs-title">
+          <h2 class="card-title" id="jobs-title">
+            <Clock size={20} stroke-width={1.75} />
+            Tus turnos de trabajo
+          </h2>
+          <p class="field-hint">Si cambias de horario, elígelo aquí. A la dueña le llega un aviso; la sucursal y el puesto los cambia ella.</p>
+          {jobs.map(({ business, branch, employee, shifts }) => {
+            const form = `shift-${employee.id}`;
+            return (
+              <form id={form} class="job" data-action="changeMyShift" novalidate>
+                <input type="hidden" name="employeeId" value={employee.id} />
+                <input type="hidden" name="businessId" value={business.id} />
+                <FormInput
+                  form={form}
+                  name="shiftId"
+                  label={`${business.name} · ${branch.name}`}
+                  options={[
+                    ...(employee.shiftId ? [] : [{ value: "", label: "Elige un turno", selected: true }]),
+                    ...shifts.map((s) => ({ value: s.id, label: `${s.name} (${shiftHours(s)})`, selected: s.id === employee.shiftId })),
+                  ]}
+                  required
+                />
+                <p class="notice notice-error" role="alert" data-form-notice />
+                <button type="submit" class="btn btn-secondary">
+                  Cambiar turno<span class="sr-only"> en {business.name}</span>
+                </button>
+              </form>
+            );
+          })}
+        </section>
+      )
+    }
 
     <section class="card block" aria-labelledby="mfa-title">
       <div class="block-head">
@@ -240,6 +276,29 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
   .stack > .btn,
   .start {
     justify-self: start;
+  }
+
+  .job {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.5rem 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .job .notice {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 480px) {
+    .job {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .job .btn {
+      justify-self: start;
+    }
   }
 
   .strong {

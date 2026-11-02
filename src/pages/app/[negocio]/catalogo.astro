@@ -3,17 +3,19 @@ import PageHeader from "@/components/PageHeader.astro";
 import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
 import { plural } from "@/lib/format";
+import { catalogLabel } from "@/data/kinds";
 import { businessContext } from "@/data/queries";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
 const { business, catalog, categories } = ctx;
+const label = catalogLabel(business.kind);
 const lowCount = catalog.filter((p) => p.soldIn.some((s) => s.low)).length;
 ---
 
-<Layout title={`Catálogo · ${business.name}`} context={{ membership: ctx.membership }}>
+<Layout title={`${label} · ${business.name}`} context={{ membership: ctx.membership }}>
   <PageHeader
-    title="Catálogo"
+    title={label}
     description={`${plural(catalog.length, "producto", "productos")} de ${business.name} · ${lowCount} con stock bajo en alguna sucursal. El precio y el stock los lleva cada sucursal.`}
   />
 

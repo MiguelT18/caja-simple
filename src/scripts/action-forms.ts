@@ -3,8 +3,10 @@
 //   data-redirect="/app/{slug}"           → al guardar, va ahí ({campo} sale de la respuesta); si no, recarga
 //   <p class="notice" data-form-notice>   → donde se muestra el error general
 //   <p class="field-error" id="<name>-error"> → errores de cada campo
+//   data-confirm="¿…?" data-confirm-label="Quitar" data-danger → pide confirmación en un diálogo (scripts/dialogs.ts)
 // Diálogos: <button data-open-dialog="id"> abre <dialog id="id" class="modal">; [data-close-dialog] lo cierra.
 import { actions, isInputError } from "astro:actions";
+import { confirmDialog, toast } from "./dialogs";
 import { showPageSkeleton } from "./nav-skeleton";
 
 type ActionFn = (input: FormData) => Promise<{ data?: Record<string, unknown>; error?: Error & { code?: string } }>;
@@ -18,7 +20,7 @@ document.addEventListener("submit", async (event) => {
   const notice = form.querySelector<HTMLElement>("[data-form-notice]");
   const submit = form.querySelector<HTMLButtonElement>("button[type=submit]");
   const confirmText = form.dataset.confirm;
-  if (confirmText && !window.confirm(confirmText)) return;
+  if (confirmText && !(await confirmDialog(confirmText, { confirmLabel: form.dataset.confirmLabel, danger: "danger" in form.dataset }))) return;
 
   for (const el of form.querySelectorAll<HTMLElement>(".field-error")) el.textContent = "";
   for (const el of form.querySelectorAll("[aria-invalid]")) el.removeAttribute("aria-invalid");
@@ -52,7 +54,7 @@ document.addEventListener("submit", async (event) => {
     return;
   }
   if (notice) notice.textContent = error.message || "No se pudo guardar. Intenta de nuevo.";
-  else window.alert(error.message);
+  else toast(error.message || "No se pudo guardar. Intenta de nuevo.", "error");
 });
 
 document.addEventListener("click", (event) => {

@@ -1,6 +1,7 @@
 ---
 import { ArrowLeft, Check, CreditCard, Landmark, QrCode } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
+import PlanCalculator from "@/components/PlanCalculator.astro";
 import Layout from "@/layouts/Layout.astro";
 import { businessContext, businessHref } from "@/data/queries";
 import { plans, upgradeUrl } from "@/data/plans";
@@ -47,6 +48,8 @@ const payments = [
       })
     }
   </div>
+
+  <PlanCalculator branches={ctx.membership.branches.length} />
 
   <section class="payments" aria-labelledby="payments-title">
     <h2 class="section-title" id="payments-title">Métodos de pago</h2>
@@ -102,7 +105,7 @@ const payments = [
   }
 
   .payments {
-    margin-bottom: 2.5rem;
+    margin-block: 2.5rem;
   }
 
   .payments ul {

@@ -5,8 +5,10 @@ import FormInput from "@/components/app/FormInput.astro";
 import MediaCard from "@/components/app/MediaCard.astro";
 import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
+import { kindOptions } from "@/data/kinds";
 import { currentUser, entryHref, myBusinesses } from "@/data/queries";
-import { boliviaNow, plural } from "@/lib/format";
+import { boliviaNow } from "@/lib/dates";
+import { plural } from "@/lib/format";
 
 const memberships = myBusinesses(Astro.locals);
 const hour = boliviaNow().minutes / 60;
@@ -38,6 +40,7 @@ const monogram = (name: string) =>
         </header>
         <form id="onboarding" class="onboarding-form" data-action="createBusiness" data-redirect="/app/{slug}" novalidate>
           <FormInput form="onboarding" name="name" label="Nombre del negocio" placeholder="Ej.: Almacén López" required maxlength={80} />
+          <FormInput form="onboarding" name="kind" label="Rubro" options={kindOptions()} hint="Cambia los textos y las secciones. Lo puedes cambiar después." />
           <div class="field-row-2">
             <FormInput form="onboarding" name="branchName" label="Primera sucursal" value="Principal" required maxlength={80} />
             <FormInput form="onboarding" name="branchAddress" label="Dirección" hint="Opcional" maxlength={160} />
@@ -58,6 +61,7 @@ const monogram = (name: string) =>
 
   <Modal id="new-business" title="Crear negocio" description="Con su primera sucursal, que arranca con los turnos de mañana, tarde y noche." action="createBusiness" submitLabel="Crear negocio" redirect="/app/{slug}">
     <FormInput form="new-business-form" name="name" label="Nombre del negocio" required maxlength={80} />
+    <FormInput form="new-business-form" name="kind" label="Rubro" options={kindOptions()} />
     <FormInput form="new-business-form" name="branchName" label="Primera sucursal" value="Principal" required maxlength={80} />
     <FormInput form="new-business-form" name="branchAddress" label="Dirección" hint="Opcional" maxlength={160} />
   </Modal>

@@ -161,6 +161,7 @@ const tones = [
                 class="inline-form"
                 data-action="closeShift"
                 data-confirm="¿Cerrar el turno? Después ya no se pueden registrar ventas ni gastos en él."
+                data-confirm-label="Cerrar turno"
                 novalidate
               >
                 <input type="hidden" name="closeId" value={t.closeId} />
@@ -216,6 +217,8 @@ const tones = [
                 class="delete-form"
                 data-action="deleteShift"
                 data-confirm={`¿Quitar el turno ${shift.name}? Las ventas pasadas lo siguen mostrando.`}
+                data-confirm-label="Quitar"
+                data-danger
                 novalidate
               >
                 <input type="hidden" name="id" value={shift.id} />

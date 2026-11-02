@@ -5,6 +5,7 @@ import BranchDialogs from "@/components/app/BranchDialogs.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
+import { kindOptions } from "@/data/kinds";
 import { businessContext, businessHref } from "@/data/queries";
 import { planLimits } from "@/data/plans";
 import { plural } from "@/lib/format";
@@ -40,14 +41,15 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
       <div class="block-head">
         <h2 class="card-title" id="business-title">Negocio</h2>
       </div>
-      <form id="business-form" class="business-form" data-action="renameBusiness" novalidate>
+      <form id="business-form" class="business-form" data-action="saveBusiness" novalidate>
         <input type="hidden" name="id" value={business.id} />
         <FormInput form="business-form" name="name" label="Nombre del negocio" value={business.name} required maxlength={80} />
+        <FormInput form="business-form" name="kind" label="Rubro" options={kindOptions(business.kind)} hint="Cambia los textos y las secciones de la app; tus datos no cambian." />
         <p class="field-hint">
           Dirección en la app: <span class="slug">{base}</span>. No cambia al renombrar, así tus enlaces siguen funcionando.
         </p>
         <p class="notice notice-error" role="alert" data-form-notice></p>
-        <button type="submit" class="btn btn-primary">Guardar nombre</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
       </form>
     </section>
 

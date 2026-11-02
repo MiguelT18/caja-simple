@@ -19,7 +19,7 @@ const { branch, business, products, currentShift: shift } = ctx;
     <section class="catalog" aria-label="Productos">
       <label class="search">
         <Search size={18} stroke-width={1.75} />
-        <span class="visually-hidden">Buscar producto</span>
+        <span class="sr-only">Buscar producto</span>
         <input type="search" class="input" placeholder="Buscar producto" data-search autocomplete="off" />
       </label>
 
@@ -40,10 +40,12 @@ const { branch, business, products, currentShift: shift } = ctx;
         {
           products.map((p) => (
             <li data-name={p.name.toLowerCase()}>
-              <button type="button" class="product" data-id={p.id} data-name={p.name} data-price={p.price} data-stock={p.stock} disabled={p.stock === 0 || !shift}>
+              <button type="button" class="product" data-id={p.id} data-name={p.name} data-price={p.price ?? ""} data-stock={p.stock ?? ""} disabled={p.stock === 0 || !shift}>
                 <span class="product-name">{p.name}</span>
-                <span class="product-price num">{formatBs(p.price)}</span>
-                <span class="product-stock num">{p.stock === 0 ? "Sin stock" : `${p.stock} en stock`}</span>
+                <span class="product-price num">{p.price === null ? "Precio al vender" : formatBs(p.price)}</span>
+                <span class="product-stock num">
+                  {p.stock === null ? "Sin control de stock" : p.stock === 0 ? "Sin stock" : `${p.stock} en stock`}
+                </span>
                 <span class="add play-btn" aria-hidden="true">
                   <Plus size={20} stroke-width={1.75} />
                 </span>
@@ -91,10 +93,13 @@ const { branch, business, products, currentShift: shift } = ctx;
 
 <script>
   import { actions } from "astro:actions";
-  const money = new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const formatBs = (n: number) => `Bs ${money.format(n)}`;
+  import { formatBs } from "@/lib/format";
 
-  const cart = new Map<string, { name: string; price: number; stock: number; qty: number }>();
+  // Una línea por producto; con precio al vender, una línea por prenda (cada una con su precio).
+  // price null: falta escribirlo. stock Infinity: sin control de stock.
+  type Line = { productId: string; name: string; price: number | null; open: boolean; stock: number; qty: number };
+  const cart = new Map<string, Line>();
+  let openLines = 0;
   const lines = document.querySelector<HTMLUListElement>("[data-cart-lines]")!;
   const emptyCart = document.querySelector<HTMLElement>("[data-cart-empty]")!;
   const total = document.querySelector<HTMLElement>("[data-total]")!;
@@ -112,11 +117,24 @@ const { branch, business, products, currentShift: shift } = ctx;
     return button;
   }
 
+  /** Campo de precio de una prenda: actualiza el total al escribir sin redibujar la línea (no pierde el foco). */
+  function priceInput(item: Line) {
+    const input = document.createElement("input");
+    Object.assign(input, { type: "number", inputMode: "decimal", step: "0.01", min: "0", placeholder: "Precio", className: "input line-price num" });
+    input.setAttribute("aria-label", `Precio de ${item.name}`);
+    if (item.price !== null) input.value = String(item.price);
+    input.addEventListener("input", () => {
+      item.price = Number(input.value) > 0 ? Number(input.value) : null;
+      total.textContent = formatBs([...cart.values()].reduce((a, l) => a + (l.price ?? 0) * l.qty, 0));
+    });
+    return input;
+  }
+
   function render() {
     lines.replaceChildren();
     let sum = 0;
     for (const [id, item] of cart) {
-      sum += item.price * item.qty;
+      sum += (item.price ?? 0) * item.qty;
       const li = document.createElement("li");
       const name = document.createElement("span");
       name.className = "line-name";
@@ -124,9 +142,11 @@ const { branch, business, products, currentShift: shift } = ctx;
       const qty = document.createElement("span");
       qty.className = "qty num";
       qty.textContent = String(item.qty);
-      const amount = document.createElement("span");
-      amount.className = "line-amount num";
-      amount.textContent = formatBs(item.price * item.qty);
+      const amount = item.open ? priceInput(item) : document.createElement("span");
+      if (!item.open) {
+        amount.className = "line-amount num";
+        amount.textContent = formatBs(item.price! * item.qty);
+      }
       const step = (delta: number) => () => {
         if (delta > 0 && item.qty >= item.stock) {
           notice.textContent = `Solo quedan ${item.stock} de ${item.name}.`;
@@ -152,16 +172,20 @@ const { branch, business, products, currentShift: shift } = ctx;
 
   for (const button of document.querySelectorAll<HTMLButtonElement>(".product")) {
     button.addEventListener("click", () => {
-      const { id, name, price } = button.dataset;
-      const item = cart.get(id!) ?? { name: name!, price: Number(price), stock: Number(button.dataset.stock), qty: 0 };
+      const { id, name, price, stock } = button.dataset;
+      const open = price === "";
+      const key = open ? `${id}#${++openLines}` : id!;
+      const item = cart.get(key) ?? { productId: id!, name: name!, price: open ? null : Number(price), open, stock: stock === "" ? Infinity : Number(stock), qty: 0 };
       if (item.qty >= item.stock) {
         notice.textContent = `Solo quedan ${item.stock} de ${item.name}.`;
         return;
       }
       item.qty += 1;
-      cart.set(id!, item);
+      cart.set(key, item);
       notice.textContent = "";
       render();
+      // La prenda recién agregada pide su precio enseguida.
+      if (open) lines.querySelector<HTMLInputElement>("li:last-child .line-price")?.focus();
     });
   }
 
@@ -171,12 +195,17 @@ const { branch, business, products, currentShift: shift } = ctx;
   });
 
   confirm.addEventListener("click", async () => {
+    const missing = [...cart.values()].find((l) => l.price === null);
+    if (missing) {
+      notice.textContent = `Escribe el precio de «${missing.name}».`;
+      return;
+    }
     confirm.disabled = clear.disabled = true;
     notice.textContent = "Guardando venta…";
     const { error } = await actions.registerSale({
       branchId: confirm.dataset.branch!,
       shiftId: confirm.dataset.shift!,
-      items: [...cart].map(([productId, item]) => ({ productId, qty: item.qty })),
+      items: [...cart.values()].map((l) => ({ productId: l.productId, qty: l.qty, ...(l.open && { price: l.price! }) })),
     });
     if (error) {
       notice.textContent = error.message;
@@ -236,14 +265,6 @@ const { branch, business, products, currentShift: shift } = ctx;
     padding-left: 2.75rem;
   }
 
-  .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
 
   .product-grid {
     display: grid;
@@ -388,6 +409,12 @@ const { branch, business, products, currentShift: shift } = ctx;
   }
 
   .cart-lines :global(.line-amount) {
+    text-align: right;
+  }
+
+  .cart-lines :global(.line-price) {
+    min-height: 2.25rem;
+    padding-block: 0.25rem;
     text-align: right;
   }
 

@@ -4,7 +4,8 @@
 // Sin turno abierto, invita a abrir uno. Los datos salen de shiftBarData() (src/data/queries.ts).
 import { Clock, LockOpen, Moon, Plus, Sun, Sunset, TriangleAlert } from "@lucide/astro";
 import type { ShiftBarData } from "@/data/queries";
-import { duration, formatBs, overnight, shiftProgress } from "@/lib/format";
+import { shiftProgress } from "@/lib/dates";
+import { duration, formatBs, overnight } from "@/lib/format";
 
 interface Props {
   data: ShiftBarData;
@@ -109,7 +110,8 @@ const here = Astro.url.pathname.replace(/\/$/, "");
 </aside>
 
 <script>
-  import { duration, shiftProgress } from "@/lib/format";
+  import { shiftProgress } from "@/lib/dates";
+  import { duration } from "@/lib/format";
 
   // El horario avanza solo: se recalcula cada minuto en hora de Bolivia.
   const box = document.querySelector<HTMLElement>("[data-shift-bar] [data-progress]");

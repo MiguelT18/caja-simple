@@ -46,6 +46,7 @@ export type Database = {
         Row: {
           created_at: string;
           id: string;
+          kind: Database["public"]["Enums"]["business_kind"];
           name: string;
           owner_id: string;
           plan: Database["public"]["Enums"]["plan"];
@@ -55,6 +56,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           id?: string;
+          kind?: Database["public"]["Enums"]["business_kind"];
           name: string;
           owner_id?: string;
           plan?: Database["public"]["Enums"]["plan"];
@@ -63,6 +65,7 @@ export type Database = {
         Update: {
           created_at?: string;
           id?: string;
+          kind?: Database["public"]["Enums"]["business_kind"];
           name?: string;
           owner_id?: string;
           plan?: Database["public"]["Enums"]["plan"];
@@ -237,27 +240,27 @@ export type Database = {
         Row: {
           branch_id: string;
           business_id: string;
-          min_stock: number;
-          price: number;
+          min_stock: number | null;
+          price: number | null;
           product_id: string;
-          stock: number;
+          stock: number | null;
         };
         ComputedFields: never;
         Insert: {
           branch_id: string;
           business_id: string;
-          min_stock?: number;
-          price: number;
+          min_stock?: number | null;
+          price?: number | null;
           product_id: string;
-          stock?: number;
+          stock?: number | null;
         };
         Update: {
           branch_id?: string;
           business_id?: string;
-          min_stock?: number;
-          price?: number;
+          min_stock?: number | null;
+          price?: number | null;
           product_id?: string;
-          stock?: number;
+          stock?: number | null;
         };
         Relationships: [
           {
@@ -673,8 +676,17 @@ export type Database = {
       };
     };
     Functions: {
+      change_my_shift: { Args: { p_employee: string; p_shift: string }; Returns: undefined };
       create_business: {
-        Args: { p_branch_address: string; p_branch_name: string; p_branch_slug: string; p_name: string; p_shifts: Json; p_slug: string };
+        Args: {
+          p_branch_address: string;
+          p_branch_name: string;
+          p_branch_slug: string;
+          p_kind?: Database["public"]["Enums"]["business_kind"];
+          p_name: string;
+          p_shifts: Json;
+          p_slug: string;
+        };
         Returns: string;
       };
       register_sale: { Args: { p_branch: string; p_items: Json; p_shift: string }; Returns: string };
@@ -692,9 +704,10 @@ export type Database = {
       };
     };
     Enums: {
+      business_kind: "tienda" | "ropa" | "restaurante";
       close_status: "en-curso" | "cerrado";
       employee_status: "activo" | "invitado";
-      notification_kind: "invitation" | "invitation_answer" | "cash_mismatch" | "low_stock";
+      notification_kind: "invitation" | "invitation_answer" | "cash_mismatch" | "low_stock" | "shift_change";
       plan: "Gratis" | "Negocio" | "Sucursales";
       shift_tone: "morning" | "afternoon" | "night";
     };
@@ -803,9 +816,10 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      business_kind: ["tienda", "ropa", "restaurante"],
       close_status: ["en-curso", "cerrado"],
       employee_status: ["activo", "invitado"],
-      notification_kind: ["invitation", "invitation_answer", "cash_mismatch", "low_stock"],
+      notification_kind: ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change"],
       plan: ["Gratis", "Negocio", "Sucursales"],
       shift_tone: ["morning", "afternoon", "night"],
     },

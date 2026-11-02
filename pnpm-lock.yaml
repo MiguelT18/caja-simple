@@ -13,7 +13,7 @@ importers:
         version: 7.1.2(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(jiti@2.7.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(yaml@2.9.1)
       '@astrojs/vercel':
         specifier: 11.0.17
-        version: 11.0.17(astro@7.4.4(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1))(react@19.3.1)
+        version: 11.0.17(astro@7.4.4(@upstash/redis@1.40.0)(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1))(react@19.3.1)
       '@fontsource-variable/plus-jakarta-sans':
         specifier: ^5.3.0
         version: 5.3.0
@@ -25,7 +25,7 @@ importers:
         version: 5.3.0
       '@lucide/astro':
         specifier: ^1.62.0
-        version: 1.62.0(astro@7.4.4(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1))
+        version: 1.62.0(astro@7.4.4(@upstash/redis@1.40.0)(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1))
       '@supabase/ssr':
         specifier: 0.12.7
         version: 0.12.7(@supabase/supabase-js@2.118.0)
@@ -41,9 +41,12 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
+      '@upstash/redis':
+        specifier: ^1.40.0
+        version: 1.40.0
       astro:
         specifier: ^7.4.4
-        version: 7.4.4(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1)
+        version: 7.4.4(@upstash/redis@1.40.0)(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1603,6 +1606,9 @@ packages:
 
   '@ungap/structured-clone@1.4.0':
     resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
+
+  '@upstash/redis@1.40.0':
+    resolution: {integrity: sha512-F6+V7Kof2McJtGWclusZLt7hBRmIMZg+albS32/5TuNRg/92FM2nkyKPY9wWEieMj9hjyUi4iURsN1djsHNbwA==}
 
   '@vercel/analytics@2.0.1':
     resolution: {integrity: sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g==}
@@ -3343,14 +3349,14 @@ snapshots:
       is-docker: 4.0.0
       package-manager-detector: 1.9.0
 
-  '@astrojs/vercel@11.0.17(astro@7.4.4(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1))(react@19.3.1)':
+  '@astrojs/vercel@11.0.17(astro@7.4.4(@upstash/redis@1.40.0)(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1))(react@19.3.1)':
     dependencies:
       '@astrojs/internal-helpers': 0.13.0
       '@vercel/analytics': 2.0.1(react@19.3.1)
       '@vercel/functions': 3.10.4
       '@vercel/nft': 1.11.0
       '@vercel/routing-utils': 6.6.1
-      astro: 7.4.4(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1)
+      astro: 7.4.4(@upstash/redis@1.40.0)(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1)
       rolldown: 1.2.15
       tinyglobby: 0.2.17
     transitivePeerDependencies:
@@ -3637,9 +3643,9 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@lucide/astro@1.62.0(astro@7.4.4(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1))':
+  '@lucide/astro@1.62.0(astro@7.4.4(@upstash/redis@1.40.0)(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
-      astro: 7.4.4(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1)
+      astro: 7.4.4(@upstash/redis@1.40.0)(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1)
 
   '@mapbox/node-pre-gyp@2.0.3':
     dependencies:
@@ -4704,6 +4710,10 @@ snapshots:
 
   '@ungap/structured-clone@1.4.0': {}
 
+  '@upstash/redis@1.40.0':
+    dependencies:
+      uncrypto: 0.1.3
+
   '@vercel/analytics@2.0.1(react@19.3.1)':
     optionalDependencies:
       react: 19.3.1
@@ -4867,7 +4877,7 @@ snapshots:
 
   aria-query@5.3.2: {}
 
-  astro@7.4.4(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1):
+  astro@7.4.4(@upstash/redis@1.40.0)(@vercel/functions@3.10.4)(jiti@2.7.0)(yaml@2.9.1):
     dependencies:
       '@astrojs/compiler-rs': 0.5.2
       '@astrojs/internal-helpers': 0.13.0
@@ -4914,7 +4924,7 @@ snapshots:
       tinyps: 0.5.1
       ultrahtml: 1.7.0
       unifont: 1.0.3
-      unstorage: 1.17.6(@vercel/functions@3.10.4)
+      unstorage: 1.17.6(@upstash/redis@1.40.0)(@vercel/functions@3.10.4)
       verkit: 0.5.0
       vite: 8.3.5(jiti@2.7.0)(yaml@2.9.1)
       vitefu: 1.1.3(vite@8.3.5(jiti@2.7.0)(yaml@2.9.1))
@@ -5985,7 +5995,7 @@ snapshots:
       unist-util-is: 6.0.1
       unist-util-visit-parents: 6.1.0
 
-  unstorage@1.17.6(@vercel/functions@3.10.4):
+  unstorage@1.17.6(@upstash/redis@1.40.0)(@vercel/functions@3.10.4):
     dependencies:
       anymatch: 3.1.3
       chokidar: 5.0.0
@@ -5996,6 +6006,7 @@ snapshots:
       ofetch: 1.5.1
       ufo: 1.6.4
     optionalDependencies:
+      '@upstash/redis': 1.40.0
       '@vercel/functions': 3.10.4
 
   uri-js@4.4.1:

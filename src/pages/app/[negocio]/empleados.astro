@@ -20,7 +20,9 @@ const rows = employees.map((e) => {
     name: fullName(e),
     email: e.email,
     role: e.jobTitle,
+    branchId: e.branchId,
     branch: branchById(e.branchId)?.name ?? "—",
+    shiftId: e.shiftId ?? undefined,
     shift: shift && { name: shift.name, tone: shift.tone },
     active: e.status === "activo",
   };
@@ -98,7 +100,12 @@ const rows = employees.map((e) => {
     </div>
   </Modal>
 
-  <EmployeesTable client:visible rows={rows} />
+  <EmployeesTable
+    client:visible
+    rows={rows}
+    branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+    shifts={shifts.map((s) => ({ id: s.id, branchId: s.branchId, name: s.name, start: s.start, end: s.end, tone: s.tone }))}
+  />
 </Layout>
 
 <script>
@@ -452,12 +459,4 @@ const rows = employees.map((e) => {
     cursor: default;
   }
 
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
 </style>

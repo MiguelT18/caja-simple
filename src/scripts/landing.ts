@@ -1,7 +1,7 @@
+import { formatBs } from "@/lib/format";
 import { SKY_END, SKY_START, skyPoint } from "./sky";
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const money = new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - 2 ** (-10 * t));
 
 // Los turnos se encienden al entrar en vista y se apagan al salir, así vuelven a encenderse
@@ -66,11 +66,11 @@ if (!reduceMotion) {
   // Montos de la tarjeta del hero: cuentan desde 0 hasta el valor que ya trae el HTML.
   for (const el of document.querySelectorAll<HTMLElement>("[data-count]")) {
     const target = Number(el.dataset.count);
-    const sign = el.dataset.sign ?? "";
+    const sign = el.dataset.sign as "+" | "−" | undefined;
     const start = performance.now() + Number(el.dataset.delay ?? 0);
     const tick = (now: number) => {
       const t = Math.min(1, Math.max(0, (now - start) / 900));
-      el.textContent = `${sign}Bs ${money.format(target * easeOutExpo(t))}`;
+      el.textContent = formatBs(target * easeOutExpo(t), sign);
       if (t < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

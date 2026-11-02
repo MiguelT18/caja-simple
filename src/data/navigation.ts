@@ -1,4 +1,5 @@
 import { BriefcaseBusiness, ChartColumn, Clock, LayoutDashboard, Package, Store, Users, Wallet, Boxes, Settings, UserRound } from "@lucide/astro";
+import { catalogLabel } from "./kinds";
 import type { Branch } from "./types";
 import { branchHref, businessHref, type Membership } from "./queries";
 
@@ -35,7 +36,7 @@ export function appNav(m?: Membership, branch?: Branch) {
       items: [
         { label: "Resumen del negocio", href: base, icon: ChartColumn },
         { label: "Sucursales", href: `${base}/sucursales`, icon: Store },
-        { label: "Catálogo", href: `${base}/catalogo`, icon: Package },
+        { label: catalogLabel(m.business.kind), href: `${base}/catalogo`, icon: Package },
         { label: "Empleados", href: `${base}/empleados`, icon: Users },
         { label: "Configuración", href: `${base}/configuracion`, icon: Settings },
       ],

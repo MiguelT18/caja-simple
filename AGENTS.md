@@ -53,7 +53,7 @@ src/
 │   ├── app/          # la app con sesión: /app (Tus negocios), /app/cuenta, /app/[negocio]/…, /app/[negocio]/sucursales/[sucursal]/… (ver docs/modelo-de-datos.md)
 │   ├── auth/         # /auth/iniciar-sesion, /auth/crear-cuenta, /auth/verificar (código de la 2FA)
 │   └── api/auth/     # login, signup, google, callback, verify, logout (endpoints de Supabase Auth)
-├── actions/          # Astro Actions: todas las escrituras de /app (validan con zod; RLS autoriza)
+├── actions/          # Astro Actions: todas las escrituras de /app (validan con zod; RLS autoriza). index.ts las junta; un archivo por dominio (businesses, shifts, sales, products, employees, account) y shared.ts (validadores, errores, fotos)
 ├── middleware.ts     # cliente de Supabase por petición, sesión y protección de /app
 ├── layouts/
 │   ├── Layout.astro      # app: <body class="app-surface">, Sidebar + <main> en paneles y, en una sucursal, la barra del turno
@@ -61,11 +61,15 @@ src/
 │   └── AuthLayout.astro  # acceso: <body class="auth-surface">, pizarra + formulario, carga auth-form.ts
 ├── components/       # Sidebar (con la biblioteca de sucursales), PageHeader (encabezado con degradado), ContextSwitcher, NotificationBell, UserCard, ThemeToggle, Logo, BaseHead; app/ = ShiftBar, MediaCard, BranchCard, Modal, FormInput…; auth/ = pizarra y campos; landing/
 ├── data/
-│   ├── queries.ts    # única entrada a los datos para las páginas: negocios, rol, contexto de negocio/sucursal
+│   ├── queries.ts    # única entrada a los datos para las páginas: solo re-exporta los módulos de abajo
+│   ├── session.ts    # sesión: perfil, negocios, rol y avisos (la carga el middleware)
+│   ├── branch.ts · business.ts # contexto de una página de sucursal (y la barra del turno) / del negocio
+│   ├── cash.ts       # cuentas puras: esperado en caja, estado de la caja, totales
+│   ├── shared.ts · mappers.ts · routes.ts # consultas comunes (movimientos, cierres, fotos firmadas) · filas → tipos · rutas de /app
 │   ├── navigation.ts # enlaces del Sidebar según rol (agrega aquí las rutas nuevas de /app)
 │   ├── types.ts      # tipos de dominio (Business, Branch, Product…)
 │   └── plans.ts      # planes y precios orientativos
-├── lib/              # supabase.ts (cliente de servidor), database.types.ts (generado), auth.ts, format.ts
+├── lib/              # supabase.ts (cliente de servidor), cache.ts (Redis de Upstash; opcional), database.types.ts (generado), auth.ts, format.ts (dinero y texto), dates.ts (hora de Bolivia)
 ├── scripts/          # JS del navegador: auth-form.ts (validación y envío), action-forms.ts (formularios → Actions), nav-skeleton.ts (esqueleto al navegar en /app), auth-board.ts
 └── styles/
     ├── tokens.css    # todos los valores de diseño; colores con light-dark()
@@ -95,6 +99,7 @@ Fuera de `src/`: `supabase/migrations/` (esquema), `supabase/functions/send-push
   - `aria-*` correctos en los controles personalizados (popover, menú, toggles).
 - **Datos falsos:** no inventes clientes, métricas ni testimonios. Si hace falta mostrar algo, rotúlalo como «Ejemplo».
 - **Datos y permisos:** las páginas leen solo por `src/data/queries.ts` y escriben solo por `src/actions/`. La autorización real es RLS en la base (ver `docs/modelo-de-datos.md`): nunca la reemplaces con chequeos en el cliente. Cambios de esquema, siempre con una migración nueva. Toda tabla nueva lleva RLS y la política restrictiva «Exige la verificación en dos pasos» (`private.mfa_ok()`).
+- **Caché (Redis):** solo lo que cambia poco (sesión, catálogo, turnos, equipo, URLs firmadas), con clave por persona. Caja, stock y avisos nunca van a la caché. El middleware la invalida tras cada Action; si una Action nueva solo toca datos frescos, agrégala a `LIVE_ACTIONS` en `src/middleware.ts`. Ver `docs/modelo-de-datos.md` › Caché.
 - **Formularios de /app:** en páginas Astro, `<form data-action="nombreDeLaAccion">` con `FormInput` y `Modal` (`src/components/app/`); en islas React, `actions.x()` directo.
 
 ## Herramientas

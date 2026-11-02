@@ -1,7 +1,8 @@
 import type { APIRoute } from "astro";
+import { rateLimit } from "@/lib/cache";
 import { authMessage, authResponse } from "@/lib/auth";
 
-export const POST: APIRoute = async ({ request, locals, url }) => {
+export const POST: APIRoute = async ({ request, locals, url, clientAddress }) => {
   const form = await request.formData();
   const firstName = String(form.get("firstName") ?? "").trim();
   const lastName = String(form.get("lastName") ?? "").trim();
@@ -10,6 +11,8 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
   const back = "/auth/crear-cuenta";
   if (!firstName || !lastName || !email) return authResponse(request, { back, message: "Completa todos los campos." });
   if (password.length < 8) return authResponse(request, { back, message: "La contraseña debe tener al menos 8 caracteres." });
+
+  if (!(await rateLimit(`signup:ip:${clientAddress}`, 5, 60 * 60))) return authResponse(request, { back, message: "Demasiados intentos. Espera unos minutos y vuelve a intentar." });
 
   const { data, error } = await locals.supabase.auth.signUp({
     email,
