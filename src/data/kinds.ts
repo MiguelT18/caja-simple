@@ -3,8 +3,8 @@ import type { BusinessKind } from "./types";
 
 export const businessKinds: { value: BusinessKind; label: string; hint: string }[] = [
   { value: "tienda", label: "Tienda o almacén", hint: "Productos con precio y stock." },
-  { value: "ropa", label: "Ropa americana", hint: "Prendas con precio al vender y fardos." },
-  { value: "restaurante", label: "Restaurante", hint: "Menú sin stock y pedidos por mesa." },
+  { value: "ropa", label: "Ropa americana", hint: "Prendas con precio que se escribe al vender." },
+  { value: "restaurante", label: "Restaurante", hint: "El catálogo se llama Menú; platos sin control de stock." },
 ];
 
 /** Opciones del campo «Rubro» para FormInput. */

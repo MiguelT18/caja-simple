@@ -5,10 +5,10 @@ import BranchDialogs from "@/components/app/BranchDialogs.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
-import { kindOptions } from "@/data/kinds";
-import { businessContext, businessHref } from "@/data/queries";
+import { businessKinds, catalogLabel, kindOptions } from "@/data/kinds";
+import { businessContext, businessHref, currentUser } from "@/data/queries";
 import { planLimits } from "@/data/plans";
-import { plural } from "@/lib/format";
+import { initials, plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
@@ -30,26 +30,62 @@ const usage = [
   },
   { label: "Aviso de caja descuadrada", value: limits.cashAlerts ? "Sí" : "No incluido", ok: limits.cashAlerts },
 ];
+const user = currentUser(Astro.locals);
+// Lo único que cambia el rubro en la app: cómo se llama el catálogo (ver docs/modelo-de-datos.md › Rubros).
+const catalogLabels = JSON.stringify(Object.fromEntries(businessKinds.map((k) => [k.value, catalogLabel(k.value)])));
 const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleados asignados";
 ---
 
 <Layout title={`Configuración · ${business.name}`} context={{ membership: ctx.membership }}>
-  <PageHeader title="Configuración" description={`Datos, sucursales y plan de ${business.name}.`} />
+  <PageHeader title="Configuración" description={`Datos, sucursales y plan de ${business.name}. Lo tuyo (foto, contraseña) está en Tu cuenta.`} />
 
   <div class="settings">
+    <a href="/app/cuenta" class="account-link">
+      {
+        user.avatarUrl ? (
+          <img class="account-avatar skeleton" src={user.avatarUrl} alt="" width="48" height="48" />
+        ) : (
+          <span class="account-avatar avatar-initials" aria-hidden="true">
+            {initials(user.firstName, user.lastName || user.email)}
+          </span>
+        )
+      }
+      <span class="account-text">
+        <span class="account-title">Tu cuenta</span>
+        <span class="row-meta">Tu foto, tu contraseña, la verificación en dos pasos y los avisos en este teléfono. Valen para todos tus negocios.</span>
+      </span>
+      <span class="btn btn-secondary account-btn" aria-hidden="true">
+        Ir a tu cuenta
+        <ArrowRight size={18} stroke-width={2} />
+      </span>
+    </a>
+
     <section class="card block" aria-labelledby="business-title">
       <div class="block-head">
         <h2 class="card-title" id="business-title">Negocio</h2>
       </div>
-      <form id="business-form" class="business-form" data-action="saveBusiness" novalidate>
+      <form
+        id="business-form"
+        class="business-form"
+        data-action="saveBusiness"
+        data-track-changes
+        data-success="Cambios guardados."
+        data-kind-from={business.kind}
+        data-catalog-labels={catalogLabels}
+        novalidate
+      >
         <input type="hidden" name="id" value={business.id} />
         <FormInput form="business-form" name="name" label="Nombre del negocio" value={business.name} required maxlength={80} />
-        <FormInput form="business-form" name="kind" label="Rubro" options={kindOptions(business.kind)} hint="Cambia los textos y las secciones de la app; tus datos no cambian." />
+        <FormInput form="business-form" name="kind" label="Rubro" options={kindOptions(business.kind)} hint="Solo cambia cómo se llaman algunas secciones. Tus productos, precios, stock y ventas no cambian." />
+        <p class="notice kind-effect" aria-live="polite" data-kind-effect></p>
         <p class="field-hint">
           Dirección en la app: <span class="slug">{base}</span>. No cambia al renombrar, así tus enlaces siguen funcionando.
         </p>
         <p class="notice notice-error" role="alert" data-form-notice></p>
-        <button type="submit" class="btn btn-primary">Guardar</button>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Guardar cambios</button>
+          <span class="change-status" data-change-status>Sin cambios</span>
+        </div>
       </form>
     </section>
 
@@ -124,13 +160,6 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
       {limits.historyDays !== null && <p class="field-hint">Lo anterior no se borra: vuelve a aparecer cuando pasas a un plan pago.</p>}
     </section>
 
-    <a href="/app/cuenta" class="card block account-link">
-      <span>
-        <span class="row-title">Tu cuenta</span>
-        <span class="row-meta">Tu foto, tu contraseña, la verificación en dos pasos y los avisos en tu teléfono.</span>
-      </span>
-      <ArrowRight size={18} stroke-width={2} />
-    </a>
 
     <section class="card block danger" aria-labelledby="danger-title">
       <div class="block-head">
@@ -143,8 +172,8 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
             branchSummary.map(({ branch }) => (
               <li>
                 <div class="row-text">
-                  <p class="row-title">Sucursal {branch.name}</p>
-                  <p class="row-meta">Se borran {lost}.</p>
+                  <p class="row-title">{branch.name}</p>
+                  <p class="row-meta">Sucursal · se borran {lost}.</p>
                 </div>
                 <button type="button" class="btn btn-secondary danger-btn" data-open-dialog={`delete-branch-${branch.id}`}>
                   <Trash size={16} stroke-width={1.75} />
@@ -155,9 +184,9 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
         }
         <li>
           <div class="row-text">
-            <p class="row-title">Negocio {business.name}</p>
+            <p class="row-title">{business.name}</p>
             <p class="row-meta">
-              Se borran sus {plural(branchSummary.length, "sucursal", "sucursales")}, el catálogo y todo su historial. Tus empleados pierden el acceso.
+              Negocio · se borran sus {plural(branchSummary.length, "sucursal", "sucursales")}, el catálogo y todo su historial. Tus empleados pierden el acceso.
             </p>
           </div>
           <button type="button" class="btn btn-secondary danger-btn" data-open-dialog="delete-business">
@@ -202,6 +231,32 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     <FormInput form="delete-business-form" name="confirm" label={`Escribe «${business.name}» para confirmar`} autocomplete="off" required />
   </Modal>
 </Layout>
+
+<script>
+  // Qué pasa al cambiar el rubro: se dice antes de guardar, y solo si de verdad cambia algo.
+  const form = document.querySelector<HTMLFormElement>("#business-form");
+  const effect = form?.querySelector<HTMLElement>("[data-kind-effect]");
+  const kind = form?.querySelector<HTMLSelectElement>("[name=kind]");
+  if (form && effect && kind) {
+    const from = form.dataset.kindFrom!;
+    const labels: Record<string, string> = JSON.parse(form.dataset.catalogLabels!);
+    const show = () => {
+      const to = kind.value;
+      const lines =
+        to === from
+          ? []
+          : [
+              labels[to] !== labels[from]
+                ? `Al guardar, «${labels[from]}» pasa a llamarse «${labels[to]}» en el menú lateral y en su página. Tus productos, precios, stock y ventas siguen igual.`
+                : "Al guardar, solo cambia el rubro del negocio: las secciones y tus datos siguen igual.",
+              ...(to === "ropa" ? ["Los tipos de prenda de ejemplo solo se crean al abrir un negocio nuevo; agrégalos en el catálogo si los necesitas."] : []),
+            ];
+      effect.replaceChildren(...lines.map((text) => Object.assign(document.createElement("span"), { textContent: text })));
+    };
+    form.addEventListener("formchange", show);
+    show();
+  }
+</script>
 
 <style>
   .settings {
@@ -316,21 +371,99 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     font-weight: var(--font-semibold);
   }
 
+  /* Tu cuenta: arriba y con identidad, para que no se pierda entre los ajustes del negocio. Toda la fila es el enlace. */
   .account-link {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-panel);
+    background: var(--color-surface-muted);
     color: inherit;
     text-decoration: none;
+    transition: background-color 150ms;
   }
 
-  .account-link > span {
+  .account-link:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .account-avatar {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  span.account-avatar {
+    display: grid;
+    place-items: center;
+    background: var(--color-primary-soft);
+    color: var(--color-text);
+    font-weight: var(--font-extrabold);
+  }
+
+  .account-text {
     display: grid;
     gap: 0.125rem;
   }
 
-  .account-link:hover {
-    border-color: var(--color-border-strong);
+  .account-title {
+    font-weight: var(--font-bold);
+  }
+
+  .account-link:hover .account-btn {
+    border-color: var(--color-text);
+  }
+
+  .form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+  }
+
+  .business-form .form-actions .btn {
+    justify-self: auto;
+  }
+
+  .change-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  /* Con cambios: el texto lo dice y el punto ámbar solo acompaña. */
+  [data-dirty] .change-status {
+    color: var(--color-text);
+    font-weight: var(--font-semibold);
+  }
+
+  [data-dirty] .change-status::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--color-primary);
+  }
+
+  .kind-effect:not(:empty) {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  @media (max-width: 560px) {
+    .account-link {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .account-btn {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
   }
 
   .danger {

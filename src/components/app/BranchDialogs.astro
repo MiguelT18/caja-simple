@@ -39,10 +39,21 @@ const shiftPresets = [
         action="saveBranch"
         submitLabel="Guardar"
         enctype="multipart/form-data"
+        trackChanges={!!branch}
+        success={branch ? "Sucursal guardada." : "Sucursal agregada."}
         hidden={{ businessId: business.id, id: branch?.id }}
       >
-        <FormInput form={form} name="name" label="Nombre" value={branch?.name} placeholder="Ej.: Sucursal Norte" required maxlength={80} />
-        <FormInput form={form} name="address" label="Dirección" value={branch?.address} hint="Opcional" maxlength={160} />
+        <FormInput
+          form={form}
+          name="name"
+          label="Nombre de la sucursal"
+          value={branch?.name}
+          placeholder="Ej.: Centro"
+          hint={`Cómo la reconoce tu equipo: la zona, la calle o un lugar conocido. Por ejemplo: Centro, Mercado Rodríguez, Av. Busch o Sopocachi.${branch ? " Su dirección web no cambia al renombrarla." : ""}`}
+          required
+          maxlength={80}
+        />
+        <FormInput form={form} name="address" label="Dirección" value={branch?.address} hint="Opcional. Ayuda a tu equipo y aparece bajo el nombre en el menú lateral." maxlength={160} />
         <PhotoField form={form} label="Foto de la fachada" image={stats?.image} />
         {!branch && <ShiftsEditor form={form} presets={shiftPresets} />}
       </Modal>

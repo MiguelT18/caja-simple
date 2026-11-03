@@ -14,16 +14,20 @@ interface Props {
   enctype?: string;
   /** El botón de envío en rojo: para eliminar. */
   danger?: boolean;
+  /** «Guardar» deshabilitado mientras no haya cambios (ver scripts/action-forms.ts). */
+  trackChanges?: boolean;
+  /** Mensaje del toast tras guardar. */
+  success?: string;
 }
 
-const { id, title, description, action, submitLabel, redirect, confirm, hidden = {}, enctype, danger } = Astro.props;
+const { id, title, description, action, submitLabel, redirect, confirm, hidden = {}, enctype, danger, trackChanges, success } = Astro.props;
 ---
 
-<dialog id={id} class="modal" aria-labelledby={`${id}-title`}>
-  <form id={`${id}-form`} class="modal-form" method="dialog" data-action={action} data-redirect={redirect} data-confirm={confirm} enctype={enctype} novalidate>
+<dialog id={id} class="modal" aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-desc` : undefined}>
+  <form id={`${id}-form`} class="modal-form" method="dialog" data-action={action} data-redirect={redirect} data-confirm={confirm} data-track-changes={trackChanges || undefined} data-success={success} enctype={enctype} novalidate>
     <header class="modal-head">
       <h2 id={`${id}-title`}>{title}</h2>
-      {description && <p>{description}</p>}
+      {description && <p id={`${id}-desc`}>{description}</p>}
     </header>
     {Object.entries(hidden).map(([name, value]) => value !== undefined && <input type="hidden" name={name} value={value} />)}
     <slot />
