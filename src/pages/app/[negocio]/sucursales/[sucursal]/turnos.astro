@@ -1,5 +1,5 @@
 ---
-import { CircleCheck, LockOpen, Pencil, Plus, Trash, TriangleAlert } from "@lucide/astro";
+import { CircleCheck, Clock, LockOpen, Pencil, Plus, Trash, TriangleAlert } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import FormInput from "@/components/app/FormInput.astro";
@@ -7,7 +7,7 @@ import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
 import { branchColor, branchContext, businessHref, shiftBarData, fullName } from "@/data/queries";
 import { differenceLabel, formatBs, initials, overnight, shiftHours } from "@/lib/format";
-import { addDays, longDate } from "@/lib/dates";
+import { addDays, inShiftWindow, longDate, openFrom } from "@/lib/dates";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
@@ -40,6 +40,9 @@ const tones = [
       shifts.map((shift) => {
         const t = shiftTotals(shift.id);
         const staff = employees.filter((e) => e.shiftId === shift.id);
+        // Fuera de horario solo abre quien administra, y confirmándolo; la base lo exige igual (check_shift_schedule).
+        const onSchedule = inShiftWindow(shift);
+        const schedule = `${openFrom(shift)} a ${shift.end}`;
         return (
           <article class:list={["card shift", { live: t.close.status === "en-curso" }]}>
             <header class="shift-head">
@@ -134,8 +137,26 @@ const tones = [
             {t.close.status === "pendiente" &&
               (currentShift ? (
                 <p class="muted">Cierra el turno {currentShift.name.toLowerCase()} antes de abrir este.</p>
+              ) : !onSchedule && !isOwner ? (
+                <p class="status chip-neutral">
+                  <Clock size={16} stroke-width={2} />
+                  <span>
+                    Se abre de <span class="num">{schedule}</span>. Fuera de ese horario, solo quien administra el negocio puede abrirlo.
+                  </span>
+                </p>
               ) : (
-                <form id={`open-${shift.id}`} class="inline-form" data-action="openShift" novalidate>
+                <form
+                  id={`open-${shift.id}`}
+                  class="inline-form"
+                  data-action="openShift"
+                  data-confirm={
+                    onSchedule
+                      ? undefined
+                      : `Estás fuera del horario del turno ${shift.name.toLowerCase()} (se abre de ${schedule}). Las ventas y los gastos que registres contarán en este turno. ¿Abrirlo igual?`
+                  }
+                  data-confirm-label="Abrir fuera de horario"
+                  novalidate
+                >
                   <input type="hidden" name="branchId" value={branch.id} />
                   <input type="hidden" name="shiftId" value={shift.id} />
                   <FormInput

@@ -62,6 +62,22 @@ export function boliviaNow(at = new Date()) {
 
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
+/** Minutos antes de empezar desde los que ya se puede abrir un turno (igual que private.in_shift_window). */
+export const OPEN_EARLY_MIN = 15;
+
+/** ¿Se puede abrir el turno ahora? Desde OPEN_EARLY_MIN antes de empezar hasta la hora de cierre, cruzando la medianoche. */
+export function inShiftWindow(s: { start: string; end: string }, now = boliviaNow()) {
+  const from = minutesOf(s.start) - OPEN_EARLY_MIN;
+  const wrap = (m: number) => (m + 2880) % 1440;
+  return wrap(now.minutes - from) < wrap(minutesOf(s.end) - from);
+}
+
+/** Hora (HH:MM) desde la que se puede abrir el turno. */
+export const openFrom = (s: { start: string }) => {
+  const m = (minutesOf(s.start) - OPEN_EARLY_MIN + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
+
 /**
  * Cuánto va del horario de un turno abierto el día `openedOn` (cruza la medianoche si termina antes de empezar).
  * `elapsed` se queda entre 0 y `total`; `late` dice si ya pasó la hora de cierre.
