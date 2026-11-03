@@ -48,11 +48,7 @@ const tones = [
               </span>
               {t.close.status === "en-curso" && (
                 <span class="live-label">
-                  <span class="eq" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                  </span>
+                  <span class="live-dot" aria-hidden="true" />
                   {t.openedOn === today ? "En curso" : `En curso desde el ${t.openedOn.split("-").reverse().join("/")}`}
                 </span>
               )}

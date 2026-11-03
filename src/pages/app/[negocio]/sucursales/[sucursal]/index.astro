@@ -105,11 +105,7 @@ const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural
               </p>
             ) : t.close.status === "en-curso" ? (
               <p class="status status-live">
-                <span class="eq" aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
-                </span>
+                <span class="live-dot" aria-hidden="true" />
                 Turno en curso
               </p>
             ) : t.close.difference === 0 ? (

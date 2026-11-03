@@ -235,51 +235,42 @@
 	gap: 1rem;
 }
 
-/* Barras de ecualizador: acompañan a «En curso» (el texto siempre está). Quietas con movimiento reducido. */
-.eq {
-	display: inline-flex;
-	align-items: flex-end;
-	gap: 2px;
-	width: 0.875rem;
-	height: 0.875rem;
-}
-
-.eq > span {
-	flex: 1;
-	height: 40%;
-	border-radius: 1px;
+/* Punto vivo: acompaña a «En curso» (el texto siempre está), como la luz de un equipo encendido.
+   Un anillo se expande y se apaga; quieto con movimiento reducido. */
+.live-dot {
+	position: relative;
+	display: inline-block;
+	flex-shrink: 0;
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 50%;
 	background: currentColor;
 }
 
-.eq > span:nth-child(2) {
-	height: 100%;
-}
-
-.eq > span:nth-child(3) {
-	height: 65%;
+.live-dot::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: currentColor;
+	opacity: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.eq > span {
-		animation: eq 900ms ease-in-out infinite alternate;
-	}
-
-	.eq > span:nth-child(2) {
-		animation-delay: -300ms;
-	}
-
-	.eq > span:nth-child(3) {
-		animation-delay: -600ms;
+	.live-dot::after {
+		animation: live-ping 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 	}
 }
 
-@keyframes eq {
+@keyframes live-ping {
 	from {
-		height: 25%;
+		opacity: 0.45;
+		scale: 1;
 	}
 
 	to {
-		height: 100%;
+		opacity: 0;
+		scale: 2.6;
 	}
 }
 

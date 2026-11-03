@@ -1,5 +1,5 @@
 ---
-import { ArrowLeftRight, Bell, PackageMinus, TriangleAlert, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
+import { ArrowLeftRight, Bell, BellOff, PackageMinus, TriangleAlert, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
 import type { HTMLAttributes } from "astro/types";
 import { inbox } from "@/data/queries";
 import type { Notification } from "@/data/types";
@@ -87,9 +87,13 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
 
     {
       notifications.length === 0 ? (
-        <p class="bell-empty">
-          No tienes avisos. Aquí te llegan las invitaciones a un negocio y, si eres dueña, los descuadres de caja, el stock bajo y los cambios de turno de tu equipo.
-        </p>
+        <div class="bell-empty">
+          <span class="bell-empty-icon" aria-hidden="true">
+            <BellOff size={24} stroke-width={1.75} />
+          </span>
+          <p class="bell-empty-title">No tienes avisos</p>
+          <p>Aquí verás invitaciones, descuadres de caja, stock bajo y cambios de turno.</p>
+        </div>
       ) : (
         <ul class="bell-list" role="list">
           {notifications.map((n) => {
@@ -280,10 +284,34 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
   }
 
   .bell-empty {
-    margin: 0;
-    padding: 1.25rem 1rem;
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+    padding: 2rem 1.5rem;
     color: var(--color-text-muted);
     font-size: var(--text-sm);
+    text-align: center;
+  }
+
+  .bell-empty p {
+    margin: 0;
+    max-width: 18rem;
+  }
+
+  .bell-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 0.5rem;
+    border-radius: 50%;
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+  }
+
+  .bell-empty-title {
+    color: var(--color-text);
+    font-weight: 600;
   }
 
   .bell-list {

@@ -123,7 +123,9 @@ export function shiftBarData(ctx: NonNullable<Awaited<ReturnType<typeof branchCo
     saleHref: href("registrar-venta"),
     shift: { name: shift.name, tone: shift.tone, start: shift.start, end: shift.end },
     openedOn: totals.openedOn,
+    opening: totals.close.opening,
     sales: totals.sales,
+    expenses: totals.expenses,
     expected: totals.expected,
   };
 }

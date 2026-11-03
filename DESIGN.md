@@ -4,7 +4,7 @@ Tono cálido y cercano, con modo claro y oscuro. Los valores base viven en `src/
 
 ## Reglas
 
-- **El acento es escaso.** `--color-primary` (ámbar) se reserva para la acción principal, el ítem activo, el progreso y el logo. Lo que guía la vista son los colores con significado.
+- **El acento es escaso.** `--color-primary` (ámbar) se reserva para la acción principal, el ítem activo, la señal «En curso» y el logo. Lo que guía la vista son los colores con significado.
 - **Nada se comunica solo con color.** Los montos llevan signo (`+` / `−`), las alertas llevan ícono y los turnos su nombre escrito.
 - **Montos:** ingreso → `--color-income` con `+`; gasto → `--color-expense` con `−`; saldo → `--color-text`, y en `--color-expense` solo si es negativo. Siempre con la clase `.num` (cifras tabulares).
 - **Advertencias** (stock bajo, caja descuadrada) → `--color-warning` sobre `--color-warning-soft` y con ícono, para no confundirlas con el ámbar de marca.
@@ -69,10 +69,10 @@ Tono cálido y cercano, con modo claro y oscuro. Los valores base viven en `src/
 | `--color-surface-muted` | `#F3F0EB` | `#221E1B` | Superficie elevada: tarjetas, inputs, ítem activo |
 | `--color-surface-hover` | `#E9E5DF` | `#2C2723` | Hover de filas y tarjetas, sucursal actual, arte sin tono |
 | `--color-border` | `#E4DFD8` | `#2A2522` | Línea bajo el encabezado de tabla, divisores de cifras |
-| `--color-border-strong` | `#8A8077` | `#7D736A` | Bordes de inputs y botón secundario (≥3:1 sobre panel y elevada), pista del progreso |
+| `--color-border-strong` | `#8A8077` | `#7D736A` | Bordes de inputs y botón secundario (≥3:1 sobre panel y elevada) |
 | `--color-text` / `-muted` / `-subtle` | `#1A1613` / `#5C544C` / `#6F665E` | `#F5F1EC` / `#B3A99E` / `#8F857B` | Texto (≥4.5:1 sobre panel y elevada) |
 
-Marca, significado, turnos y sucursales no cambian. En la app el ámbar va en el botón redondo de acción (`.play-btn`), el ícono del ítem activo, el nombre de la sucursal actual, la barra de progreso del turno y el anillo del turno abierto.
+Marca, significado, turnos y sucursales no cambian. En la app el ámbar va en el botón redondo de acción (`.play-btn`), el ícono del ítem activo, el nombre de la sucursal actual, el punto de «En curso» y el anillo del turno abierto.
 
 ## Tipografía
 
@@ -114,6 +114,8 @@ Se usan los componentes de [Lucide](https://lucide.dev/icons) vía `@lucide/astr
 
 El mundo de la app es el de un reproductor de música con la marca de Caja Simple: suelo oscuro, paneles redondeados, píldoras, botones redondos y arte cuadrado para cosas (círculo para personas). Nada de la marca de Spotify: ni su verde, ni su logo, ni su tipografía.
 
+- **Del reproductor se toma la forma, nunca sus metáforas de audio.** Paneles, barra fija abajo, arte cuadrado y píldoras sí; tiempos de canción, ecualizadores, reproducir/pausar o listas con duración, no. Cada pieza muestra datos de la caja: montos, turnos, stock.
+
 - **Shell** (`Layout.astro`): `<body>` es una grilla de `18.5rem | 1fr` a toda la altura (`100dvh`) sobre `--color-bg`, con `0.5rem` de separación y de margen. A la izquierda la navegación; a la derecha `<main>`, un panel `--color-surface` con `--radius-panel` (8px) y su propio scroll. En una sucursal se suma abajo, a todo el ancho, la barra del turno.
 - **Sin bordes ni sombras en los paneles:** se separan por el tono del suelo. Las sombras quedan para lo que flota: popovers, modales, la barra del turno en móvil y el arte de tarjetas y portadas.
 - **Móvil (≤768px):** desaparece el suelo; todo queda sobre `--color-surface`, la navegación pasa a barra superior fija y la barra del turno a mini-reproductor fijo abajo.
@@ -142,16 +144,16 @@ El mundo de la app es el de un reproductor de música con la marca de Caja Simpl
 
 ## Barra del turno
 
-`src/components/app/ShiftBar.astro`, abajo en toda página de sucursal (`Layout` la muestra si recibe `context.shift`; los datos salen de `shiftBarData()` en `queries.ts`). Es el reproductor: el turno abierto «suena» siempre.
+`src/components/app/ShiftBar.astro`, abajo en toda página de sucursal (`Layout` la muestra si recibe `context.shift`; los datos salen de `shiftBarData()` en `src/data/branch.ts`). Tiene la forma de la barra de un reproductor, pero lo que muestra siempre es la caja del turno abierto.
 
 - **Escritorio:** sobre `--color-bg`, sin panel, en tres columnas.
-  - **Izquierda:** el arte del turno (3.5rem, ícono sol, atardecer o luna sobre el `-soft` de su turno), «Turno mañana», y debajo «En curso» en ámbar con las barras `.eq` y el nombre de la sucursal.
-  - **Centro:** el horario como el tiempo de una canción: inicio, pista de 4px (`--color-border-strong`) con el relleno ámbar y fin (`+1` si termina al día siguiente). Es un `role="progressbar"` con `aria-valuetext` («2 h 10 min de 8 h»). `shiftProgress()` (`format.ts`) lo calcula en hora de Bolivia (`boliviaNow()`) y se actualiza cada minuto. Pasada la hora de cierre aparece «Pasó la hora de cierre» en `--color-warning` con ícono.
-  - **Derecha:** «Ventas» y «Esperado en caja» (`dl`, 700) y el `.play-btn` con `+` y «Registrar venta». A ≤1180px el texto del botón queda solo para lectores de pantalla; a ≤960px se oculta «Ventas».
+  - **Izquierda:** el arte del turno (3.5rem, ícono sol, atardecer o luna sobre el `-soft` de su turno), «Turno mañana» y, debajo, la línea de estado: `.live-dot` + «En curso» en ámbar · horario («07:00–14:00», `(+1)` si termina al día siguiente) · sucursal. Pasada la hora de cierre, la línea cambia a «Pasó la hora de cierre (14:00)» en `--color-warning` con ícono. `shiftProgress()` (`src/lib/dates.ts`) lo decide en hora de Bolivia y se revisa cada minuto.
+  - **Centro:** la cuenta del turno, como en el mostrador: Apertura · Ventas (`+`, `--color-income`) · Gastos (`−`, `--color-expense`) = Esperado en caja (800; en `--color-expense` si es negativo). Es un `<dl>`: los signos de los montos son la operación y el «=» va en CSS sin texto para lectores de pantalla.
+  - **Derecha:** el `.play-btn` con `+` y «Registrar venta». A ≤1180px el texto del botón queda solo para lectores de pantalla y la cuenta pierde la apertura y el «=» (sin la apertura la suma no cierra); a ≤960px queda solo el esperado.
 - **Sin turno abierto:** «Sin turno abierto» con un reloj y, a la derecha, `.btn-primary` «Abrir turno».
 - **Nunca repite la página actual:** en «Registrar venta» no muestra ese botón y en «Turnos» no muestra «Abrir turno».
-- **Móvil:** mini-reproductor fijo a 0.5rem de los bordes, `--color-surface-hover`, `--radius-panel` y `--shadow-md`. Solo quedan el arte, el título, el esperado y el botón (2.75rem); el progreso se vuelve una línea de 3px al pie, sin horas. `<main>` reserva 6.5rem abajo.
-- **El turno abierto en las páginas** (Turnos, resumen de la sucursal): la tarjeta lleva un anillo ámbar de 2px (`box-shadow: inset`) y «En curso» con `.eq`. El texto siempre está: las barras solo acompañan y quedan quietas con movimiento reducido.
+- **Móvil:** mini-reproductor fijo a 0.5rem de los bordes, `--color-surface-hover`, `--radius-panel` y `--shadow-md`. Quedan el arte, el turno con «En curso» (o «Pasó el cierre (14:00)»), el esperado y el botón (2.75rem). `<main>` reserva 6.5rem abajo.
+- **El turno abierto en las páginas** (Turnos, resumen de la sucursal y del negocio, tarjeta de sucursal): la tarjeta lleva un anillo ámbar de 2px (`box-shadow: inset`) y «En curso» con `.live-dot` (`app-surface.css`), un punto de 0.5rem con un anillo que se expande y se apaga cada 2 s, como la luz de un equipo encendido. El texto siempre está: el punto solo acompaña y queda quieto con movimiento reducido.
 
 ## Botones, tarjetas y listas
 

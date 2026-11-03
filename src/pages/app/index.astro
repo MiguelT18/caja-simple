@@ -6,7 +6,7 @@ import MediaCard from "@/components/app/MediaCard.astro";
 import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
 import { kindOptions } from "@/data/kinds";
-import { currentUser, entryHref, myBusinesses } from "@/data/queries";
+import { businessHref, currentUser, entryHref, myBusinesses } from "@/data/queries";
 import { boliviaNow } from "@/lib/dates";
 import { plural } from "@/lib/format";
 
@@ -21,6 +21,8 @@ const monogram = (name: string) =>
     .map((w) => w[0] ?? "")
     .join("")
     .toUpperCase();
+// Un solo negocio en Gratis por persona (lo aplica la base, migración plan_limits): con uno ya no se abre el modal.
+const freeBusiness = memberships.find((m) => m.role === "dueño" && m.business.plan === "Gratis")?.business;
 ---
 
 <Layout title="Tus negocios">
@@ -51,7 +53,13 @@ const monogram = (name: string) =>
       </section>
     ) : (
       <PageHeader title={firstName ? `${greeting}, ${firstName}` : greeting} description="Los negocios que tienes y en los que trabajas. Elige uno para entrar.">
-        <button type="button" class="btn btn-secondary" data-open-dialog="new-business">
+        <button
+          type="button"
+          class="btn btn-secondary"
+          data-open-dialog={freeBusiness ? undefined : "new-business"}
+          data-upgrade-notice={freeBusiness && `Tu plan Gratis incluye 1 negocio. Para abrir otro, pasa «${freeBusiness.name}» a un plan pago.`}
+          data-upgrade-href={freeBusiness && `${businessHref(freeBusiness)}/plan`}
+        >
           <Plus size={18} stroke-width={2} />
           Crear negocio
         </button>
@@ -59,12 +67,14 @@ const monogram = (name: string) =>
     )
   }
 
+  {!freeBusiness && (
   <Modal id="new-business" title="Crear negocio" description="Con su primera sucursal, que arranca con los turnos de mañana, tarde y noche." action="createBusiness" submitLabel="Crear negocio" redirect="/app/{slug}">
     <FormInput form="new-business-form" name="name" label="Nombre del negocio" required maxlength={80} />
     <FormInput form="new-business-form" name="kind" label="Rubro" options={kindOptions()} />
     <FormInput form="new-business-form" name="branchName" label="Primera sucursal" value="Principal" required maxlength={80} />
     <FormInput form="new-business-form" name="branchAddress" label="Dirección" hint="Opcional" maxlength={160} />
   </Modal>
+  )}
 
   {
     memberships.length > 0 && (
@@ -94,6 +104,15 @@ const monogram = (name: string) =>
     )
   }
 </Layout>
+
+<script>
+  import { toast } from "@/scripts/dialogs";
+
+  document.querySelector<HTMLElement>("[data-upgrade-notice]")?.addEventListener("click", (event) => {
+    const { upgradeNotice, upgradeHref } = (event.currentTarget as HTMLElement).dataset;
+    toast(upgradeNotice!, "info", upgradeHref ? { href: upgradeHref, label: "Ver planes →" } : undefined);
+  });
+</script>
 
 <style>
   .onboarding {

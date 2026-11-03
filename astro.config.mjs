@@ -11,6 +11,7 @@ export default defineConfig({
   output: 'server',
   adapter: vercel(),
   integrations: [react()],
+  devToolbar: { enabled: false },
   env: {
     schema: {
       SUPABASE_URL: envField.string({ context: 'server', access: 'public', url: true }),

@@ -54,7 +54,7 @@ export function confirmDialog(message: string, { title = "¿Seguro?", confirmLab
 let toastRegion: HTMLElement | undefined;
 
 /** Aviso flotante abajo a la derecha (arriba del todo en móvil). Los errores se anuncian de inmediato. */
-export function toast(message: string, tone: "error" | "success" | "info" = "info") {
+export function toast(message: string, tone: "error" | "success" | "info" = "info", link?: { href: string; label: string }) {
   if (!toastRegion) {
     toastRegion = document.createElement("div");
     toastRegion.className = "toast-region";
@@ -65,6 +65,12 @@ export function toast(message: string, tone: "error" | "success" | "info" = "inf
   el.setAttribute("role", tone === "error" ? "alert" : "status");
   el.innerHTML = `<p></p><button type="button" class="icon-btn" aria-label="Cerrar aviso">×</button>`;
   el.querySelector("p")!.textContent = message;
+  if (link) {
+    const a = document.createElement("a");
+    a.href = link.href;
+    a.textContent = link.label;
+    el.querySelector("p")!.append(" ", a);
+  }
 
   const dismiss = () => {
     el.classList.add("toast-leaving");
