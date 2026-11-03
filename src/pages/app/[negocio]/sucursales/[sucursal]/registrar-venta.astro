@@ -1,16 +1,27 @@
 ---
-import { ChevronUp, Clock, LockOpen, Minus, Plus, Search, ShoppingCart, TriangleAlert } from "@lucide/astro";
+import { ChevronUp, Clock, LockOpen, Minus, Package, Plus, Search, ShoppingCart, TriangleAlert, X } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, shiftBarData, branchHref, isLowStock } from "@/data/queries";
+import { branchColor, branchContext, shiftBarData, branchHref, colorAt, isLowStock } from "@/data/queries";
 import { longDate } from "@/lib/dates";
 import { formatBs } from "@/lib/format";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx) return Astro.rewrite("/404");
-const { branch, business, products, currentShift: shift, today } = ctx;
+const { branch, business, categories, products, currentShift: shift, today } = ctx;
+
+// Cada categoría con un color de la paleta (el arte de los productos sin foto); el filtro solo con 2 grupos o más.
+const NONE = "none";
+const groups = [
+  ...categories.filter((c) => products.some((p) => p.categoryId === c.id)).map((c) => ({ id: c.id, name: c.name })),
+  ...(products.some((p) => !p.categoryId) ? [{ id: NONE, name: "Sin categoría" }] : []),
+];
+const colorOf = (categoryId?: string) => {
+  const i = categories.findIndex((c) => c.id === categoryId);
+  return i < 0 ? "var(--color-text-muted)" : colorAt(i);
+};
 ---
 
 <Layout title={`Registrar venta · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
@@ -37,11 +48,28 @@ const { branch, business, products, currentShift: shift, today } = ctx;
 
   <div class="sale">
     <section class="catalog" aria-label="Productos">
-      <label class="search">
-        <Search size={18} stroke-width={1.75} />
-        <span class="sr-only">Buscar producto</span>
-        <input type="search" class="input" placeholder="Buscar producto" data-search autocomplete="off" />
-      </label>
+      <div class="toolbar">
+        <label class="search">
+          <Search size={18} stroke-width={1.75} />
+          <span class="sr-only">Buscar producto</span>
+          <input type="search" class="input" placeholder="Buscar producto" aria-keyshortcuts="/" data-search autocomplete="off" />
+        </label>
+
+        {
+          groups.length > 1 && (
+            <div class="filters" role="group" aria-label="Filtrar por categoría">
+              <button type="button" class="pill" aria-pressed="true" data-filter="">
+                Todo
+              </button>
+              {groups.map((g) => (
+                <button type="button" class="pill" aria-pressed="false" data-filter={g.id}>
+                  {g.name}
+                </button>
+              ))}
+            </div>
+          )
+        }
+      </div>
 
       {
         products.length === 0 && (
@@ -56,46 +84,87 @@ const { branch, business, products, currentShift: shift, today } = ctx;
           </p>
         )
       }
+
+      <!-- Card tipo álbum: el botón invisible cubre toda la card (agrega uno); el stepper va encima del arte y aparece cuando el producto ya está en la venta. -->
       <ul class="product-grid" role="list">
         {
-          products.map((p) => (
-            <li data-name={p.name.toLowerCase()}>
-              <button type="button" class="product" data-id={p.id} data-name={p.name} data-price={p.price ?? ""} data-stock={p.stock ?? ""} disabled={p.stock === 0 || !shift}>
-                <span class="product-name">{p.name}</span>
-                <span class="product-price num">{p.price === null ? "Precio al vender" : formatBs(p.price)}</span>
-                {p.stock !== null && (
-                  <span class:list={["product-stock num", { low: isLowStock(p) }]}>
-                    {isLowStock(p) && p.stock > 0 && <TriangleAlert size={14} stroke-width={2} />}
-                    {p.stock === 0 ? "Sin stock" : isLowStock(p) ? `Quedan ${p.stock}` : `${p.stock} en stock`}
-                  </span>
-                )}
-                <span class="in-cart num" data-in-cart hidden />
+          products.map((p) => {
+            const price = p.price === null ? "precio al vender" : formatBs(p.price);
+            return (
+              <li data-name={p.name.toLowerCase()} data-category={p.categoryId ?? NONE}>
+                <div
+                  class:list={["product", { "sold-out": p.stock === 0 }]}
+                  data-product
+                  data-id={p.id}
+                  data-name={p.name}
+                  data-price={p.price ?? ""}
+                  data-stock={p.stock ?? ""}
+                  data-min-stock={p.minStock ?? ""}
+                  data-image={p.image ?? ""}
+                  data-color={colorOf(p.categoryId)}
+                >
+                  <button type="button" class="product-add" aria-label={`Agregar ${p.name}, ${price}`} disabled={p.stock === 0 || !shift} data-add />
 
-                <span class="add play-btn" aria-hidden="true">
-                  <Plus size={20} stroke-width={1.75} />
-                </span>
-              </button>
-            </li>
-          ))
+                  <span class="art" style={`--cat: ${colorOf(p.categoryId)}`}>
+                    {p.image ? <img class="skeleton" src={p.image} alt="" loading="lazy" /> : <Package size={36} stroke-width={1.5} />}
+                    <span class="out-chip">Sin stock</span>
+                    <span class="add play-btn" aria-hidden="true">
+                      <Plus size={20} stroke-width={1.75} />
+                    </span>
+                    {p.price !== null && (
+                      <span class="stepper" role="group" aria-label={`${p.name} en la venta`}>
+                        <button type="button" class="icon-btn" aria-label={`Quitar un ${p.name}`} data-step="-1">
+                          <Minus size={16} stroke-width={2} />
+                        </button>
+                        <span class="num" data-qty>
+                          0
+                        </span>
+                        <button type="button" class="icon-btn" aria-label={`Agregar un ${p.name}`} data-step="1">
+                          <Plus size={16} stroke-width={2} />
+                        </button>
+                      </span>
+                    )}
+                  </span>
+
+                  <span class="product-name">{p.name}</span>
+                  <span class="product-price num">{p.price === null ? "Precio al vender" : formatBs(p.price)}</span>
+                  {p.stock !== null && (
+                    <span class:list={["product-stock num", { low: isLowStock(p), warn: isLowStock(p) && p.stock > 0 }]} data-stock-label>
+                      <TriangleAlert size={14} stroke-width={2} />
+                      <span data-stock-text>{p.stock === 0 ? "Sin stock" : isLowStock(p) ? `Quedan ${p.stock}` : `${p.stock} en stock`}</span>
+                    </span>
+                  )}
+                  <span class="in-cart num" data-in-cart hidden />
+                </div>
+              </li>
+            );
+          })
         }
       </ul>
-      <p class="empty" data-empty hidden>Ningún producto coincide con tu búsqueda.</p>
+      <p class="empty" data-empty hidden>
+        Ningún producto coincide.
+        <button type="button" class="link-btn" data-clear-filters>Quitar filtros</button>
+      </p>
     </section>
 
-    <!-- En pantallas angostas la venta es una hoja pegada abajo: la barra muestra total y «Confirmar», y se despliega para ver las líneas. -->
+    <!-- En pantallas angostas la venta es una hoja pegada abajo: la barra muestra total y «Cobrar», y se despliega para ver las líneas. -->
     <aside class:list={["card cart", !shift && "cart-off"]} aria-labelledby="cart-title" data-cart>
       <header class="cart-head">
-        <h2 id="cart-title" class="card-title">Venta actual</h2>
+        <div class="cart-title">
+          <h2 id="cart-title" class="card-title">Venta actual</h2>
+          <span class="cart-units" data-units></span>
+        </div>
         {shift && <ShiftChip shift={shift} />}
+        <button type="button" class="link-btn cart-clear" data-clear hidden>Vaciar</button>
       </header>
 
-      <button type="button" class="cart-toggle" aria-expanded="false" aria-controls="cart-body" data-cart-toggle data-idle={shift ? `Turno ${shift.name.toLowerCase()}` : "Toca un producto para agregarlo"}>
+      <button type="button" class="cart-toggle" aria-expanded="false" aria-controls="cart-body" data-cart-toggle data-idle={shift ? `Turno ${shift.name.toLowerCase()}` : "Elige productos para empezar"}>
         <span class="cart-art" aria-hidden="true">
           <ShoppingCart size={20} stroke-width={1.75} />
         </span>
         <span class="cart-toggle-text">
           <span class="cart-toggle-total num" data-total-mini>{formatBs(0)}</span>
-          <span class="cart-toggle-sub" data-count>{shift ? `Turno ${shift.name.toLowerCase()}` : "Toca un producto para agregarlo"}</span>
+          <span class="cart-toggle-sub" data-count>{shift ? `Turno ${shift.name.toLowerCase()}` : "Elige productos para empezar"}</span>
         </span>
         <ChevronUp class="cart-chevron" size={20} stroke-width={1.75} />
       </button>
@@ -103,7 +172,7 @@ const { branch, business, products, currentShift: shift, today } = ctx;
       <div class="cart-body" id="cart-body">
         <p class="cart-empty" data-cart-empty>
           <ShoppingCart size={20} stroke-width={1.75} />
-          Todavía no agregaste productos.
+          Elige productos para empezar la venta.
         </p>
         <ul class="cart-lines" role="list" data-cart-lines></ul>
 
@@ -112,18 +181,26 @@ const { branch, business, products, currentShift: shift, today } = ctx;
           <span class="num" data-total aria-live="polite">{formatBs(0)}</span>
         </p>
 
-        <button type="button" class="btn btn-secondary btn-block cart-clear" data-clear disabled>Vaciar</button>
+        <!-- Solo para el efectivo del mostrador: no se guarda con la venta. -->
+        <div class="change" data-change hidden>
+          <label class="field-label" for="paid">Paga con (Bs)</label>
+          <input id="paid" class="input num" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00" autocomplete="off" data-paid />
+          <p class="change-result num" aria-live="polite" data-change-result></p>
+        </div>
       </div>
 
       <p class="notice cart-notice" data-notice role="status"></p>
       <button type="button" class="btn btn-primary btn-block cart-confirm" data-confirm data-branch={branch.id} data-shift={shift?.id} disabled>
-        <span>Confirmar<span class="confirm-rest"> venta</span></span>
+        <span>Cobrar<span class="confirm-rest"> <span data-confirm-total>{formatBs(0)}</span></span></span>
       </button>
     </aside>
 
     <template data-icons>
-      <Minus size={18} stroke-width={1.75} data-icon="minus" />
-      <Plus size={18} stroke-width={1.75} data-icon="plus" />
+      <Minus size={16} stroke-width={2} data-icon="minus" />
+      <Plus size={16} stroke-width={2} data-icon="plus" />
+      <X size={16} stroke-width={2} data-icon="remove" />
+      <Package size={18} stroke-width={1.75} data-icon="package" />
+      <TriangleAlert size={16} stroke-width={2} data-icon="alert" />
     </template>
   </div>
 </Layout>
@@ -131,26 +208,36 @@ const { branch, business, products, currentShift: shift, today } = ctx;
 <script>
   import { actions } from "astro:actions";
   import { formatBs } from "@/lib/format";
-  import { toast } from "@/scripts/dialogs";
+  import { confirmDialog, toast } from "@/scripts/dialogs";
 
   // Una línea por producto; con precio al vender, una línea por prenda (cada una con su precio).
   // price null: falta escribirlo. stock Infinity: sin control de stock.
-  type Line = { productId: string; name: string; price: number | null; open: boolean; stock: number; qty: number };
+  type Line = { productId: string; name: string; price: number | null; open: boolean; stock: number; qty: number; image: string; color: string };
   const cart = new Map<string, Line>();
   let openLines = 0;
-  const lines = document.querySelector<HTMLUListElement>("[data-cart-lines]")!;
-  const emptyCart = document.querySelector<HTMLElement>("[data-cart-empty]")!;
-  const total = document.querySelector<HTMLElement>("[data-total]")!;
-  const notice = document.querySelector<HTMLElement>("[data-notice]")!;
-  const confirm = document.querySelector<HTMLButtonElement>("[data-confirm]")!;
-  const clear = document.querySelector<HTMLButtonElement>("[data-clear]")!;
+  let totalValue = 0;
 
-  const icons = document.querySelector<HTMLTemplateElement>("[data-icons]")!.content;
-  const cartBox = document.querySelector<HTMLElement>("[data-cart]")!;
-  const toggle = document.querySelector<HTMLButtonElement>("[data-cart-toggle]")!;
-  const totalMini = document.querySelector<HTMLElement>("[data-total-mini]")!;
-  const count = document.querySelector<HTMLElement>("[data-count]")!;
-  const products = document.querySelectorAll<HTMLButtonElement>(".product");
+  const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
+  const lines = $<HTMLUListElement>("[data-cart-lines]");
+  const emptyCart = $("[data-cart-empty]");
+  const total = $("[data-total]");
+  const notice = $("[data-notice]");
+  const confirm = $<HTMLButtonElement>("[data-confirm]");
+  const confirmTotal = $("[data-confirm-total]");
+  const clear = $<HTMLButtonElement>("[data-clear]");
+  const units = $("[data-units]");
+  const change = $("[data-change]");
+  const paid = $<HTMLInputElement>("[data-paid]");
+  const changeResult = $("[data-change-result]");
+
+  const icons = $<HTMLTemplateElement>("[data-icons]").content;
+  const icon = (name: string) => icons.querySelector(`[data-icon="${name}"]`)!.cloneNode(true);
+  const cartBox = $("[data-cart]");
+  const toggle = $<HTMLButtonElement>("[data-cart-toggle]");
+  const totalMini = $("[data-total-mini]");
+  const count = $("[data-count]");
+  const cards = document.querySelectorAll<HTMLElement>("[data-product]");
+  const cardById = new Map([...cards].map((card) => [card.dataset.id!, card]));
 
   /** Despliega o pliega la hoja de la venta (solo se ve como hoja en pantallas angostas). */
   function setOpen(open: boolean) {
@@ -165,11 +252,119 @@ const { branch, business, products, currentShift: shift, today } = ctx;
     }
   });
 
-  function qtyButton(label: string, icon: "minus" | "plus", onClick: () => void) {
+  const plural = (n: number) => `${n} ${n === 1 ? "producto" : "productos"}`;
+
+  /** Unidades de un producto en la venta (con precio al vender, suma todas sus líneas). */
+  function inCart(productId: string) {
+    let n = 0;
+    for (const l of cart.values()) if (l.productId === productId) n += l.qty;
+    return n;
+  }
+
+  /** Suma una unidad del producto (o una prenda nueva, si su precio se escribe al vender). */
+  function add(productId: string) {
+    const card = cardById.get(productId)!;
+    const { name, price, stock, image = "", color = "" } = card.dataset;
+    const open = price === "";
+    const key = open ? `${productId}#${++openLines}` : productId;
+    const item = cart.get(key) ?? { productId, name: name!, price: open ? null : Number(price), open, stock: stock === "" ? Infinity : Number(stock), qty: 0, image, color };
+    if (inCart(productId) >= item.stock) {
+      notice.textContent = `Solo quedan ${item.stock} de ${item.name}.`;
+      return;
+    }
+    item.qty += 1;
+    cart.set(key, item);
+    notice.textContent = "";
+    render();
+    // La prenda recién agregada pide su precio enseguida (en pantallas angostas, despliega la hoja para escribirlo).
+    if (open) {
+      setOpen(true);
+      lines.querySelector<HTMLInputElement>("li:last-child .line-price")?.focus();
+    }
+  }
+
+  /** Cambia la cantidad de una línea; el stepper de la card y el del carro usan esta misma función. */
+  function step(key: string, delta: number) {
+    const item = cart.get(key);
+    if (!item) return delta > 0 && add(key);
+    if (delta > 0 && inCart(item.productId) >= item.stock) {
+      notice.textContent = `Solo quedan ${item.stock} de ${item.name}.`;
+      return;
+    }
+    notice.textContent = "";
+    item.qty += delta;
+    if (item.qty <= 0) cart.delete(key);
+    render();
+  }
+
+  function remove(key: string) {
+    cart.delete(key);
+    notice.textContent = "";
+    render();
+  }
+
+  /** Lo que da de cambio el efectivo recibido; si no alcanza, cuánto falta (con ícono, no solo color). */
+  function showChange() {
+    change.hidden = cart.size === 0;
+    const value = paid.value === "" ? null : Number(paid.value);
+    changeResult.replaceChildren();
+    changeResult.classList.remove("short");
+    if (value === null || cart.size === 0) return;
+    if (value >= totalValue) {
+      changeResult.textContent = `Cambio: ${formatBs(value - totalValue)}`;
+    } else {
+      changeResult.classList.add("short");
+      changeResult.append(icon("alert"), `Faltan ${formatBs(totalValue - value)}`);
+    }
+  }
+  paid.addEventListener("input", showChange);
+
+  function showTotal() {
+    totalValue = [...cart.values()].reduce((a, l) => a + (l.price ?? 0) * l.qty, 0);
+    total.textContent = totalMini.textContent = confirmTotal.textContent = formatBs(totalValue);
+    showChange();
+  }
+
+  /** Resumen de la barra plegada y, en cada card, cuántos van en la venta y el stock que queda descontándolos. */
+  function showCounts() {
+    const byProduct = new Map<string, number>();
+    for (const l of cart.values()) byProduct.set(l.productId, (byProduct.get(l.productId) ?? 0) + l.qty);
+    const n = [...byProduct.values()].reduce((a, x) => a + x, 0);
+    count.textContent = n === 0 ? toggle.dataset.idle! : plural(n);
+    units.textContent = n === 0 ? "" : plural(n);
+    for (const card of cards) {
+      const inSale = byProduct.get(card.dataset.id!) ?? 0;
+      const open = card.dataset.price === "";
+      const addButton = card.querySelector<HTMLButtonElement>("[data-add]")!;
+      // Precio fijo: el stepper sobre el arte. Precio al vender: cada toque es otra prenda, así que solo se cuenta.
+      card.classList.toggle("in-sale", inSale > 0 && !open);
+      const qty = card.querySelector("[data-qty]");
+      if (qty) qty.textContent = String(inSale);
+      const badge = card.querySelector<HTMLElement>("[data-in-cart]")!;
+      badge.hidden = !open || inSale === 0;
+      badge.textContent = `${inSale} en la venta`;
+
+      const label = card.querySelector<HTMLElement>("[data-stock-label]");
+      if (!label) continue; // Sin control de stock.
+      const left = Number(card.dataset.stock) - inSale;
+      const min = card.dataset.minStock;
+      const low = min !== "" && left <= Number(min);
+      label.classList.toggle("low", low);
+      label.classList.toggle("warn", low && left > 0);
+      label.querySelector("[data-stock-text]")!.textContent = left <= 0 ? "Sin stock" : low ? `Quedan ${left}` : `${left} en stock`;
+      card.querySelector<HTMLButtonElement>('[data-step="1"]')?.toggleAttribute("disabled", left <= 0);
+      // Agotado en la venta: la card se apaga; se reactiva al quitar unidades del carro.
+      if (!confirm.dataset.shift) continue;
+      addButton.disabled = left <= 0;
+      card.classList.toggle("sold-out", left <= 0 && inSale === 0);
+    }
+  }
+
+  function iconButton(label: string, name: string, onClick: () => void, className = "") {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "icon-btn qty-btn";
-    button.append(icons.querySelector(`[data-icon="${icon}"]`)!.cloneNode(true));
+    button.className = `icon-btn ${className}`;
+    button.append(icon(name));
     button.setAttribute("aria-label", label);
     button.addEventListener("click", onClick);
     return button;
@@ -183,94 +378,65 @@ const { branch, business, products, currentShift: shift, today } = ctx;
     if (item.price !== null) input.value = String(item.price);
     input.addEventListener("input", () => {
       item.price = Number(input.value) > 0 ? Number(input.value) : null;
+      amountOf.get(item)!.textContent = item.price === null ? "—" : formatBs(item.price * item.qty);
       showTotal();
     });
     return input;
   }
 
-  function showTotal() {
-    const sum = formatBs([...cart.values()].reduce((a, l) => a + (l.price ?? 0) * l.qty, 0));
-    total.textContent = totalMini.textContent = sum;
-  }
-
-  /** Resumen de la barra plegada y cuántos de cada producto ya están en la venta (en el mosaico, con texto). */
-  function showCounts() {
-    const byProduct = new Map<string, number>();
-    for (const l of cart.values()) byProduct.set(l.productId, (byProduct.get(l.productId) ?? 0) + l.qty);
-    const units = [...byProduct.values()].reduce((a, n) => a + n, 0);
-    count.textContent = units === 0 ? toggle.dataset.idle! : `${units} ${units === 1 ? "producto" : "productos"}`;
-    for (const button of products) {
-      const badge = button.querySelector<HTMLElement>("[data-in-cart]")!;
-      const n = byProduct.get(button.dataset.id!) ?? 0;
-      badge.hidden = n === 0;
-      badge.textContent = `${n} en la venta`;
-    }
-  }
+  const amountOf = new WeakMap<Line, HTMLElement>();
+  const el = (tag: string, className: string, text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
 
   function render() {
     lines.replaceChildren();
-    for (const [id, item] of cart) {
+    for (const [key, item] of cart) {
       const li = document.createElement("li");
-      const name = document.createElement("span");
-      name.className = "line-name";
-      name.textContent = item.name;
-      const qty = document.createElement("span");
-      qty.className = "qty num";
-      qty.textContent = String(item.qty);
-      const amount = item.open ? priceInput(item) : document.createElement("span");
-      if (!item.open) {
-        amount.className = "line-amount num";
-        amount.textContent = formatBs(item.price! * item.qty);
-      }
-      const step = (delta: number) => () => {
-        if (delta > 0 && item.qty >= item.stock) {
-          notice.textContent = `Solo quedan ${item.stock} de ${item.name}.`;
-          return;
-        }
-        item.qty += delta;
-        if (item.qty <= 0) cart.delete(id);
-        render();
-      };
-      li.append(
-        name,
-        qtyButton(`Quitar un ${item.name}`, "minus", step(-1)),
-        qty,
-        qtyButton(`Agregar un ${item.name}`, "plus", step(1)),
-        amount,
+
+      const thumb = el("span", "line-thumb");
+      thumb.setAttribute("aria-hidden", "true");
+      thumb.style.setProperty("--cat", item.color);
+      if (item.image) thumb.append(Object.assign(document.createElement("img"), { src: item.image, alt: "" }));
+      else thumb.append(icon("package"));
+
+      const info = el("span", "line-info");
+      info.append(el("span", "line-name", item.name), item.open ? priceInput(item) : el("span", "line-unit num", `${formatBs(item.price!)} c/u`));
+
+      const qty = el("span", "line-qty");
+      qty.append(
+        iconButton(`Quitar un ${item.name}`, "minus", () => step(key, -1), "qty-btn"),
+        el("span", "qty num", String(item.qty)),
+        iconButton(`Agregar un ${item.name}`, "plus", () => step(key, 1), "qty-btn"),
       );
+
+      const amount = el("span", "line-amount num", item.price === null ? "—" : formatBs(item.price * item.qty));
+      amountOf.set(item, amount);
+
+      li.append(thumb, info, iconButton(`Quitar ${item.name} de la venta`, "remove", () => remove(key), "line-remove"), qty, amount);
       lines.append(li);
     }
     emptyCart.hidden = cart.size > 0;
+    clear.hidden = cart.size === 0;
     showTotal();
     showCounts();
-    confirm.disabled = clear.disabled = cart.size === 0;
-    if (cart.size === 0) setOpen(false);
+    confirm.disabled = cart.size === 0;
+    if (cart.size === 0) {
+      paid.value = "";
+      setOpen(false);
+    }
   }
 
-  for (const button of products) {
-    button.addEventListener("click", () => {
-      const { id, name, price, stock } = button.dataset;
-      const open = price === "";
-      const key = open ? `${id}#${++openLines}` : id!;
-      const item = cart.get(key) ?? { productId: id!, name: name!, price: open ? null : Number(price), open, stock: stock === "" ? Infinity : Number(stock), qty: 0 };
-      if (item.qty >= item.stock) {
-        notice.textContent = `Solo quedan ${item.stock} de ${item.name}.`;
-        return;
-      }
-      item.qty += 1;
-      cart.set(key, item);
-      notice.textContent = "";
-      render();
-      // La prenda recién agregada pide su precio enseguida (en pantallas angostas, despliega la hoja para escribirlo).
-      if (open) {
-        setOpen(true);
-        lines.querySelector<HTMLInputElement>("li:last-child .line-price")?.focus();
-      }
-    });
+  for (const card of cards) {
+    const id = card.dataset.id!;
+    card.querySelector("[data-add]")!.addEventListener("click", () => add(id));
+    for (const button of card.querySelectorAll<HTMLButtonElement>("[data-step]")) {
+      button.addEventListener("click", () => step(id, Number(button.dataset.step)));
+    }
   }
 
-  clear.addEventListener("click", () => {
+  clear.addEventListener("click", async () => {
+    if (cart.size > 1 && !(await confirmDialog("Se quitan todos los productos de la venta.", { title: "¿Vaciar la venta?", confirmLabel: "Vaciar", danger: true }))) return;
     cart.clear();
+    notice.textContent = "";
     render();
   });
 
@@ -295,7 +461,7 @@ const { branch, business, products, currentShift: shift, today } = ctx;
     }
     // Recarga para mostrar el stock actualizado; el aviso queda para la siguiente vista.
     try {
-      sessionStorage.setItem("sale-notice", `Venta de ${total.textContent} registrada.`);
+      sessionStorage.setItem("sale-notice", `Venta de ${formatBs(totalValue)} registrada.`);
     } catch {}
     window.location.reload();
   });
@@ -308,131 +474,70 @@ const { branch, business, products, currentShift: shift, today } = ctx;
     }
   } catch {}
 
-  const search = document.querySelector<HTMLInputElement>("[data-search]")!;
-  const empty = document.querySelector<HTMLElement>("[data-empty]")!;
-  search.addEventListener("input", () => {
+  // Búsqueda y filtro por categoría, combinados.
+  const search = $<HTMLInputElement>("[data-search]");
+  const empty = $("[data-empty]");
+  const pills = document.querySelectorAll<HTMLButtonElement>("[data-filter]");
+  const items = document.querySelectorAll<HTMLLIElement>(".product-grid li");
+  let category = "";
+
+  function applyFilters() {
     const query = search.value.trim().toLowerCase();
     let visible = 0;
-    for (const li of document.querySelectorAll<HTMLLIElement>(".product-grid li")) {
-      li.hidden = !li.dataset.name!.includes(query);
+    for (const li of items) {
+      li.hidden = !li.dataset.name!.includes(query) || (category !== "" && li.dataset.category !== category);
       if (!li.hidden) visible++;
     }
-    empty.hidden = visible > 0;
+    empty.hidden = visible > 0 || items.length === 0;
+    return [...items].filter((li) => !li.hidden);
+  }
+
+  function setCategory(value: string) {
+    category = value;
+    for (const pill of pills) pill.setAttribute("aria-pressed", String(pill.dataset.filter === value));
+    applyFilters();
+  }
+
+  for (const pill of pills) pill.addEventListener("click", () => setCategory(pill.dataset.filter!));
+  search.addEventListener("input", applyFilters);
+  $("[data-clear-filters]").addEventListener("click", () => {
+    search.value = "";
+    setCategory("");
+  });
+
+  // Atajos: «/» busca; Enter agrega el único resultado; Esc limpia la búsqueda.
+  if (matchMedia("(pointer: fine)").matches) search.placeholder = "Buscar producto (/)";
+  search.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const visible = applyFilters();
+      const button = visible.length === 1 ? visible[0].querySelector<HTMLButtonElement>("[data-add]") : null;
+      if (!button || button.disabled) return;
+      button.click();
+      search.value = "";
+      applyFilters();
+    } else if (event.key === "Escape") {
+      if (search.value === "") return search.blur();
+      event.preventDefault();
+      search.value = "";
+      applyFilters();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("input, textarea, select, [contenteditable], dialog[open]")) return;
+    event.preventDefault();
+    search.focus();
   });
 </script>
 
 <style>
   .sale {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    grid-template-columns: minmax(0, 1fr) minmax(19rem, 25rem);
     gap: 1.5rem;
     align-items: start;
-  }
-
-  .search {
-    position: relative;
-    display: block;
-    margin-bottom: 1rem;
-    color: var(--color-text-muted);
-  }
-
-  .search :global(svg) {
-    position: absolute;
-    top: 50%;
-    left: 0.875rem;
-    translate: 0 -50%;
-    pointer-events: none;
-  }
-
-  .search .input {
-    padding-left: 2.75rem;
-  }
-
-
-  .product-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-    gap: 0.75rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* Mosaico de producto: superficie elevada; al pasar el mouse se aclara y asoma el botón redondo de agregar. */
-  .product {
-    position: relative;
-    display: grid;
-    align-content: start;
-    gap: 0.25rem;
-    width: 100%;
-    height: 100%;
-    padding: 1rem;
-    border: none;
-    border-radius: var(--radius-panel);
-    background: var(--color-surface-muted);
-    color: var(--color-text);
-    text-align: left;
-    cursor: pointer;
-    transition: background-color 150ms;
-  }
-
-  .product:hover:not(:disabled) {
-    background: var(--color-surface-hover);
-  }
-
-  .add {
-    position: absolute;
-    right: 0.75rem;
-    bottom: 0.75rem;
-    width: 2.5rem;
-    height: 2.5rem;
-    opacity: 0;
-    transform: translateY(0.375rem);
-    transition:
-      opacity 200ms var(--ease-out),
-      transform 300ms var(--ease-out);
-  }
-
-  .product:is(:hover, :focus-visible):not(:disabled) .add {
-    opacity: 1;
-    transform: none;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .add {
-      transition: none;
-    }
-  }
-
-  .product:active {
-    scale: 0.98;
-  }
-
-  .product:disabled {
-    cursor: not-allowed;
-    opacity: 0.7;
-  }
-
-  .product-name {
-    font-weight: var(--font-bold);
-  }
-
-  .product-price {
-    font-size: var(--text-lg);
-    font-weight: var(--font-bold);
-  }
-
-  .product-stock {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: var(--color-text-muted);
-    font-size: var(--text-xs);
-  }
-
-  .product-stock.low {
-    color: var(--color-warning);
-    font-weight: var(--font-semibold);
   }
 
   /* Sin turno abierto: el aviso va arriba, antes de los productos, con la salida a mano. */
@@ -454,10 +559,291 @@ const { branch, business, products, currentShift: shift, today } = ctx;
     font-weight: var(--font-semibold);
   }
 
+  /* Búsqueda y filtros */
+  .toolbar {
+    display: grid;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .search {
+    position: relative;
+    display: block;
+    color: var(--color-text-muted);
+  }
+
+  .search :global(svg) {
+    position: absolute;
+    top: 50%;
+    left: 0.875rem;
+    translate: 0 -50%;
+    pointer-events: none;
+  }
+
+  .search .input {
+    padding-left: 2.75rem;
+  }
+
+  .filters {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    margin-inline: -0.25rem;
+    padding: 0.25rem;
+    scrollbar-width: none;
+  }
+
+  .pill {
+    flex-shrink: 0;
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    border: none;
+    border-radius: 999px;
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 150ms;
+  }
+
+  .pill:hover {
+    background: var(--color-surface-hover);
+  }
+
+  /* Activa: invertida, como las píldoras de filtro de un reproductor. */
+  .pill[aria-pressed="true"] {
+    background: var(--color-text);
+    color: var(--color-surface);
+  }
+
   .empty {
     color: var(--color-text-muted);
   }
 
+  .link-btn {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    font-weight: var(--font-bold);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+  }
+
+  /* Cards tipo álbum */
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .product-grid li[hidden] {
+    display: none;
+  }
+
+  .product {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 0.125rem;
+    height: 100%;
+    padding: 0.625rem 0.625rem 0.875rem;
+    border-radius: var(--radius-panel);
+    background: var(--color-surface-muted);
+    transition:
+      background-color 150ms,
+      box-shadow 150ms;
+  }
+
+  .product:has(.product-add:not(:disabled)):hover {
+    background: var(--color-surface-hover);
+  }
+
+  /* En la venta: el mismo anillo ámbar que el turno abierto; el stepper dice cuántos. */
+  .product.in-sale {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+  }
+
+  /* El botón cubre toda la card: un toque en cualquier parte agrega uno. El foco se dibuja en la card. */
+  .product-add {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 0;
+    border: none;
+    border-radius: inherit;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .product-add:disabled {
+    cursor: not-allowed;
+  }
+
+  .product-add:active:not(:disabled) ~ .art {
+    scale: 0.98;
+  }
+
+  .art {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    border-radius: 0.375rem;
+    background: color-mix(in srgb, var(--cat) 22%, var(--color-surface));
+    color: var(--cat);
+    transition: scale 150ms var(--ease-out);
+  }
+
+  .art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    object-fit: cover;
+  }
+
+  .product:has(.product-add:disabled) .art > :not(.out-chip, .stepper) {
+    opacity: 0.45;
+  }
+
+  .out-chip {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    display: none;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+  }
+
+  .sold-out .out-chip {
+    display: block;
+  }
+
+  .add {
+    position: absolute;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    opacity: 0;
+    transform: translateY(0.375rem);
+    transition:
+      opacity 200ms var(--ease-out),
+      transform 300ms var(--ease-out);
+  }
+
+  .product:has(.product-add:not(:disabled)):is(:hover, :has(.product-add:focus-visible)) .add {
+    opacity: 1;
+    transform: none;
+  }
+
+  .in-sale .add {
+    display: none;
+  }
+
+  /* Stepper sobre el arte: encima del botón de la card, para que − y + no agreguen otro. */
+  .stepper {
+    position: absolute;
+    right: 0.375rem;
+    bottom: 0.375rem;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    padding: 0.125rem;
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-md);
+  }
+
+  .in-sale .stepper {
+    display: flex;
+  }
+
+  .stepper .icon-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    color: var(--color-text);
+  }
+
+  .stepper .icon-btn:disabled {
+    color: var(--color-text-subtle);
+    cursor: not-allowed;
+  }
+
+  .stepper .num {
+    min-width: 1.5rem;
+    text-align: center;
+    font-weight: var(--font-extrabold);
+  }
+
+  .product-name {
+    display: -webkit-box;
+    overflow: hidden;
+    font-weight: var(--font-bold);
+    line-height: 1.3;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .product-price {
+    font-size: var(--text-lg);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.01em;
+  }
+
+  .product-stock {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .product-stock.low {
+    color: var(--color-warning);
+    font-weight: var(--font-semibold);
+  }
+
+  /* El ícono de alerta solo cuando quedan pocas, no con «Sin stock». */
+  .product-stock:not(.warn) :global(svg) {
+    display: none;
+  }
+
+  /* Prendas con precio al vender: cuántas van, con texto. */
+  .in-cart {
+    justify-self: start;
+    margin-top: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    color: var(--color-text);
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+  }
+
+  .in-cart[hidden] {
+    display: none;
+  }
+
+  /* Carro */
   .cart {
     position: sticky;
     top: 1.5rem;
@@ -468,9 +854,28 @@ const { branch, business, products, currentShift: shift, today } = ctx;
 
   .cart-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .cart-title {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .cart-units {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .cart-clear {
+    font-size: var(--text-sm);
+  }
+
+  .cart-clear[hidden] {
+    display: none;
   }
 
   .cart-empty {
@@ -489,7 +894,7 @@ const { branch, business, products, currentShift: shift, today } = ctx;
 
   .cart-lines {
     display: grid;
-    gap: 0.5rem;
+    gap: 0.75rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -500,32 +905,94 @@ const { branch, business, products, currentShift: shift, today } = ctx;
     display: none;
   }
 
+  /* Línea: miniatura · nombre y precio unitario · quitar; debajo, cantidad y total de la línea. */
   .cart-lines :global(li) {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto 1.75rem auto 5.5rem;
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "thumb info remove"
+      "thumb qty amount";
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .cart-lines :global(.line-thumb) {
+    grid-area: thumb;
+    align-self: start;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    overflow: hidden;
+    border-radius: 0.25rem;
+    background: color-mix(in srgb, var(--cat, var(--color-text-muted)) 22%, var(--color-surface));
+    color: var(--cat, var(--color-text-muted));
+  }
+
+  .cart-lines :global(.line-thumb img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .cart-lines :global(.line-info) {
+    grid-area: info;
+    display: grid;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .cart-lines :global(.line-name) {
+    overflow: hidden;
+    font-weight: var(--font-semibold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cart-lines :global(.line-unit) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .cart-lines :global(.line-price) {
+    width: min(9rem, 100%);
+    min-height: 2.25rem;
+    padding-block: 0.25rem;
+  }
+
+  .cart-lines :global(.line-remove) {
+    grid-area: remove;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+  }
+
+  .cart-lines :global(.line-qty) {
+    grid-area: qty;
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    border-radius: 999px;
+    background: var(--color-surface);
   }
 
   .cart-lines :global(.qty-btn) {
     width: 2rem;
     height: 2rem;
-    font-size: var(--text-lg);
+    border-radius: 50%;
+    color: var(--color-text);
   }
 
   .cart-lines :global(.qty) {
+    min-width: 1.75rem;
     text-align: center;
-    font-weight: var(--font-semibold);
+    font-weight: var(--font-bold);
   }
 
   .cart-lines :global(.line-amount) {
+    grid-area: amount;
     text-align: right;
-  }
-
-  .cart-lines :global(.line-price) {
-    min-height: 2.25rem;
-    padding-block: 0.25rem;
-    text-align: right;
+    font-weight: var(--font-bold);
   }
 
   .cart-total {
@@ -541,26 +1008,40 @@ const { branch, business, products, currentShift: shift, today } = ctx;
   .cart-total .num {
     font-size: var(--text-4xl);
     line-height: var(--text-4xl-lh);
-    font-weight: var(--font-bold);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.03em;
   }
 
-  /* Cuántos de este producto ya van en la venta: con texto, porque en pantallas angostas la venta está plegada. */
-  .in-cart {
-    justify-self: start;
-    margin-top: 0.25rem;
-    padding: 0.125rem 0.5rem;
-    border-radius: 999px;
-    background: var(--color-primary-soft);
-    color: var(--color-text);
-    font-size: var(--text-xs);
-    font-weight: var(--font-bold);
+  /* Cambio del efectivo: campo y resultado en una fila. */
+  .change {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.375rem 0.75rem;
   }
 
-  .in-cart[hidden] {
+  .change[hidden] {
     display: none;
   }
 
-  /* En escritorio la venta es la tarjeta de siempre: la barra plegable no existe y «Vaciar» va al final. */
+  .change label {
+    grid-column: 1 / -1;
+  }
+
+  .change-result {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: 0;
+    font-weight: var(--font-bold);
+    white-space: nowrap;
+  }
+
+  .change-result.short {
+    color: var(--color-expense);
+  }
+
+  /* En escritorio la venta es la tarjeta de siempre: la barra plegable no existe. */
   .cart-toggle {
     display: none;
   }
@@ -569,37 +1050,36 @@ const { branch, business, products, currentShift: shift, today } = ctx;
     display: contents;
   }
 
-  .cart-clear {
-    order: 2;
-  }
-
-  .cart-notice,
-  .cart-confirm {
-    order: 1;
-  }
-
-  /* Con pantalla táctil, el botón de agregar se ve siempre y los botones de cantidad llegan a 44px. */
+  /* Con pantalla táctil, el botón de agregar se ve siempre y los botones llegan a 44px. */
   @media (hover: none) {
     .add {
       opacity: 1;
       transform: none;
     }
-
-    /* El botón fijo ocupa la esquina: el stock no pasa por debajo. */
-    .product-stock {
-      padding-right: 2.75rem;
-    }
   }
 
   @media (pointer: coarse) {
-    .cart-lines :global(.qty-btn) {
+    .pill {
+      min-height: 2.75rem;
+    }
+
+    .stepper .icon-btn,
+    .cart-lines :global(.qty-btn),
+    .cart-lines :global(.line-remove) {
       width: 2.75rem;
       height: 2.75rem;
     }
   }
 
-  /* Pantallas angostas: el catálogo ocupa todo el ancho y la venta es una hoja pegada abajo, como el mini-reproductor.
-     Plegada muestra el total, cuántos productos lleva y «Confirmar»; desplegada suma las líneas encima. */
+  @media (prefers-reduced-motion: reduce) {
+    .add,
+    .art {
+      transition: none;
+    }
+  }
+
+  /* Pantallas angostas: los productos ocupan todo el ancho y la venta es una hoja pegada abajo, como el mini-reproductor.
+     Plegada muestra el total, cuántos productos lleva y «Cobrar»; desplegada suma las líneas encima. */
   @media (max-width: 960px) {
     .sale {
       grid-template-columns: minmax(0, 1fr);
@@ -631,6 +1111,8 @@ const { branch, business, products, currentShift: shift, today } = ctx;
     }
 
     .cart:not(.cart-off) .cart-toggle {
+      grid-column: 1;
+      grid-row: 4;
       display: flex;
       align-items: center;
       gap: 0.75rem;
@@ -691,11 +1173,6 @@ const { branch, business, products, currentShift: shift, today } = ctx;
       width: auto;
     }
 
-    .cart:not(.cart-off) .cart-toggle {
-      grid-column: 1;
-      grid-row: 4;
-    }
-
     .cart:not(.cart-off) .cart-notice {
       grid-column: 1 / -1;
       grid-row: 3;
@@ -710,8 +1187,8 @@ const { branch, business, products, currentShift: shift, today } = ctx;
       grid-column: 1 / -1;
       grid-row: 2;
       display: grid;
-      gap: 0.75rem;
-      max-height: min(55dvh, 28rem);
+      gap: 0.875rem;
+      max-height: min(60dvh, 32rem);
       overflow-y: auto;
       overscroll-behavior: contain;
       padding: 0.5rem 0.5rem 0.75rem;
@@ -721,22 +1198,6 @@ const { branch, business, products, currentShift: shift, today } = ctx;
 
     .cart-off {
       position: static;
-    }
-
-    /* Una línea por fila en dos renglones: el nombre arriba, cantidad y monto debajo. */
-    .cart-lines :global(li) {
-      grid-template-columns: auto 1.75rem auto minmax(0, 1fr);
-      row-gap: 0.125rem;
-    }
-
-    .cart-lines :global(.line-name) {
-      grid-column: 1 / -1;
-      font-weight: var(--font-semibold);
-    }
-
-    .cart-lines :global(:is(.line-amount, .line-price)) {
-      justify-self: end;
-      width: min(8rem, 100%);
     }
   }
 
@@ -762,7 +1223,7 @@ const { branch, business, products, currentShift: shift, today } = ctx;
     }
   }
 
-  /* Celular: «Confirmar» a secas, para que la barra deje lugar al total; el botón sigue llamándose «Confirmar venta». */
+  /* Celular: «Cobrar» a secas, para que la barra deje lugar al total (que ya se ve al lado); el total sigue en el nombre del botón. */
   @media (max-width: 480px) {
     .confirm-rest {
       position: absolute;
