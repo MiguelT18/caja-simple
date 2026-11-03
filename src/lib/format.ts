@@ -5,6 +5,9 @@ export function formatBs(amount: number, sign?: "+" | "−") {
   return `${sign ?? (amount < 0 ? "−" : "")}Bs ${bs.format(Math.abs(amount))}`;
 }
 
+/** Diferencia del cierre de caja: «Sobran Bs 5,00» o «Faltan Bs 5,00». */
+export const differenceLabel = (d: number) => `${d > 0 ? "Sobran" : "Faltan"} ${formatBs(Math.abs(d))}`;
+
 export const initials = (first: string, last: string) => `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
 
 /** «1 producto», «3 productos». */

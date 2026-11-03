@@ -91,8 +91,8 @@ const freeBusiness = memberships.find((m) => m.role === "dueño" && m.business.p
                   monogram={monogram(m.business.name)}
                   subtitle={
                     m.role === "dueño"
-                      ? `Dueña · plan ${m.business.plan} · ${plural(m.branches.length, "sucursal", "sucursales")}`
-                      : `Empleada · ${[m.employee?.jobTitle, ...m.branches.map((b) => b.name)].filter(Boolean).join(" · ")}`
+                      ? `Tu negocio · plan ${m.business.plan} · ${plural(m.branches.length, "sucursal", "sucursales")}`
+                      : ["Trabajas aquí", m.employee?.jobTitle, ...m.branches.map((b) => b.name)].filter(Boolean).join(" · ")
                   }
                   label={owner ? `Entrar a ${m.business.name}` : `Ir a la caja de ${m.branches[0].name}, en ${m.business.name}`}
                 />

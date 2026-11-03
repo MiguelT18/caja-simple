@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, ChartColumn, Clock, LayoutDashboard, Package, Store, Users, Wallet, Boxes, Settings, UserRound } from "@lucide/astro";
+import { BriefcaseBusiness, ChartColumn, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound } from "@lucide/astro";
 import { catalogLabel } from "./kinds";
 import type { Branch } from "./types";
 import { branchHref, businessHref, type Membership } from "./queries";
@@ -22,7 +22,9 @@ export function appNav(m?: Membership, branch?: Branch) {
     sections.push({
       title: branch.name,
       items: [
+        { label: "Vender", href: href("registrar-venta"), icon: ShoppingCart },
         ...(m.role === "dueño" ? [{ label: "Resumen", href: href(), icon: LayoutDashboard }] : []),
+        { label: "Ventas", href: href("ventas"), icon: Receipt },
         { label: "Gastos", href: href("gastos"), icon: Wallet },
         { label: "Inventario", href: href("inventario"), icon: Boxes },
         { label: "Turnos", href: href("turnos"), icon: Clock },
@@ -35,7 +37,6 @@ export function appNav(m?: Membership, branch?: Branch) {
       title: m.business.name,
       items: [
         { label: "Resumen del negocio", href: base, icon: ChartColumn },
-        { label: "Sucursales", href: `${base}/sucursales`, icon: Store },
         { label: catalogLabel(m.business.kind), href: `${base}/catalogo`, icon: Package },
         { label: "Empleados", href: `${base}/empleados`, icon: Users },
         { label: "Configuración", href: `${base}/configuracion`, icon: Settings },

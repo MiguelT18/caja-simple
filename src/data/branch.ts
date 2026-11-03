@@ -100,6 +100,7 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
     employees: staff,
     sales,
     expenses,
+    salesHistory: moves.sales,
     expenseHistory: moves.expenses,
     salesTotal: sum(sales.map((s) => s.total)),
     expensesTotal: sum(expenses.map((g) => g.amount)),

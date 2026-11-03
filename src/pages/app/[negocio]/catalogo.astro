@@ -16,7 +16,7 @@ const lowCount = catalog.filter((p) => p.soldIn.some((s) => s.low)).length;
 <Layout title={`${label} · ${business.name}`} context={{ membership: ctx.membership }}>
   <PageHeader
     title={label}
-    description={`${plural(catalog.length, "producto", "productos")} de ${business.name} · ${lowCount} con stock bajo en alguna sucursal. El precio y el stock los lleva cada sucursal.`}
+    description={`${[plural(catalog.length, "producto", "productos"), lowCount > 0 && `${lowCount} con stock bajo en alguna sucursal`].filter(Boolean).join(" · ")}. Cada sucursal pone su precio y su stock.`}
   />
 
   <ProductCatalog client:load products={catalog} categories={categories} businessId={business.id} canEdit />

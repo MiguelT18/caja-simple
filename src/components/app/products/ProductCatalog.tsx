@@ -172,7 +172,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
               ? "Agrega los productos que vendes. Después, en el inventario de cada sucursal, les pones precio y stock."
               : canEdit
                 ? "Elige productos de tu catálogo y ponles precio y stock para esta sucursal."
-                : "La dueña del negocio todavía no agregó productos a esta sucursal."}
+                : "Todavía no hay productos en esta sucursal. Quien administra el negocio los agrega desde el catálogo."}
           </p>
           {canEdit && mode === "business" && (
             <Button onClick={() => setEditing("new")}>
@@ -226,7 +226,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
       )}
       {filtered && visible.length > 0 && (
         <p className="mt-3 mb-0 text-sm text-muted-foreground">
-          Mostrando {visible.length} de {products.length} productos.{" "}
+          Mostrando {visible.length} de {products.length} {products.length === 1 ? "producto" : "productos"}.{" "}
           <button type="button" className="font-semibold text-primary underline-offset-4 hover:underline" onClick={clearFilters}>
             Quitar filtros
           </button>

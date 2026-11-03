@@ -6,7 +6,7 @@ Tono cálido y cercano, con modo claro y oscuro. Los valores base viven en `src/
 
 - **El acento es escaso.** `--color-primary` (ámbar) se reserva para la acción principal, el ítem activo, la señal «En curso» y el logo. Lo que guía la vista son los colores con significado.
 - **Nada se comunica solo con color.** Los montos llevan signo (`+` / `−`), las alertas llevan ícono y los turnos su nombre escrito.
-- **Montos:** ingreso → `--color-income` con `+`; gasto → `--color-expense` con `−`; saldo → `--color-text`, y en `--color-expense` solo si es negativo. Siempre con la clase `.num` (cifras tabulares).
+- **Montos:** ingreso → `--color-income` con `+`; gasto → `--color-expense` con `−`; saldo → `--color-text`, y en `--color-expense` solo si es negativo. Siempre con la clase `.num` (cifras tabulares). La diferencia de un cierre se escribe «Sobran Bs 5,00» o «Faltan Bs 5,00» (`differenceLabel()` en `format.ts`), nunca con signo.
 - **Advertencias** (stock bajo, caja descuadrada) → `--color-warning` sobre `--color-warning-soft` y con ícono, para no confundirlas con el ámbar de marca.
 - **Chips** (turnos, estados): texto con el color fuerte sobre el `-soft` correspondiente, en `--text-xs` + `--font-semibold`.
 - **Contraste:** todo el texto cumple WCAG AA en los dos temas. `--color-text-subtle` solo se usa en placeholders y datos poco importantes.
@@ -123,7 +123,8 @@ El mundo de la app es el de un reproductor de música con la marca de Caja Simpl
 ## Navegación
 
 - **Dos paneles apilados** (`Sidebar.astro`), los dos `--color-surface` con `--radius-panel`: arriba la marca (logo ámbar, «Caja Simple» en 800 y el lema), la campana y el tema; abajo la biblioteca, que crece y hace scroll sola (la barra de scroll aparece al pasar el mouse) y termina en la tarjeta de usuario.
-- **Biblioteca:** selector de negocio (`ContextSwitcher.astro`, son enlaces: muestra el rol en cada negocio y termina en «Tus negocios»), luego las secciones y al final «Sucursales». No hay selector de sucursal ni botón de acción: «Registrar venta» vive en la barra del turno.
+- **Biblioteca:** selector de negocio (`ContextSwitcher.astro`, son enlaces: muestra el rol en cada negocio con texto neutro, «Tu negocio» o «Trabajas aquí», y termina en «Tus negocios»), luego las secciones y al final «Sucursales». No hay selector de sucursal. En la sección de la sucursal, «Vender» va primero (lleva a «Registrar venta», que también está en la barra del turno), luego Resumen (solo dueño), Ventas, Gastos, Inventario y Turnos.
+- **«Sucursales» una sola vez:** la sección del negocio no repite el enlace; el título de la biblioteca lleva a la derecha «Ver todas» (`.library-all`, solo para el dueño), que es el enlace a la página de sucursales y toma `aria-current` en ella.
 - **Secciones:** el título es el nombre de la sucursal o del negocio, en `--text-sm`, 800 y `--color-text`, sin mayúsculas. Los enlaces (`--text-sm`, 600, `--color-text-muted`; `--color-text` al pasar) se definen en `src/data/navigation.ts`.
 - **Según dónde estás:** en `/app`, «Cuenta» (Tus negocios, Tu cuenta); en las páginas del negocio, la sección del negocio; en una sucursal, la de la sucursal arriba y la del negocio debajo. La empleada nunca ve la sección del negocio ni el resumen de la sucursal.
 - **Ítem activo:** `aria-current="page"`, fondo `--color-surface-muted`, texto `--color-text` en 700 y solo el ícono en ámbar (el ámbar sobre la superficie elevada clara no llega a AA como texto).
@@ -137,7 +138,9 @@ El mundo de la app es el de un reproductor de música con la marca de Caja Simpl
 `PageHeader.astro` abre cada página de `/app` con el color de su entidad.
 
 - **Degradado:** de arriba abajo, `--tint` al 40% → 16% (al 65%) → `--color-surface`, mezclado en `oklab`, de borde a borde del panel (anula el padding de `<main>` con `--main-pad`). `tint` es el color de la sucursal (`branchColor()`) o, por defecto, el ámbar.
-- **Título:** h1 en `--text-display`, 800, `-0.035em`, `text-wrap: balance`.
+- **Fecha:** `eyebrow` (línea en `--text-sm` 600 sobre el h1) con `longDate()` de `src/lib/dates.ts`, «Martes 3 de noviembre», en toda página que muestra cifras de «hoy»: resúmenes, Vender, Ventas, Gastos y Turnos.
+- **Título:** h1 en `--text-display`, 800, `-0.035em`, `text-wrap: balance`. Con `compact` (solo «Registrar venta») baja a `--text-3xl` y el degradado se acorta, para ver los productos en el primer pantallazo del celular.
+- **Acción principal:** la del encabezado va en `.btn-primary` (Registrar gasto, Invitar empleado, Agregar sucursal…); el resto, en secundario.
 - **Descripción:** `--text-sm`, 500, en `--color-text`: el `-muted` no llega a AA sobre el tinte.
 - **Acciones:** van debajo del título, en una fila que se parte si no cabe.
 - **Portada** (slot `cover`): cuadrada, de 6 a 12rem, radio 0.375rem y sombra; queda a la izquierda del título y baja encima a ≤480px. La usa el resumen de la sucursal, con el ícono `Store` sobre su color.

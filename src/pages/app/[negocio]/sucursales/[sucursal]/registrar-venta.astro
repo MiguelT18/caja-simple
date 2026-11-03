@@ -1,19 +1,39 @@
 ---
-import { ChevronUp, Minus, Plus, Search, ShoppingCart } from "@lucide/astro";
+import { ChevronUp, Clock, LockOpen, Minus, Plus, Search, ShoppingCart, TriangleAlert } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, shiftBarData, branchHref } from "@/data/queries";
+import { branchColor, branchContext, shiftBarData, branchHref, isLowStock } from "@/data/queries";
+import { longDate } from "@/lib/dates";
 import { formatBs } from "@/lib/format";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx) return Astro.rewrite("/404");
-const { branch, business, products, currentShift: shift } = ctx;
+const { branch, business, products, currentShift: shift, today } = ctx;
 ---
 
 <Layout title={`Registrar venta · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader tint={branchColor(ctx.membership, branch.id)} title="Registrar venta" description={`${branch.name} · toca los productos para agregarlos a la venta`} />
+  <PageHeader
+    compact
+    tint={branchColor(ctx.membership, branch.id)}
+    eyebrow={[longDate(today), shift && `Turno ${shift.name.toLowerCase()}`].filter(Boolean).join(" · ")}
+    title="Registrar venta"
+    description={`${branch.name} · elige los productos y el total se suma solo.`}
+  />
+
+  {
+    !shift && (
+      <div class="closed">
+        <Clock size={20} stroke-width={1.75} />
+        <p>No hay un turno abierto. Ábrelo para empezar a vender.</p>
+        <a class="btn btn-primary" href={branchHref(business, branch, "turnos")}>
+          <LockOpen size={18} stroke-width={1.75} />
+          Abrir turno
+        </a>
+      </div>
+    )
+  }
 
   <div class="sale">
     <section class="catalog" aria-label="Productos">
@@ -43,9 +63,12 @@ const { branch, business, products, currentShift: shift } = ctx;
               <button type="button" class="product" data-id={p.id} data-name={p.name} data-price={p.price ?? ""} data-stock={p.stock ?? ""} disabled={p.stock === 0 || !shift}>
                 <span class="product-name">{p.name}</span>
                 <span class="product-price num">{p.price === null ? "Precio al vender" : formatBs(p.price)}</span>
-                <span class="product-stock num">
-                  {p.stock === null ? "Sin control de stock" : p.stock === 0 ? "Sin stock" : `${p.stock} en stock`}
-                </span>
+                {p.stock !== null && (
+                  <span class:list={["product-stock num", { low: isLowStock(p) }]}>
+                    {isLowStock(p) && p.stock > 0 && <TriangleAlert size={14} stroke-width={2} />}
+                    {p.stock === 0 ? "Sin stock" : isLowStock(p) ? `Quedan ${p.stock}` : `${p.stock} en stock`}
+                  </span>
+                )}
                 <span class="in-cart num" data-in-cart hidden />
 
                 <span class="add play-btn" aria-hidden="true">
@@ -78,14 +101,6 @@ const { branch, business, products, currentShift: shift } = ctx;
       </button>
 
       <div class="cart-body" id="cart-body">
-        {
-          !shift && (
-            <p class="notice">
-              No hay un turno abierto. <a href={branchHref(business, branch, "turnos")}>Abre uno en Turnos</a> para registrar ventas.
-            </p>
-          )
-        }
-
         <p class="cart-empty" data-cart-empty>
           <ShoppingCart size={20} stroke-width={1.75} />
           Todavía no agregaste productos.
@@ -116,6 +131,7 @@ const { branch, business, products, currentShift: shift } = ctx;
 <script>
   import { actions } from "astro:actions";
   import { formatBs } from "@/lib/format";
+  import { toast } from "@/scripts/dialogs";
 
   // Una línea por producto; con precio al vender, una línea por prenda (cada una con su precio).
   // price null: falta escribirlo. stock Infinity: sin control de stock.
@@ -278,14 +294,16 @@ const { branch, business, products, currentShift: shift } = ctx;
       return;
     }
     // Recarga para mostrar el stock actualizado; el aviso queda para la siguiente vista.
-    sessionStorage.setItem("sale-notice", "Venta registrada.");
+    try {
+      sessionStorage.setItem("sale-notice", `Venta de ${total.textContent} registrada.`);
+    } catch {}
     window.location.reload();
   });
 
   try {
     const saved = sessionStorage.getItem("sale-notice");
     if (saved) {
-      notice.textContent = saved;
+      toast(saved, "success");
       sessionStorage.removeItem("sale-notice");
     }
   } catch {}
@@ -392,7 +410,7 @@ const { branch, business, products, currentShift: shift } = ctx;
 
   .product:disabled {
     cursor: not-allowed;
-    opacity: 0.55;
+    opacity: 0.7;
   }
 
   .product-name {
@@ -405,8 +423,35 @@ const { branch, business, products, currentShift: shift } = ctx;
   }
 
   .product-stock {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     color: var(--color-text-muted);
     font-size: var(--text-xs);
+  }
+
+  .product-stock.low {
+    color: var(--color-warning);
+    font-weight: var(--font-semibold);
+  }
+
+  /* Sin turno abierto: el aviso va arriba, antes de los productos, con la salida a mano. */
+  .closed {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius-panel);
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+  }
+
+  .closed p {
+    flex: 1 1 16rem;
+    margin: 0;
+    font-weight: var(--font-semibold);
   }
 
   .empty {

@@ -2,18 +2,18 @@
 import { CircleCheck, Clock, Store, TriangleAlert } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
-import BarCompareChart from "@/components/app/charts/BarCompareChart";
 import DonutChart from "@/components/app/charts/DonutChart";
 import WeekChart from "@/components/app/charts/WeekChart";
 import MovementsTable from "@/components/app/MovementsTable";
 import Layout from "@/layouts/Layout.astro";
 import { branchColor, branchContext, shiftBarData, branchHref, isLowStock } from "@/data/queries";
-import { formatBs, plural, shiftHours } from "@/lib/format";
+import { differenceLabel, formatBs, plural, shiftHours } from "@/lib/format";
+import { longDate } from "@/lib/dates";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx || ctx.role !== "dueño") return Astro.rewrite("/404");
-const { branch, expenses, products, sales, salesByCategory, salesTotal, expensesTotal, shiftById, shiftTotals, shifts, weekSummary } = ctx;
+const { today, branch, expenses, products, sales, salesByCategory, salesTotal, expensesTotal, shiftById, shiftTotals, shifts, weekSummary } = ctx;
 const balance = salesTotal - expensesTotal;
 
 const movements = [
@@ -34,20 +34,15 @@ const movements = [
     };
   });
 
-const byShift = shifts.map((shift) => {
-  const t = shiftTotals(shift.id);
-  return { label: shift.name, sales: t.sales, expenses: t.expenses };
-});
-
 const lowStock = products.filter(isLowStock);
 const color = branchColor(ctx.membership, branch.id);
-const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural(ctx.employees.length, "persona", "personas"), branch.address]
+const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(ctx.employees.length, "persona", "personas")]
   .filter(Boolean)
   .join(" · ");
 ---
 
 <Layout title={`Resumen · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader tint={color} title={branch.name} description={meta}>
+  <PageHeader tint={color} eyebrow={longDate(today)} title={branch.name} description={meta}>
     <span slot="cover" class="cover-art" style={`--branch: ${color}`}>
       <Store size={64} stroke-width={1.5} />
     </span>
@@ -57,12 +52,12 @@ const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural
     <div class="kpi">
       <p class="kpi-label">Ventas</p>
       <p class="kpi-value num amount-income">{formatBs(salesTotal, "+")}</p>
-      <p class="kpi-note">{sales.length} {sales.length === 1 ? "venta" : "ventas"}</p>
+      <p class="kpi-note">{plural(sales.length, "venta", "ventas")}</p>
     </div>
     <div class="kpi">
       <p class="kpi-label">Gastos</p>
       <p class="kpi-value num amount-expense">{formatBs(expensesTotal, "−")}</p>
-      <p class="kpi-note">{expenses.length} {expenses.length === 1 ? "gasto" : "gastos"}</p>
+      <p class="kpi-note">{plural(expenses.length, "gasto", "gastos")}</p>
     </div>
     <div class="kpi">
       <p class="kpi-label">Saldo del día</p>
@@ -116,7 +111,7 @@ const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural
             ) : (
               <p class="status chip-warning">
                 <TriangleAlert size={16} stroke-width={2} />
-                <span>Descuadre de <span class="num">{formatBs(t.close.difference!)}</span></span>
+                <span class="num">{differenceLabel(t.close.difference!)}</span>
               </p>
             )}
           </article>
@@ -125,15 +120,14 @@ const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural
     }
   </section>
 
-  <section class="card chart-card" aria-labelledby="week-title">
-    <div class="chart-head">
-      <h2 id="week-title" class="card-title">Últimos 7 días</h2>
-      <p>Ventas y gastos por día</p>
-    </div>
-    <WeekChart client:visible days={weekSummary} />
-  </section>
-
   <div class="chart-grid">
+    <section class="card chart-card" aria-labelledby="week-title">
+      <div class="chart-head">
+        <h2 id="week-title" class="card-title">Últimos 7 días</h2>
+        <p>Ventas y gastos por día</p>
+      </div>
+      <WeekChart client:visible days={weekSummary} />
+    </section>
     <section class="card chart-card" aria-labelledby="category-title">
       <div class="chart-head">
         <h2 id="category-title" class="card-title">Ventas por categoría</h2>
@@ -141,18 +135,14 @@ const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural
       </div>
       <DonutChart client:visible items={salesByCategory()} totalLabel="vendido hoy" />
     </section>
-    <section class="card chart-card" aria-labelledby="shift-title">
-      <div class="chart-head">
-        <h2 id="shift-title" class="card-title">Ventas y gastos por turno</h2>
-        <p>Hoy</p>
-      </div>
-      <BarCompareChart client:visible rows={byShift} />
-    </section>
   </div>
 
   <div class="split">
     <section>
-      <h2 class="section-title">Movimientos de hoy</h2>
+      <div class="shelf-head">
+        <h2>Movimientos de hoy</h2>
+        <a href={branchHref(ctx.business, branch, "ventas")} class="shelf-link">Ver ventas</a>
+      </div>
       <MovementsTable client:visible rows={movements} />
     </section>
 
@@ -169,7 +159,7 @@ const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural
               <TriangleAlert size={16} stroke-width={2} class="warn-icon" />
               <span class="stock-name">{p.name}</span>
               <span class="num muted">
-                quedan {p.stock}
+                Quedan {p.stock}{p.minStock ? ` · mínimo ${p.minStock}` : ""}
               </span>
             </li>
           ))
@@ -195,7 +185,7 @@ const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural
 
   .chart-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     gap: 1rem;
   }
 
@@ -207,15 +197,6 @@ const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural
     background: linear-gradient(135deg, color-mix(in oklab, var(--branch) 55%, var(--color-surface)), color-mix(in oklab, var(--branch) 20%, var(--color-surface)));
     color: var(--color-text);
   }
-
-  /* Cifras del día en fila, sin tarjetas: el número manda. */
-
-
-
-
-
-
-
 
   .shift-grid {
     display: grid;
@@ -316,7 +297,6 @@ const meta = ["Resumen de hoy", plural(shifts.length, "turno", "turnos"), plural
     flex-shrink: 0;
     color: var(--color-warning);
   }
-
 
   @media (max-width: 1100px) {
     .chart-grid {

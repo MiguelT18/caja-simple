@@ -5,8 +5,9 @@ import ShiftChip from "@/components/ShiftChip.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, shiftBarData, fullName } from "@/data/queries";
-import { formatBs, initials, overnight, shiftHours } from "@/lib/format";
+import { branchColor, branchContext, businessHref, shiftBarData, fullName } from "@/data/queries";
+import { differenceLabel, formatBs, initials, overnight, shiftHours } from "@/lib/format";
+import { addDays, longDate } from "@/lib/dates";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
@@ -21,10 +22,10 @@ const tones = [
 ---
 
 <Layout title={`Turnos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader tint={branchColor(ctx.membership, branch.id)} title="Turnos" description={`Horarios, responsables y cuadre de hoy en ${branch.name}`}>
+  <PageHeader tint={branchColor(ctx.membership, branch.id)} eyebrow={longDate(today)} title="Turnos" description={`Horarios, quién está a cargo y el cuadre de caja de hoy en ${branch.name}.`}>
     {
       isOwner && (
-        <button type="button" class="btn btn-secondary" data-open-dialog="shift-new">
+        <button type="button" class="btn btn-primary" data-open-dialog="shift-new">
           <Plus size={18} stroke-width={2} />
           Agregar turno
         </button>
@@ -49,7 +50,7 @@ const tones = [
               {t.close.status === "en-curso" && (
                 <span class="live-label">
                   <span class="live-dot" aria-hidden="true" />
-                  {t.openedOn === today ? "En curso" : `En curso desde el ${t.openedOn.split("-").reverse().join("/")}`}
+                  {t.openedOn === today ? "En curso" : t.openedOn === addDays(today, -1) ? "En curso desde ayer" : `En curso desde el ${longDate(t.openedOn).replace(/^\S+ /, "")}`}
                 </span>
               )}
               {t.close.status === "cerrado" && <span class="chip chip-neutral">Cerrado</span>}
@@ -65,7 +66,15 @@ const tones = [
               <div>
                 <h2 class="label">A cargo</h2>
                 {staff.length === 0 ? (
-                  <p class="muted">{isOwner ? "Nadie asignado. Asigna personas en Empleados." : "Nadie asignado."}</p>
+                  <p class="muted">
+                    Nadie asignado.
+                    {isOwner && (
+                      <>
+                        {" "}
+                        <a href={`${businessHref(ctx.business)}/empleados`}>Asigna a alguien en Empleados</a>.
+                      </>
+                    )}
+                  </p>
                 ) : (
                   <ul class="staff" role="list">
                     {staff.map((e) => (
@@ -97,7 +106,7 @@ const tones = [
                   <dd class="num amount-expense">{formatBs(t.expenses, "−")}</dd>
                 </div>
                 <div class="strong">
-                  <dt>Esperado</dt>
+                  <dt>Esperado en caja</dt>
                   <dd class="num">{formatBs(t.expected)}</dd>
                 </div>
                 <div>
@@ -118,10 +127,7 @@ const tones = [
             {t.close.difference !== undefined && t.close.difference !== 0 && (
               <p class="status chip-warning">
                 <TriangleAlert size={16} stroke-width={2} />
-                <span>
-                  Descuadre de <span class="num">{formatBs(t.close.difference)}</span>
-                  {t.close.difference > 0 ? " (sobra)" : " (falta)"}
-                </span>
+                <span class="num">{differenceLabel(t.close.difference)}</span>
               </p>
             )}
 

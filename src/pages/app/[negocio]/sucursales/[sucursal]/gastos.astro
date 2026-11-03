@@ -9,11 +9,12 @@ import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
 import { branchColor, branchContext, shiftBarData, branchHref, expensesByCategory, fullName, sum } from "@/data/queries";
 import { formatBs } from "@/lib/format";
+import { longDate } from "@/lib/dates";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx) return Astro.rewrite("/404");
-const { branch, business, currentShift, expenseHistory, expenses, shiftById, shifts } = ctx;
+const { branch, business, currentShift, expenseHistory, expenses, shiftById, shifts, today } = ctx;
 // Categorías ya usadas, como sugerencias del campo.
 const usedCategories = [...new Set(expenseHistory.map((g) => g.category))].sort();
 
@@ -40,10 +41,10 @@ const rows = expenseHistory.map((g) => {
 ---
 
 <Layout title={`Gastos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader tint={branchColor(ctx.membership, branch.id)} title="Gastos" description={`Salidas de dinero de los últimos 7 días en ${branch.name}`}>
+  <PageHeader tint={branchColor(ctx.membership, branch.id)} eyebrow={longDate(today)} title="Gastos" description={`Lo que salió de la caja en los últimos 7 días en ${branch.name}.`}>
     {
       currentShift ? (
-        <button type="button" class="btn btn-secondary" data-open-dialog="expense">
+        <button type="button" class="btn btn-primary" data-open-dialog="expense">
           <Plus size={18} stroke-width={2} />
           Registrar gasto
         </button>
@@ -82,12 +83,12 @@ const rows = expenseHistory.map((g) => {
   <div class="top">
     <dl class="card totals">
       <div class="totals-main">
-        <dt>Total de la semana</dt>
+        <dt>Últimos 7 días</dt>
         <dd class="num amount-expense">{formatBs(weekTotal, "−")}</dd>
       </div>
       <div>
         <dt>Hoy</dt>
-        <dd class="num">{formatBs(todayTotal, "−")}</dd>
+        <dd class="num amount-expense">{formatBs(todayTotal, "−")}</dd>
       </div>
       {
         byShift.map(({ shift, total }) => (
@@ -95,7 +96,7 @@ const rows = expenseHistory.map((g) => {
             <dt>
               <ShiftChip shift={shift} />
             </dt>
-            <dd class="num">{formatBs(total, "−")}</dd>
+            <dd class="num amount-expense">{formatBs(total, "−")}</dd>
           </div>
         ))
       }

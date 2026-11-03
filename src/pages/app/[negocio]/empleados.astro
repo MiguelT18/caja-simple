@@ -31,13 +31,13 @@ const rows = employees.map((e) => {
 
 <Layout title={`Empleados · ${business.name}`} context={{ membership: ctx.membership }}>
   <PageHeader title="Empleados" description={`${plural(employees.length, "persona", "personas")} en las sucursales de ${business.name}. Entran gratis, siempre.`}>
-    <button type="button" class="btn btn-secondary" data-open-dialog="invite"><UserPlus size={18} stroke-width={2} />Invitar empleado</button>
+    <button type="button" class="btn btn-primary" data-open-dialog="invite"><UserPlus size={18} stroke-width={2} />Invitar empleado</button>
   </PageHeader>
 
   <Modal
     id="invite"
     title="Invitar empleado"
-    description="Tiene que tener cuenta en Caja Simple. Le llegará la invitación a su bandeja y entrará cuando la acepte."
+    description="Le llega la invitación a sus avisos y entra al negocio cuando la acepta."
     action="inviteEmployee"
     submitLabel="Invitar"
     hidden={{ businessId: business.id }}
@@ -47,7 +47,7 @@ const rows = employees.map((e) => {
       name="email"
       type="email"
       label="Correo"
-      hint="Escribe al menos 3 letras para buscar entre las cuentas registradas. Con el teclado: ↑ ↓ para elegir y RePág / AvPág para cambiar de página."
+      hint="Busca a la persona por su correo: tiene que tener cuenta en Caja Simple."
       required
       autocapitalize="none"
       spellcheck="false"
@@ -83,6 +83,7 @@ const rows = employees.map((e) => {
         </button>
       </div>
       <p class="sr-only" aria-live="polite" data-status></p>
+      <p class="sr-only" id="people-keys">Con las flechas arriba y abajo eliges una cuenta; con RePág y AvPág cambias de página.</p>
     </div>
     <FormInput form="invite-form" name="jobTitle" label="Puesto" placeholder="Ej.: Cajera" required maxlength={60} />
     <div class="field-row-2">
@@ -126,6 +127,8 @@ const rows = employees.map((e) => {
     const [prev, next] = popover.querySelectorAll<HTMLButtonElement>(".pager-btn");
     const status = popover.querySelector<HTMLElement>("[data-status]")!;
     const businessId = input.dataset.peopleSearch!;
+    // Las teclas de la lista se anuncian aparte: en pantalla la pista queda corta.
+    input.setAttribute("aria-describedby", `${input.getAttribute("aria-describedby") ?? ""} people-keys`.trim());
 
     // Búsquedas ya hechas: volver atrás o cambiar de página no espera a la red.
     const cache = new Map<string, Result>();

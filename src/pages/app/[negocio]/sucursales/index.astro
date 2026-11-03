@@ -6,6 +6,7 @@ import BranchDialogs from "@/components/app/BranchDialogs.astro";
 import Layout from "@/layouts/Layout.astro";
 import { businessContext, businessHref } from "@/data/queries";
 import { planLimits } from "@/data/plans";
+import { plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
@@ -15,16 +16,16 @@ const canAddBranch = maxBranches === null || branchSummary.length < maxBranches;
 ---
 
 <Layout title={`Sucursales · ${business.name}`} context={{ membership: ctx.membership }}>
-  <PageHeader title="Sucursales" description={`${branchSummary.length} ${branchSummary.length === 1 ? "sucursal" : "sucursales"} de ${business.name} · movimientos de hoy`}>
+  <PageHeader title="Sucursales" description={`${plural(branchSummary.length, "sucursal", "sucursales")} de ${business.name}, con las cifras de hoy.`}>
     {
       canAddBranch ? (
-        <button type="button" class="btn btn-secondary" data-open-dialog="branch-new">
+        <button type="button" class="btn btn-primary" data-open-dialog="branch-new">
           <Plus size={18} stroke-width={2} />
           Agregar sucursal
         </button>
       ) : (
         <p class="notice">
-          Tu plan {business.plan} incluye {maxBranches} sucursal. <a href={`${businessHref(business)}/plan`}>Ver planes →</a>
+          Tu plan {business.plan} incluye {plural(maxBranches!, "sucursal", "sucursales")}. <a href={`${businessHref(business)}/plan`}>Ver planes →</a>
         </p>
       )
     }

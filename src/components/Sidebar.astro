@@ -2,12 +2,13 @@
 import { BriefcaseBusiness, Store } from "@lucide/astro";
 import type { Branch, User } from "../data/types";
 import { appNav } from "../data/navigation";
-import { branchColor, branchHref, branchImages, branchSections, entryHref, myBusinesses, type Membership } from "../data/queries";
+import { branchColor, branchHref, branchImages, branchSections, businessHref, entryHref, myBusinesses, type Membership } from "../data/queries";
 import ContextSwitcher from "./ContextSwitcher.astro";
 import Logo from "./Logo.astro";
 import NotificationBell from "./NotificationBell.astro";
 import ThemeToggle from "./ThemeToggle.astro";
 import UserCard from "./UserCard.astro";
+import { plural } from "../lib/format";
 
 interface Props {
   user: User;
@@ -26,8 +27,8 @@ const businessOptions = myBusinesses(Astro.locals).map((other) => ({
   label: other.business.name,
   detail:
     other.role === "dueño"
-      ? `Dueña · ${other.branches.length} ${other.branches.length === 1 ? "sucursal" : "sucursales"}`
-      : `Empleada · ${other.employee?.jobTitle ?? ""}`,
+      ? `Tu negocio · ${plural(other.branches.length, "sucursal", "sucursales")}`
+      : ["Trabajas aquí", other.employee?.jobTitle].filter(Boolean).join(" · "),
   href: entryHref(other),
   current: other.business.id === m?.business.id,
 }));
@@ -35,6 +36,8 @@ const businessOptions = myBusinesses(Astro.locals).map((other) => ({
 // Biblioteca de sucursales: al cambiar se queda en la misma sección (de Turnos a Turnos), si el rol la puede ver.
 const section = m && branch ? currentPath.slice(branchHref(m.business, branch).length).replace(/^\//, "") : undefined;
 const fallback = m?.role === "dueño" ? "" : "registrar-venta";
+// Solo el dueño ve la página de sucursales: el título de la biblioteca lleva a ella.
+const branchesHref = m?.role === "dueño" ? `${businessHref(m.business)}/sucursales` : undefined;
 const images = m ? await branchImages(Astro.locals, m) : new Map<string, string>();
 const branchLinks = m
   ? m.branches.map((other) => ({
@@ -118,9 +121,16 @@ const branchLinks = m
       {
         branchLinks.length > 0 && (
           <div class="nav-section">
-            <p class="nav-section-title" id="nav-section-branches">
-              Sucursales
-            </p>
+            <div class="library-head">
+              <p class="nav-section-title" id="nav-section-branches">
+                Sucursales
+              </p>
+              {branchesHref && (
+                <a href={branchesHref} class="library-all" aria-current={currentPath === branchesHref ? "page" : undefined}>
+                  Ver todas<span class="sr-only"> las sucursales</span>
+                </a>
+              )}
+            </div>
             <ul aria-labelledby="nav-section-branches" class="library">
               {branchLinks.map((link) => (
                 <li>
@@ -300,6 +310,38 @@ const branchLinks = m
   .sidebar-nav:hover,
   .sidebar-nav:focus-within {
     scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  .library-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+  }
+
+  .library-head .nav-section-title {
+    margin-bottom: 0;
+  }
+
+  .library-all {
+    flex-shrink: 0;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+    text-decoration: none;
+  }
+
+  .library-all:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+  }
+
+  .library-all[aria-current="page"] {
+    background: var(--color-surface-muted);
+    color: var(--color-text);
   }
 
   .nav-section-title {

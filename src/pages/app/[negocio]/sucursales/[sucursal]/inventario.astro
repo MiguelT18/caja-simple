@@ -25,7 +25,7 @@ const lowCount = products.filter(isLowStock).length;
   <PageHeader
     tint={branchColor(ctx.membership, branch.id)}
     title="Inventario"
-    description={`${plural(products.length, "producto", "productos")} · ${lowCount} con stock bajo en ${branch.name}`}
+    description={[`${plural(products.length, "producto", "productos")} en ${branch.name}`, lowCount > 0 && `${lowCount} con stock bajo`].filter(Boolean).join(" · ")}
   >
     {
       isOwner && (

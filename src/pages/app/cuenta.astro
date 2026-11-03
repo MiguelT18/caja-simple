@@ -52,7 +52,7 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
             <Clock size={20} stroke-width={1.75} />
             Tus turnos de trabajo
           </h2>
-          <p class="field-hint">Si cambias de horario, elígelo aquí. A la dueña le llega un aviso; la sucursal y el puesto los cambia ella.</p>
+          <p class="field-hint">Si cambias de horario, elígelo aquí. Quien administra el negocio recibe un aviso; la sucursal y el puesto los cambia esa persona.</p>
           {jobs.map(({ business, branch, employee, shifts }) => {
             const form = `shift-${employee.id}`;
             return (

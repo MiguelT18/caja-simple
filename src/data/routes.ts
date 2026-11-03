@@ -11,7 +11,7 @@ export const entryHref = (m: Membership) =>
 
 /** Secciones de sucursal que ve cada rol ("" es el resumen de la sucursal). */
 export const branchSections = (role: Role) =>
-  role === "dueño" ? ["", "registrar-venta", "gastos", "inventario", "turnos"] : ["registrar-venta", "gastos", "inventario", "turnos"];
+  role === "dueño" ? ["", "registrar-venta", "ventas", "gastos", "inventario", "turnos"] : ["registrar-venta", "ventas", "gastos", "inventario", "turnos"];
 
 /** Color de una sucursal: el mismo que en «Sucursales» (por su orden en el negocio). */
 export const branchColor = (m: Membership, branchId: string) => colorAt(Math.max(0, m.branches.findIndex((b) => b.id === branchId)));

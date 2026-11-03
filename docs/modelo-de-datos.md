@@ -77,7 +77,7 @@ erDiagram
 | `/app/[negocio]/configuracion` | dueña: nombre del negocio, sucursales, uso del plan y eliminar |
 | `/app/[negocio]/plan` | dueña: planes, precios y métodos de pago |
 | `/app/[negocio]/sucursales/[sucursal]` | dueña: resumen de la sucursal |
-| `/app/[negocio]/sucursales/[sucursal]/{registrar-venta,gastos,inventario,turnos}` | dueña y empleada |
+| `/app/[negocio]/sucursales/[sucursal]/{registrar-venta,ventas,gastos,inventario,turnos}` | dueña y empleada |
 
 El negocio y la sucursal van en la URL, no en `localStorage`. Las páginas se renderizan en el servidor: el middleware carga la sesión y los negocios de la persona, y una página a la que su rol no tiene acceso responde 404.
 

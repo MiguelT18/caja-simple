@@ -19,10 +19,13 @@ export default function MovementsTable({
   rows,
   pageSize = 6,
   empty = "Todavía no hay ventas ni gastos hoy.",
+  timeLabel = "Hora",
 }: {
   rows: Movement[];
   pageSize?: number;
   empty?: string;
+  /** «Cuándo» si `time` lleva también el día. */
+  timeLabel?: string;
 }) {
   const pager = usePage(rows, pageSize);
   if (rows.length === 0) return <p className="card empty-state">{empty}</p>;
@@ -32,7 +35,7 @@ export default function MovementsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Hora</TableHead>
+              <TableHead>{timeLabel}</TableHead>
               <TableHead>Movimiento</TableHead>
               <TableHead>Turno</TableHead>
               <TableHead>Registró</TableHead>

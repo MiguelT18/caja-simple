@@ -1,0 +1,139 @@
+---
+import { Plus } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import ShiftChip from "@/components/ShiftChip.astro";
+import MovementsTable from "@/components/app/MovementsTable";
+import Layout from "@/layouts/Layout.astro";
+import { branchColor, branchContext, shiftBarData, branchHref, sum } from "@/data/queries";
+import { longDate, shortDate } from "@/lib/dates";
+import { formatBs, plural } from "@/lib/format";
+
+const { negocio, sucursal } = Astro.params;
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+if (!ctx) return Astro.rewrite("/404");
+const { branch, business, currentShift, sales, salesHistory, shiftById, shifts, today } = ctx;
+
+const weekTotal = sum(salesHistory.map((s) => s.total));
+const todayTotal = sum(sales.map((s) => s.total));
+const byShift = shifts.map((shift) => ({
+  shift,
+  total: sum(salesHistory.filter((s) => s.shiftId === shift.id).map((s) => s.total)),
+}));
+
+// Las más recientes primero; el día va junto a la hora porque la lista abarca 7 días.
+const rows = [...salesHistory]
+  .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
+  .map((s) => {
+    const shift = shiftById(s.shiftId);
+    return {
+      id: s.id,
+      time: `${s.date === today ? "Hoy" : shortDate(s.date)}, ${s.time}`,
+      label: `Venta · ${plural(s.items, "producto", "productos")}`,
+      shift: { name: shift.name, tone: shift.tone },
+      by: s.recordedBy.firstName,
+      amount: s.total,
+      kind: "sale" as const,
+    };
+  });
+---
+
+<Layout title={`Ventas · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
+  <PageHeader
+    tint={branchColor(ctx.membership, branch.id)}
+    eyebrow={longDate(today)}
+    title="Ventas"
+    description={`Lo que entró a la caja en los últimos 7 días en ${branch.name}.`}
+  >
+    {
+      currentShift ? (
+        <a class="btn btn-primary" href={branchHref(business, branch, "registrar-venta")}>
+          <Plus size={18} stroke-width={2} />
+          Registrar venta
+        </a>
+      ) : (
+        <a class="btn btn-secondary" href={branchHref(business, branch, "turnos")}>
+          Abre un turno<span class="label-rest"> para vender</span>
+        </a>
+      )
+    }
+  </PageHeader>
+
+  <dl class="card totals">
+    <div class="totals-main">
+      <dt>Últimos 7 días</dt>
+      <dd class="num amount-income">{formatBs(weekTotal, "+")}</dd>
+      <dd class="totals-note">{plural(salesHistory.length, "venta", "ventas")}</dd>
+    </div>
+    <div>
+      <dt>Hoy</dt>
+      <dd class="num amount-income">{formatBs(todayTotal, "+")}</dd>
+    </div>
+    {
+      byShift.map(({ shift, total }) => (
+        <div>
+          <dt>
+            <ShiftChip shift={shift} />
+          </dt>
+          <dd class="num amount-income">{formatBs(total, "+")}</dd>
+        </div>
+      ))
+    }
+  </dl>
+
+  <h2 class="section-title">Historial</h2>
+  <MovementsTable client:visible rows={rows} pageSize={10} timeLabel="Cuándo" empty="Todavía no hay ventas en los últimos 7 días." />
+</Layout>
+
+<style>
+  .totals {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1.25rem;
+    margin: 0 0 0.5rem;
+    padding: 1.25rem;
+  }
+
+  .totals div {
+    display: grid;
+    align-content: start;
+    gap: 0.375rem;
+  }
+
+  .totals dt {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .totals dd {
+    margin: 0;
+    font-weight: var(--font-semibold);
+  }
+
+  .totals-main dd {
+    font-size: var(--text-3xl);
+    line-height: var(--text-3xl-lh);
+    font-weight: var(--font-bold);
+  }
+
+  .totals dd.totals-note {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-regular);
+  }
+
+  @media (max-width: 480px) {
+    .label-rest {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .totals {
+      padding: 1rem;
+    }
+  }
+</style>

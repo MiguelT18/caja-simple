@@ -23,6 +23,19 @@ const partsFormat = new Intl.DateTimeFormat("en-CA", {
   hourCycle: "h23",
 });
 
+const longFormat = new Intl.DateTimeFormat("es-BO", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" });
+
+/** «Martes 3 de noviembre» para un día AAAA-MM-DD (el día ya está en hora de Bolivia). */
+export const longDate = (date: string) => {
+  const text = longFormat.format(new Date(`${date}T12:00:00Z`)).replace(",", "");
+  return text[0].toUpperCase() + text.slice(1);
+};
+
+const shortFormat = new Intl.DateTimeFormat("es-BO", { timeZone: "UTC", day: "numeric", month: "short" });
+
+/** «3 nov» para un día AAAA-MM-DD. */
+export const shortDate = (date: string) => shortFormat.format(new Date(`${date}T12:00:00Z`)).replace(".", "");
+
 /** Hoy (AAAA-MM-DD) en Bolivia. */
 export const today = () => dayFormat.format(new Date());
 

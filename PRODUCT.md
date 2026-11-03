@@ -45,6 +45,7 @@ Caja Simple lleva la caja de negocios pequeños con una o varias sucursales: reg
 
 - Nombre: **Caja Simple**. El logo es el SVG de `src/components/Logo.astro`.
 - Voz: español neutro, con tuteo, cercana y directa ("Ingresa tu correo").
+- En la interfaz, los roles se nombran por función y sin género: «Tu negocio», «Trabajas aquí», «quien administra el negocio». Nunca «Dueña» o «Empleada» como etiqueta de una persona.
 
 ## Evidence on Hand
 

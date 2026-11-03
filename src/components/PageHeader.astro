@@ -4,16 +4,20 @@
 interface Props {
   title: string;
   description?: string;
+  /** Línea chica sobre el título: la fecha del día (longDate) y, si aplica, el turno. */
+  eyebrow?: string;
+  /** Encabezado bajo para las páginas de trabajo rápido («Vender»): deja ver el contenido en el primer pantallazo. */
+  compact?: boolean;
   /** Color del degradado: el de la sucursal (branchColor) o, por defecto, el ámbar del negocio. */
   tint?: string;
 }
 
-const { title, description, tint = "var(--color-primary)" } = Astro.props;
+const { title, description, eyebrow, compact, tint = "var(--color-primary)" } = Astro.props;
 const hasCover = Astro.slots.has("cover");
 const hasActions = Astro.slots.has("default");
 ---
 
-<header class:list={["page-head", { "has-cover": hasCover }]} style={`--tint: ${tint}`}>
+<header class:list={["page-head", { "has-cover": hasCover, compact }]} style={`--tint: ${tint}`}>
   {
     hasCover && (
       <div class="page-cover">
@@ -22,6 +26,7 @@ const hasActions = Astro.slots.has("default");
     )
   }
   <div class="page-head-text">
+    {eyebrow && <p class="eyebrow">{eyebrow}</p>}
     <h1>{title}</h1>
     {description && <p>{description}</p>}
   </div>
@@ -77,12 +82,33 @@ const hasActions = Astro.slots.has("default");
   }
 
   /* Sobre el degradado, el texto secundario va en el color pleno: el atenuado no llega a AA sobre el tinte. */
+  .page-head-text p.eyebrow {
+    margin: 0 0 0.375rem;
+    font-weight: var(--font-semibold);
+  }
+
   .page-head-text p {
     max-width: 65ch;
     margin: 0.75rem 0 0;
     color: var(--color-text);
     font-size: var(--text-sm);
     font-weight: var(--font-medium);
+  }
+
+  .page-head.compact {
+    padding-top: clamp(1.5rem, 3vw, 2.5rem);
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .compact h1 {
+    font-size: var(--text-3xl);
+    line-height: var(--text-3xl-lh);
+    letter-spacing: -0.02em;
+  }
+
+  .compact .page-head-text p:not(.eyebrow) {
+    margin-top: 0.375rem;
   }
 
   .page-actions {

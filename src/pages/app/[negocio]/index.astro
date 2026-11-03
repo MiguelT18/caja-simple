@@ -4,31 +4,34 @@ import PageHeader from "@/components/PageHeader.astro";
 import BarCompareChart from "@/components/app/charts/BarCompareChart";
 import Layout from "@/layouts/Layout.astro";
 import { businessContext, businessHref } from "@/data/queries";
-import { formatBs } from "@/lib/format";
+import { formatBs, plural } from "@/lib/format";
+import { longDate, today } from "@/lib/dates";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
 const { business, branchSummary, salesTotal, expensesTotal } = ctx;
 const balance = salesTotal - expensesTotal;
+const salesCount = branchSummary.reduce((n, b) => n + b.salesCount, 0);
 const rows = branchSummary.map((b) => ({ label: b.branch.name, sales: b.sales, expenses: b.expenses }));
 ---
 
 <Layout title={`Resumen · ${business.name}`} context={{ membership: ctx.membership }}>
   <PageHeader
-    title="Resumen del negocio"
-    description={`${business.name} · ${branchSummary.length === 1 ? "hoy" : `hoy en sus ${branchSummary.length} sucursales`}`}
+    eyebrow={longDate(today())}
+    title={business.name}
+    description={branchSummary.length === 1 ? "Cómo va la caja hoy." : `Cómo va la caja hoy en tus ${branchSummary.length} sucursales.`}
   />
 
   <section class="kpis" aria-label="Totales de hoy en todas las sucursales">
     <div class="kpi">
       <p class="kpi-label">Ventas</p>
       <p class="kpi-value num amount-income">{formatBs(salesTotal, "+")}</p>
-      <p class="kpi-note">{branchSummary.reduce((n, b) => n + b.salesCount, 0)} ventas</p>
+      <p class="kpi-note">{plural(salesCount, "venta", "ventas")}</p>
     </div>
     <div class="kpi">
       <p class="kpi-label">Gastos</p>
       <p class="kpi-value num amount-expense">{formatBs(expensesTotal, "−")}</p>
-      <p class="kpi-note">Entre todas las sucursales</p>
+      <p class="kpi-note">{branchSummary.length === 1 ? "Salidas de la caja" : "Entre todas las sucursales"}</p>
     </div>
     <div class="kpi">
       <p class="kpi-label">Saldo del día</p>
@@ -37,14 +40,19 @@ const rows = branchSummary.map((b) => ({ label: b.branch.name, sales: b.sales, e
     </div>
   </section>
 
-  <section class="card chart-card" aria-labelledby="compare-title">
-    <h2 id="compare-title" class="card-title">Ventas y gastos por sucursal</h2>
-    <BarCompareChart client:visible rows={rows} />
-  </section>
+  {/* Con una sola sucursal el gráfico repetiría las cifras de arriba. */}
+  {
+    rows.length > 1 && (
+      <section class="card chart-card" aria-labelledby="compare-title">
+        <h2 id="compare-title" class="card-title">Ventas y gastos por sucursal</h2>
+        <BarCompareChart client:visible rows={rows} />
+      </section>
+    )
+  }
 
   <div class="shelf-head">
-    <h2>Cada sucursal hoy</h2>
-    <a href={`${businessHref(business)}/sucursales`} class="shelf-link">Mostrar todo</a>
+    <h2>{branchSummary.length === 1 ? "Tu sucursal hoy" : "Sucursales hoy"}</h2>
+    <a href={`${businessHref(business)}/sucursales`} class="shelf-link">Ver sucursales</a>
   </div>
   <ul class="branch-list" role="list">
     {
@@ -56,8 +64,8 @@ const rows = branchSummary.map((b) => ({ label: b.branch.name, sales: b.sales, e
             </span>
             <span class="branch-name">{b.branch.name}</span>
           </a>
-          <span class="num amount-income">{formatBs(b.sales, "+")}</span>
-          <span class="num amount-expense">{formatBs(b.expenses, "−")}</span>
+          <span class="num amount-income"><span class="sr-only">Ventas: </span>{formatBs(b.sales, "+")}</span>
+          <span class="num amount-expense"><span class="sr-only">Gastos: </span>{formatBs(b.expenses, "−")}</span>
           <span class="status">
             {b.cash === "cuadra" && (
               <span class="chip chip-income">
@@ -80,13 +88,13 @@ const rows = branchSummary.map((b) => ({ label: b.branch.name, sales: b.sales, e
             {b.cash === "sin-abrir" && (
               <span class="chip chip-neutral">
                 <Clock size={14} stroke-width={2} />
-                Sin turnos abiertos hoy
+                Sin abrir hoy
               </span>
             )}
             {b.lowStock > 0 && (
               <span class="chip chip-warning">
                 <TriangleAlert size={14} stroke-width={2} />
-                {b.lowStock} {b.lowStock === 1 ? "producto" : "productos"} con stock bajo
+                {plural(b.lowStock, "producto", "productos")} con stock bajo
               </span>
             )}
           </span>
