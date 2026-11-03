@@ -12,7 +12,8 @@
 	--color-border-strong: light-dark(#7f8b84, #66746b);
 	--color-text: light-dark(#18201c, #e9ece6);
 	--color-text-muted: light-dark(#4b5650, #a9b3ac);
-	--color-text-subtle: light-dark(#6b766f, #86918a);
+	--color-text-subtle: light-dark(#6b766f, #8d9891);
+	--color-input-border: var(--color-border-strong);
 
 	/* La acción principal es un trozo de pizarra con letra amarilla; en oscuro se invierte. */
 	--color-primary: light-dark(#1f2b25, #f2cf5b);

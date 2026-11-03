@@ -12,11 +12,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pager, usePage } from "./Pager";
 import { ShiftBadge } from "./ShiftBadge";
-import { Field, selectClass, useActionForm } from "./products/form";
-import { confirmDialog } from "@/scripts/dialogs";
+import { Field, safeAction, selectClass, useActionForm } from "./products/form";
+import { confirmDialog, toast } from "@/scripts/dialogs";
 
 export interface EmployeeRow {
   id: string;
@@ -54,7 +54,6 @@ interface Props {
 
 export default function EmployeesTable({ rows, branches, shifts, pageSize = 10 }: Props) {
   const pager = usePage(rows, pageSize);
-  const [error, setError] = useState("");
   // Persona y sucursal elegidas en el menú: abre el diálogo para confirmar el turno.
   const [moving, setMoving] = useState<{ employee: EmployeeRow; branch: BranchOption } | null>(null);
   if (rows.length === 0) return <p className="card empty-state">Todavía no invitaste a nadie a tu equipo.</p>;
@@ -63,8 +62,9 @@ export default function EmployeesTable({ rows, branches, shifts, pageSize = 10 }
     if (!(await confirmDialog(`¿Quitar a ${e.name} de tu equipo? Ya no podrá registrar ventas ni gastos.`, { confirmLabel: "Quitar", danger: true }))) return;
     const form = new FormData();
     form.set("id", e.id);
-    const { error } = await actions.removeEmployee(form);
-    if (error) setError(error.message);
+    const { error } = await safeAction(() => actions.removeEmployee(form));
+    // El aviso flotante se ve aunque la tabla tenga scroll (abajo de la tabla quedaba lejos de la fila).
+    if (error) toast(error.message, "error");
     else window.location.reload();
   }
 
@@ -72,6 +72,7 @@ export default function EmployeesTable({ rows, branches, shifts, pageSize = 10 }
     <div>
       <div className="table-wrap">
         <Table>
+          <TableCaption className="sr-only">Tu equipo</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
@@ -144,11 +145,6 @@ export default function EmployeesTable({ rows, branches, shifts, pageSize = 10 }
           </TableBody>
         </Table>
       </div>
-      {error && (
-        <p className="notice notice-error mt-3" role="alert">
-          {error}
-        </p>
-      )}
       <Pager {...pager} onPage={pager.setPage} noun="empleados" />
       {moving && (
         <AssignDialog
@@ -202,7 +198,7 @@ function AssignDialog({ employee, branch, shifts, onClose }: { employee: Employe
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={save.busy}>
+              <Button type="submit" {...save.submitProps}>
                 {save.busy ? "Guardando…" : same ? "Cambiar turno" : "Asignar"}
               </Button>
             </DialogFooter>

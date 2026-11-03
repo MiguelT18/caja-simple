@@ -22,8 +22,9 @@ const { title, context } = Astro.props;
 		<BaseHead title={title} />
 	</head>
 	<body class="app-surface">
+		<a class="skip-link" href="#main">Saltar al contenido</a>
 		<Sidebar user={currentUser(Astro.locals)} context={context} />
-		<main>
+		<main id="main" tabindex="-1">
 			<slot />
 		</main>
 		{context?.shift && <ShiftBar data={context.shift} />}

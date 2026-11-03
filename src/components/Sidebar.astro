@@ -1,7 +1,7 @@
 ---
-import { BriefcaseBusiness, Store } from "@lucide/astro";
+import { BriefcaseBusiness, GripVertical, Store } from "@lucide/astro";
 import type { Branch, User } from "../data/types";
-import { appNav } from "../data/navigation";
+import { NAV_ORDER_COOKIE, appNav, applyNavOrder } from "../data/navigation";
 import { branchColor, branchHref, branchImages, branchSections, businessHref, entryHref, myBusinesses, type Membership } from "../data/queries";
 import ContextSwitcher from "./ContextSwitcher.astro";
 import Logo from "./Logo.astro";
@@ -21,7 +21,7 @@ const m = context?.membership;
 const branch = context?.branch;
 
 const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
-const navSections = appNav(m, branch);
+const navSections = applyNavOrder(appNav(m, branch), Astro.cookies.get(NAV_ORDER_COOKIE)?.value);
 
 const businessOptions = myBusinesses(Astro.locals).map((other) => ({
   label: other.business.name,
@@ -51,7 +51,7 @@ const branchLinks = m
   : [];
 ---
 
-<aside class="sidebar">
+<div class="sidebar">
   <header class="sidebar-header">
     <a href={m ? entryHref(m) : "/app"} class="brand">
       <Logo class="logo" />
@@ -95,21 +95,23 @@ const branchLinks = m
     }
     <nav class="sidebar-nav" aria-label="Navegación principal">
       {
-        navSections.map(({ title, items }, index) => (
+        navSections.map(({ key, title, items }, index) => (
           <div class="nav-section">
             <p class="nav-section-title" id={`nav-section-${index}`}>
               {title}
             </p>
-            <ul aria-labelledby={`nav-section-${index}`}>
-              {items.map(({ label, href, icon: Icon }) => (
-                <li>
+            <ul aria-labelledby={`nav-section-${index}`} class="nav-sortable" data-nav-section={key}>
+              {items.map(({ id, label, href, icon: Icon }, i) => (
+                <li data-nav-id={id}>
                   <a
                     href={href}
                     class="nav-link"
                     aria-current={currentPath === href ? "page" : undefined}
+                    aria-describedby={i === 0 ? "nav-reorder-hint" : undefined}
                   >
                     <Icon size={18} stroke-width={1.75} />
                     {label}
+                    <GripVertical class="nav-grip" size={16} stroke-width={1.75} aria-hidden="true" />
                   </a>
                 </li>
               ))}
@@ -149,15 +151,62 @@ const branchLinks = m
           </div>
         )
       }
+      <p id="nav-reorder-hint" class="sr-only">Arrastra para reordenar, o usa Alt con las flechas arriba y abajo.</p>
+      <p class="sr-only" aria-live="polite" data-nav-announce></p>
     </nav>
 
     <footer class="sidebar-footer">
       <UserCard user={user} />
     </footer>
   </div>
-</aside>
+</div>
 
 <script>
+  import Sortable from "sortablejs";
+
+  // Orden del menú elegido por la persona: se guarda en una cookie para que el servidor ya lo pinte ordenado.
+  const lists = document.querySelectorAll<HTMLUListElement>(".nav-sortable");
+  const announce = document.querySelector<HTMLElement>("[data-nav-announce]")!;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function saveOrder() {
+    let order: Record<string, string[]> = {};
+    try {
+      order = JSON.parse(decodeURIComponent(document.cookie.match(/(?:^|; )nav-order=([^;]*)/)?.[1] ?? "{}"));
+    } catch {}
+    for (const list of lists) order[list.dataset.navSection!] = [...list.children].map((li) => (li as HTMLElement).dataset.navId!);
+    document.cookie = `nav-order=${encodeURIComponent(JSON.stringify(order))}; path=/; max-age=31536000; samesite=lax`;
+  }
+
+  for (const list of lists) {
+    Sortable.create(list, {
+      animation: reducedMotion ? 0 : 150,
+      // En pantallas táctiles hay que mantener presionado: así tocar y desplazar siguen funcionando.
+      delay: 250,
+      delayOnTouchOnly: true,
+      ghostClass: "nav-ghost",
+      chosenClass: "nav-chosen",
+      onEnd: (event) => {
+        if (event.oldIndex !== event.newIndex) saveOrder();
+      },
+    });
+
+    // Teclado: Alt + ↑/↓ mueve el enlace con foco dentro de su sección.
+    list.addEventListener("keydown", (event) => {
+      if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+      const li = (event.target as HTMLElement).closest("li");
+      if (!li) return;
+      event.preventDefault();
+      const sibling = event.key === "ArrowUp" ? li.previousElementSibling : li.nextElementSibling;
+      if (!sibling) return;
+      if (event.key === "ArrowUp") sibling.before(li);
+      else sibling.after(li);
+      li.querySelector("a")!.focus();
+      saveOrder();
+      announce.textContent = `${li.textContent!.trim()}: posición ${[...list.children].indexOf(li) + 1} de ${list.children.length}`;
+    });
+  }
+
   const sidebar = document.querySelector<HTMLElement>(".sidebar")!;
   const toggle = sidebar.querySelector<HTMLButtonElement>(".menu-toggle")!;
   const panel = sidebar.querySelector<HTMLElement>(".sidebar-panel")!;
@@ -169,7 +218,7 @@ const branchLinks = m
     toggle.setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
     document.documentElement.classList.toggle("menu-open", open);
     // Mientras el menú está abierto, el contenido de fondo no recibe foco ni clics.
-    document.querySelector("main")?.toggleAttribute("inert", open);
+    for (const el of document.querySelectorAll("main, .shift-bar")) el.toggleAttribute("inert", open);
   }
 
   toggle.addEventListener("click", () => {
@@ -302,11 +351,12 @@ const branchLinks = m
     padding: 0.25rem;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
+    /* Tenue pero siempre visible: así se nota que la lista sigue hacia abajo. */
+    scrollbar-color: var(--color-border) transparent;
     transition: scrollbar-color 150ms;
   }
 
-  /* La barra de scroll aparece al pasar por la biblioteca. */
+  /* La barra de scroll se marca al pasar por la biblioteca. */
   .sidebar-nav:hover,
   .sidebar-nav:focus-within {
     scrollbar-color: var(--scrollbar-thumb) transparent;
@@ -399,6 +449,40 @@ const branchLinks = m
 
   .nav-link[aria-current="page"] svg {
     color: var(--color-primary);
+  }
+
+  /* Agarradera de arrastre: aparece al pasar el mouse; en táctil se arrastra manteniendo presionado. */
+  .nav-link .nav-grip {
+    margin-left: auto;
+    color: var(--color-text-muted);
+    opacity: 0;
+    cursor: grab;
+    transition: opacity 150ms;
+  }
+
+  .nav-link:hover .nav-grip,
+  .nav-link:focus-visible .nav-grip {
+    opacity: 1;
+  }
+
+  .nav-link[aria-current="page"] .nav-grip {
+    color: var(--color-text-muted);
+  }
+
+  @media (hover: none) {
+    .nav-link .nav-grip {
+      display: none;
+    }
+  }
+
+  /* Hueco donde caerá el ítem y el ítem levantado. */
+  .nav-sortable :global(.nav-ghost) {
+    opacity: 0.4;
+  }
+
+  .nav-sortable :global(.nav-chosen) .nav-link {
+    background: var(--color-surface-muted);
+    color: var(--color-text);
   }
 
   /* Sucursales como filas de biblioteca: portada cuadrada con su color, nombre y detalle. */

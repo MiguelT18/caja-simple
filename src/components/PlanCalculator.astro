@@ -46,8 +46,9 @@ const branches = Math.min(MAX, Math.max(1, Astro.props.branches ?? 1));
 
     const render = () => {
       value.textContent = String(branches);
-      less.disabled = branches === 1;
-      more.disabled = branches === max;
+      // aria-disabled y no disabled: en el tope el botón conserva el foco (el clic ya no cambia nada).
+      less.setAttribute("aria-disabled", String(branches === 1));
+      more.setAttribute("aria-disabled", String(branches === max));
       if (branches === 1) {
         price.textContent = "Bs 0";
         detail.textContent = `Plan Gratis, o Negocio por Bs ${negMin}–${negMax} al mes`;
@@ -109,7 +110,7 @@ const branches = Math.min(MAX, Math.max(1, Astro.props.branches ?? 1));
     height: 2.75rem;
   }
 
-  .stepper .icon-btn:disabled {
+  .stepper .icon-btn[aria-disabled="true"] {
     opacity: 0.4;
     cursor: not-allowed;
   }

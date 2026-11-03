@@ -27,7 +27,7 @@ const payments = [
         return (
           <article class:list={["card", "plan", { current }]} aria-labelledby={`plan-${plan.name}`}>
             <header>
-              <h3 id={`plan-${plan.name}`}>{plan.name}</h3>
+              <h2 id={`plan-${plan.name}`}>{plan.name}</h2>
               {current && <span class="chip chip-income">Tu plan</span>}
             </header>
             <p class="audience">{plan.audience}</p>
@@ -77,7 +77,7 @@ const payments = [
     </ol>
     {upgradeUrl && (
       <a href={upgradeUrl} class="btn btn-primary" target="_blank" rel="noopener">
-        Mejorar plan
+        Mejorar plan<span class="sr-only"> (se abre en otra pestaña)</span>
       </a>
     )}
   </section>
@@ -167,7 +167,7 @@ const payments = [
     gap: 0.75rem;
   }
 
-  .plan h3 {
+  .plan h2 {
     margin: 0;
     font-size: var(--text-lg);
     line-height: var(--text-lg-lh);

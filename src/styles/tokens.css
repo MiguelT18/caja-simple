@@ -10,6 +10,8 @@
 	--color-surface-muted: light-dark(#f3efe9, #2b2520);
 	--color-border: light-dark(#e7e1d8, #3a322b);
 	--color-border-strong: light-dark(#d3cabd, #4d433a);
+	/* Borde de los campos: al menos 3:1 sobre la superficie (WCAG 1.4.11). */
+	--color-input-border: light-dark(#948a7f, #7a6e63);
 	--shadow-sm: 0 1px 2px light-dark(rgb(31 26 23 / 0.06), rgb(0 0 0 / 0.4));
 	--shadow-md:
 		0 1px 2px light-dark(rgb(31 26 23 / 0.04), rgb(0 0 0 / 0.3)),
@@ -21,14 +23,14 @@
 	--scrollbar-track: transparent;
 	--color-text: light-dark(#1f1a17, #f3eee8);
 	--color-text-muted: light-dark(#6b625a, #b3a89c);
-	--color-text-subtle: light-dark(#8f857b, #8a7f74);
+	--color-text-subtle: light-dark(#756b62, #9a8f84);
 
 	/* Marca: ámbar / caramelo */
 	--color-primary: light-dark(#b45309, #f0a04b);
 	--color-primary-hover: light-dark(#92400e, #f5b871);
 	--color-primary-soft: light-dark(#fdf1e3, #3a2a18);
 	--color-on-primary: light-dark(#ffffff, #1f1a17);
-	--color-focus: light-dark(#d97706, #f0a04b);
+	--color-focus: light-dark(#b45309, #f0a04b);
 
 	/* Colores con significado */
 	--color-income: light-dark(#2a7548, #5cc88a);

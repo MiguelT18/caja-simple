@@ -2,6 +2,8 @@
 // el servidor la prepara. Es navegación normal del navegador: solo cambia lo que se ve mientras espera.
 // Los esqueletos son los <template data-skeleton> de src/components/app/PageSkeleton.astro.
 
+import { announce } from "./dialogs";
+
 // Si la página llega antes, no se muestra nada: evita un parpadeo en navegaciones rápidas.
 const DELAY = 150;
 
@@ -21,7 +23,8 @@ const originalPath = location.pathname;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 function markCurrent(pathname: string) {
-  for (const link of document.querySelectorAll<HTMLAnchorElement>("nav a[href]")) {
+  // Solo las secciones: la biblioteca de sucursales marca la actual con aria-current="true" y no se toca.
+  for (const link of document.querySelectorAll<HTMLAnchorElement>("nav a.nav-link[href]")) {
     if (link.pathname === pathname) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
@@ -39,9 +42,9 @@ export function showPageSkeleton(url: URL) {
   clearTimeout(timer);
   timer = setTimeout(() => {
     original ??= [...main.childNodes];
-    const status = Object.assign(document.createElement("p"), { className: "sr-only", textContent: "Cargando…" });
-    status.setAttribute("role", "status");
-    main.replaceChildren(status, template.content.cloneNode(true));
+    // El anuncio va en una región fija fuera de <main>: una que se crea junto con el cambio no se lee.
+    announce("Cargando…");
+    main.replaceChildren(template.content.cloneNode(true));
     main.setAttribute("aria-busy", "true");
   }, DELAY);
 }

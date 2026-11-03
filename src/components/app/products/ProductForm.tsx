@@ -5,8 +5,8 @@ import type { Category } from "@/data/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { type Item } from "./catalog";
-import { Field, selectClass, useActionForm } from "./form";
-import { confirmDialog, toast } from "@/scripts/dialogs";
+import { Field, safeAction, selectClass, useActionForm } from "./form";
+import { confirmDialog } from "@/scripts/dialogs";
 
 export function ProductForm({
   businessId,
@@ -22,13 +22,17 @@ export function ProductForm({
   const save = useActionForm((form) => actions.saveProduct(form) as never);
   const [preview, setPreview] = useState(product?.image);
   const [removeImage, setRemoveImage] = useState(false);
+  // La foto se revisa al elegirla: así el error llega antes de subir un archivo que el servidor va a rechazar.
+  const [fileError, setFileError] = useState("");
+  const imageError = fileError || save.errors.image;
 
   async function remove() {
     if (!product || !(await confirmDialog(`¿Borrar «${product.name}» del catálogo? Se quita de todas las sucursales.`, { confirmLabel: "Borrar", danger: true }))) return;
     const form = new FormData();
     form.set("id", product.id);
-    const { error } = await actions.deleteProduct(form);
-    if (error) return toast(error.message, "error");
+    const { error } = await safeAction(() => actions.deleteProduct(form));
+    // Dentro del diálogo, en línea: un toast quedaría detrás del modal, inerte.
+    if (error) return save.setMessage(error.message);
     window.location.reload();
   }
 
@@ -66,7 +70,7 @@ export function ProductForm({
               maxLength={14}
             />
           </Field>
-          <Field id="product-image" label="Foto" hint="Opcional. JPG, PNG o WebP, hasta 2 MB." error={save.errors.image}>
+          <Field id="product-image" label="Foto" hint="Opcional. JPG, PNG o WebP, hasta 2 MB." error={imageError}>
             <div className="flex min-w-0 items-center gap-3">
               <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-lg border bg-muted text-muted-foreground">
                 {preview && !removeImage ? <img src={preview} alt="" className="size-full object-cover" /> : <ImagePlus className="size-6" aria-hidden="true" />}
@@ -77,15 +81,28 @@ export function ProductForm({
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="w-full min-w-0 text-sm"
+                aria-invalid={imageError ? true : undefined}
+                aria-describedby={imageError ? "product-image-error" : "product-image-hint"}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
+                  const problem =
+                    file && !["image/jpeg", "image/png", "image/webp"].includes(file.type) ? "Elige una foto JPG, PNG o WebP."
+                    : file && file.size > 2 * 1024 * 1024 ? "La foto pesa más de 2 MB. Elige una más liviana."
+                    : "";
+                  setFileError(problem);
+                  if (problem) e.target.value = "";
                   setRemoveImage(false);
-                  setPreview(file ? URL.createObjectURL(file) : product?.image);
+                  if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
+                  setPreview(file && !problem ? URL.createObjectURL(file) : product?.image);
                 }}
               />
             </div>
             {product?.image && !removeImage && (
-              <button type="button" className="justify-self-start text-sm font-semibold text-primary underline-offset-4 hover:underline" onClick={() => setRemoveImage(true)}>
+              <button type="button" className="justify-self-start text-sm font-semibold text-primary underline-offset-4 hover:underline" onClick={() => {
+                  setRemoveImage(true);
+                  // El botón desaparece: el foco pasa al campo de la foto.
+                  document.getElementById("product-image")?.focus();
+                }}>
                 Quitar foto
               </button>
             )}
@@ -109,7 +126,7 @@ export function ProductForm({
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={save.busy}>
+              <Button type="submit" {...save.submitProps}>
                 {save.busy ? "Guardando…" : "Guardar"}
               </Button>
             </div>

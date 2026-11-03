@@ -7,19 +7,28 @@ import { check, db, limit, name, uuid } from "./shared";
 export const employees = {
   inviteEmployee: defineAction({
     accept: "form",
-    input: z.object({
-      businessId: uuid,
-      branchId: uuid,
-      shiftId: z.uuid("Elige un turno"),
-      email: z.email("Ingresa un correo válido").trim().toLowerCase(),
-      jobTitle: name(60, "Escribe el puesto"),
-    }),
-    handler: async ({ businessId, branchId, shiftId, email, jobTitle }, context) => {
+    // `person` es lo escrito en el campo (nombre o correo). Si se eligió a alguien de las sugerencias encontrado
+    // por nombre, llega `personId` y se invita por su cuenta; si no, `person` tiene que ser un correo completo.
+    input: z
+      .object({
+        businessId: uuid,
+        branchId: uuid,
+        shiftId: z.uuid("Elige un turno"),
+        person: z.string().trim().min(1, "Escribe su nombre o su correo").max(160),
+        personId: z.union([uuid, z.literal("")]).optional(),
+        jobTitle: name(60, "Escribe el puesto"),
+      })
+      .superRefine((v, ctx) => {
+        if (!v.personId && !z.email().safeParse(v.person).success)
+          ctx.addIssue({ code: "custom", path: ["person"], message: "Elige a la persona de la lista o escribe su correo completo." });
+      }),
+    handler: async ({ businessId, branchId, shiftId, person, personId, jobTitle }, context) => {
       const sb = db(context);
       const { data: shift } = await sb.from("shifts").select("branch_id").eq("id", shiftId).single();
       if (shift?.branch_id !== branchId)
         throw new ActionError({ code: "BAD_REQUEST", message: "Ese turno es de otra sucursal. Elige uno de la sucursal seleccionada." });
-      // La base exige que el correo tenga cuenta y deja la invitación pendiente hasta que la persona la acepte.
+      // La base exige que la cuenta exista y deja la invitación pendiente hasta que la persona la acepte.
+      // Por cuenta, el correo va vacío y lo completa la base (private.link_invited_employee): la dueña no lo conoce.
       // shortcut: el aviso llega solo a la bandeja de la app, no por correo.
       const { error } = await sb
         .from("employees")
@@ -27,7 +36,7 @@ export const employees = {
           business_id: businessId,
           branch_id: branchId,
           shift_id: shiftId,
-          email,
+          ...(personId ? { person_id: personId, email: "" } : { email: person.toLowerCase() }),
           job_title: jobTitle,
         })
         .select("id")
@@ -37,19 +46,24 @@ export const employees = {
     },
   }),
 
-  /** Sugerencias de cuentas al escribir el correo de quien se invita. La base acota quién puede buscar y qué ve. */
+  /**
+   * Sugerencias de cuentas al escribir el nombre o el correo de quien se invita. La base acota quién puede buscar
+   * y qué ve: por nombre, el correo llega enmascarado (`byEmail: false`).
+   */
   searchPeople: defineAction({
     input: z.object({ businessId: uuid, query: z.string().trim().max(120), page: z.number().int().min(1).max(1000).default(1) }),
     handler: async ({ businessId, query, page }, context) => {
       if (query.length < 3) return { people: [], total: 0, page };
-      // Busca cuentas por correo: el límite evita raspar los correos de todos.
+      // El límite evita recorrer las cuentas de todos a fuerza de búsquedas.
       await limit(context, "search", 30, 60);
       const { data, error } = await db(context).rpc("search_people", { p_business: businessId, p_query: query, p_page: page });
       check(error);
       return {
         // La base devuelve 5 por página y el total en cada fila.
         people: (data ?? []).map((p) => ({
+          id: p.id,
           email: p.email,
+          byEmail: p.by_email,
           name: `${p.first_name} ${p.last_name}`.trim(),
           avatarUrl: p.avatar_url ?? undefined,
         })),

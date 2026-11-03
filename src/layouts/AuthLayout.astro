@@ -25,9 +25,10 @@ const error = Astro.url.searchParams.get("error");
     <BaseHead title={title} />
   </head>
   <body class="auth-surface">
+    <a class="skip-link" href="#main">Saltar al formulario</a>
     <Board pitch={pitch} />
 
-    <main class="auth-main">
+    <main class="auth-main" id="main" tabindex="-1">
       <ThemeToggle class="auth-theme" />
 
       <section class="auth-panel" aria-labelledby="auth-heading">
@@ -41,7 +42,7 @@ const error = Astro.url.searchParams.get("error");
           <p>{description}</p>
         </header>
 
-        <p class="notice" role="status" data-auth-notice>{error}</p>
+        <p class="notice notice-error" role="alert" tabindex="-1" data-auth-notice>{error}</p>
 
         <slot />
 

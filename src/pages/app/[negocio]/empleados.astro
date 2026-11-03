@@ -44,20 +44,22 @@ const rows = employees.map((e) => {
   >
     <FormInput
       form="invite-form"
-      name="email"
-      type="email"
-      label="Correo"
-      hint="Busca a la persona por su correo: tiene que tener cuenta en Caja Simple."
+      name="person"
+      label="Nombre o correo"
+      placeholder="Ej.: Ana Pérez o ana@gmail.com"
+      hint="Busca a la persona por su nombre o su correo: tiene que tener cuenta en Caja Simple."
       required
       autocapitalize="none"
       spellcheck="false"
       autocomplete="off"
       role="combobox"
       aria-autocomplete="list"
-      aria-controls="people-suggest"
+      aria-controls="people-suggest-list"
       aria-expanded="false"
       data-people-search={business.id}
     />
+    <!-- La cuenta elegida entre las sugerencias encontradas por nombre: se invita por ella, sin conocer su correo. -->
+    <input type="hidden" name="personId" form="invite-form" data-person-id />
     <!-- Dentro del diálogo: lo de afuera queda inerte mientras está abierto. -->
     <div id="people-suggest" class="suggest" popover="manual">
       <ul class="suggest-skeleton" aria-hidden="true">
@@ -71,7 +73,7 @@ const rows = employees.map((e) => {
           </li>
         ))}
       </ul>
-      <ul class="suggest-list" role="listbox" aria-label="Cuentas registradas"></ul>
+      <ul class="suggest-list" id="people-suggest-list" role="listbox" aria-label="Cuentas registradas"></ul>
       <p class="suggest-empty"></p>
       <div class="suggest-pager">
         <button type="button" class="pager-btn" data-step="-1" tabindex="-1" aria-label="Página anterior">
@@ -112,7 +114,8 @@ const rows = employees.map((e) => {
 <script>
   import { actions } from "astro:actions";
 
-  type Person = { email: string; name: string; avatarUrl?: string };
+  // byEmail: se encontró por su correo y se ve completo; si no, por su nombre, con el correo enmascarado.
+  type Person = { id: string; email: string; byEmail: boolean; name: string; avatarUrl?: string };
   type Result = { people: Person[]; total: number; page: number };
 
   const PAGE_SIZE = 5;
@@ -127,6 +130,7 @@ const rows = employees.map((e) => {
     const [prev, next] = popover.querySelectorAll<HTMLButtonElement>(".pager-btn");
     const status = popover.querySelector<HTMLElement>("[data-status]")!;
     const businessId = input.dataset.peopleSearch!;
+    const personId = document.querySelector<HTMLInputElement>("[data-person-id]")!;
     // Las teclas de la lista se anuncian aparte: en pantalla la pista queda corta.
     input.setAttribute("aria-describedby", `${input.getAttribute("aria-describedby") ?? ""} people-keys`.trim());
 
@@ -177,7 +181,10 @@ const rows = employees.map((e) => {
     const choose = (index: number) => {
       const person = result?.people[index];
       if (!person) return;
-      input.value = person.email;
+      // Por correo, el campo queda con el correo y se invita con él. Por nombre, con el nombre y el correo
+      // enmascarado a la vista, y se invita por la cuenta.
+      input.value = person.byEmail ? person.email : `${person.name || person.email} · ${person.email}`;
+      personId.value = person.byEmail ? "" : person.id;
       close();
     };
 
@@ -215,7 +222,7 @@ const rows = employees.map((e) => {
       pagerInfo.textContent = `${from}–${to} de ${result.total}`;
       prev.disabled = result.page <= 1;
       next.disabled = result.page >= pages();
-      empty.textContent = `Ninguna cuenta registrada empieza con «${query}».`;
+      empty.textContent = `Ninguna cuenta registrada coincide con «${query}».`;
       status.textContent = result.total
         ? `${result.total} ${result.total === 1 ? "cuenta" : "cuentas"}. Página ${result.page} de ${pages()}.`
         : empty.textContent;
@@ -235,12 +242,13 @@ const rows = employees.map((e) => {
       show("loading");
       status.textContent = "Buscando cuentas…";
       open();
-      const { data, error } = await actions.searchPeople({ businessId, query: q, page });
+      const { data, error } = await actions.searchPeople({ businessId, query: q, page }).catch(() => ({ data: undefined, error: new Error("offline") }));
       // Solo cuenta la última búsqueda: las respuestas pueden llegar desordenadas.
       if (mine !== request) return;
-      if (error) {
+      if (error || !data) {
         result = { people: [], total: 0, page };
-        empty.textContent = "No se pudo buscar. Sigue escribiendo el correo completo.";
+        empty.textContent = "No se pudo buscar. Escribe su correo completo.";
+        status.textContent = empty.textContent;
         return show("results");
       }
       cache.set(key, data);
@@ -249,6 +257,8 @@ const rows = employees.map((e) => {
     };
 
     input.addEventListener("input", () => {
+      // Lo escrito ya no es la persona elegida.
+      personId.value = "";
       clearTimeout(timer);
       query = input.value.trim();
       if (query.length < 3) return close();
@@ -294,7 +304,10 @@ const rows = employees.map((e) => {
     });
 
     input.addEventListener("blur", close);
-    input.closest("dialog")?.addEventListener("close", close);
+    input.closest("dialog")?.addEventListener("close", () => {
+      close();
+      personId.value = "";
+    });
     window.addEventListener("resize", close);
   }
 </script>

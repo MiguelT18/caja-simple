@@ -37,7 +37,7 @@ const query = next ? `?next=${encodeURIComponent(next)}` : "";
       required
       data-required-message="Ingresa tu contraseña"
     />
-    <button type="submit" class="btn btn-primary btn-block">Iniciar sesión</button>
+    <button type="submit" class="btn btn-primary btn-block" data-busy-label="Entrando…">Iniciar sesión</button>
   </form>
 
   <Fragment slot="switch">

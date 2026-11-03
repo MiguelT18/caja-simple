@@ -1,5 +1,5 @@
 import { actions } from "astro:actions";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import type { Category } from "@/data/types";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { colorOf } from "./catalog";
-import { confirmDialog } from "@/scripts/dialogs";
+import { safeAction } from "./form";
+import { announce, confirmDialog } from "@/scripts/dialogs";
 
 const nameError = (categories: Category[], name: string, exceptId?: string) => {
   const clean = name.trim();
@@ -33,37 +34,55 @@ export function CategoryManager({
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState<{ id: string; name: string; error: string | null } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; name: string; error: string | null; busy?: boolean } | null>(null);
+  const list = useRef<HTMLUListElement>(null);
+
+  /** Tras renombrar o borrar, el foco pasa a un botón que sigue en pantalla (si no, cae al <body>). */
+  const focusRow = (id: string | undefined, role: "rename" | "delete" = "rename") =>
+    requestAnimationFrame(() => {
+      const target =
+        (id && list.current?.querySelector<HTMLElement>(`[data-category="${id}"] [data-role="${role}"]`)) ||
+        list.current?.querySelector<HTMLElement>("[data-role=rename]") ||
+        document.getElementById("new-category");
+      target?.focus();
+    });
 
   const add = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     const problem = nameError(categories, draft);
     setError(problem);
-    if (problem) return;
+    if (problem || busy) return;
     setBusy(true);
-    const { data, error } = await actions.saveCategory({ businessId, name: draft });
+    const { data, error } = await safeAction(() => actions.saveCategory({ businessId, name: draft }));
     setBusy(false);
-    if (error) return setError(error.message);
+    if (error || !data) return setError(error?.message ?? "No se pudo guardar.");
     setCategories((list) => [...list, data].sort((a, b) => a.name.localeCompare(b.name, "es")));
     setDraft("");
+    announce(`Categoría «${data.name}» agregada.`);
   };
 
   const saveEdit = async () => {
-    if (!editing) return;
+    if (!editing || editing.busy) return;
     const problem = nameError(categories, editing.name, editing.id);
     if (problem) return setEditing({ ...editing, error: problem });
-    const { error } = await actions.saveCategory({ businessId, id: editing.id, name: editing.name });
-    if (error) return setEditing({ ...editing, error: error.message });
+    setEditing({ ...editing, busy: true });
+    const { error } = await safeAction(() => actions.saveCategory({ businessId, id: editing.id, name: editing.name }));
+    if (error) return setEditing({ ...editing, busy: false, error: error.message });
     setCategories((list) => list.map((c) => (c.id === editing.id ? { ...c, name: editing.name.trim() } : c)));
     setEditing(null);
+    focusRow(editing.id);
   };
 
   const remove = async (c: Category) => {
     if (!(await confirmDialog(`¿Borrar la categoría «${c.name}»? Sus productos quedan en «Sin categoría».`, { confirmLabel: "Borrar", danger: true }))) return;
-    const { error } = await actions.deleteCategory({ id: c.id });
+    const { error } = await safeAction(() => actions.deleteCategory({ id: c.id }));
     if (error) return setError(error.message);
+    const index = categories.findIndex((x) => x.id === c.id);
+    const neighbor = categories[index + 1] ?? categories[index - 1];
     setCategories((list) => list.filter((x) => x.id !== c.id));
     onDeleted(c.id);
+    announce(`Categoría «${c.name}» borrada.`);
+    focusRow(neighbor?.id, "delete");
   };
 
   return (
@@ -74,7 +93,17 @@ export function CategoryManager({
           Categorías
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        // Escape mientras se renombra: cancela el cambio y no cierra todo el diálogo.
+        onEscapeKeyDown={(e) => {
+          if (!editing) return;
+          e.preventDefault();
+          const id = editing.id;
+          setEditing(null);
+          focusRow(id);
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Categorías de productos</DialogTitle>
           <DialogDescription>Arma las que use tu negocio. Sirven para filtrar el catálogo.</DialogDescription>
@@ -96,7 +125,7 @@ export function CategoryManager({
               className="h-10 text-base"
               maxLength={40}
             />
-            <Button type="submit" className="h-10" disabled={busy}>
+            <Button type="submit" className="h-10" aria-disabled={busy || undefined} aria-busy={busy || undefined}>
               <Plus />
               Agregar
             </Button>
@@ -108,9 +137,9 @@ export function CategoryManager({
           )}
         </form>
 
-        <ul className="m-0 grid max-h-72 list-none gap-1 overflow-y-auto p-0">
+        <ul ref={list} className="m-0 grid max-h-72 list-none gap-1 overflow-y-auto p-0">
           {categories.map((c, i) => (
-            <li key={c.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+            <li key={c.id} data-category={c.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
               <span className="size-2.5 shrink-0 rounded-full" style={{ background: colorOf(i) }} aria-hidden="true" />
               {editing?.id === c.id ? (
                 <div className="flex flex-1 flex-col gap-1">
@@ -120,33 +149,52 @@ export function CategoryManager({
                       value={editing.name}
                       aria-label={`Nuevo nombre para ${c.name}`}
                       aria-invalid={editing.error ? true : undefined}
+                      aria-describedby={editing.error ? `rename-${c.id}-error` : undefined}
                       onChange={(e) => setEditing({ ...editing, name: e.target.value, error: null })}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") saveEdit();
-                        if (e.key === "Escape") setEditing(null);
                       }}
                       className="h-9 text-base"
                       maxLength={40}
                     />
-                    <Button size="sm" className="h-9" onClick={saveEdit}>
-                      Guardar
+                    <Button size="sm" className="h-9" onClick={saveEdit} aria-disabled={editing.busy || undefined} aria-busy={editing.busy || undefined}>
+                      {editing.busy ? "Guardando…" : "Guardar"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-9"
+                      onClick={() => {
+                        setEditing(null);
+                        focusRow(c.id);
+                      }}
+                    >
+                      Cancelar
                     </Button>
                   </div>
-                  {editing.error && <p className="field-error">{editing.error}</p>}
+                  {editing.error && (
+                    <p id={`rename-${c.id}-error`} className="field-error">
+                      {editing.error}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <>
                   <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                  <span className="text-sm text-muted-foreground tabular-nums">{counts.get(c.id) ?? 0}</span>
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {counts.get(c.id) ?? 0}
+                    <span className="sr-only"> {(counts.get(c.id) ?? 0) === 1 ? "producto" : "productos"}</span>
+                  </span>
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    data-role="rename"
                     aria-label={`Renombrar ${c.name}`}
                     onClick={() => setEditing({ id: c.id, name: c.name, error: null })}
                   >
                     <Pencil />
                   </Button>
-                  <Button variant="ghost" size="icon-sm" aria-label={`Borrar ${c.name}`} className="hover:text-destructive" onClick={() => remove(c)}>
+                  <Button variant="ghost" size="icon-sm" data-role="delete" aria-label={`Borrar ${c.name}`} className="hover:text-destructive" onClick={() => remove(c)}>
                     <Trash2 />
                   </Button>
                 </>

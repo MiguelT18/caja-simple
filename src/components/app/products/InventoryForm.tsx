@@ -3,8 +3,8 @@ import { Trash2 } from "lucide-react";
 import type { Product } from "@/data/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useActionForm, StockFields } from "./form";
-import { confirmDialog, toast } from "@/scripts/dialogs";
+import { safeAction, useActionForm, StockFields } from "./form";
+import { confirmDialog } from "@/scripts/dialogs";
 
 export function InventoryForm({ businessId, branchId, product, onClose }: { businessId: string; branchId: string; product: Product; onClose: () => void }) {
   const save = useActionForm((form) => actions.saveInventory(form) as never);
@@ -14,8 +14,9 @@ export function InventoryForm({ businessId, branchId, product, onClose }: { busi
     const form = new FormData();
     form.set("branchId", branchId);
     form.set("productId", product.id);
-    const { error } = await actions.removeInventory(form);
-    if (error) return toast(error.message, "error");
+    const { error } = await safeAction(() => actions.removeInventory(form));
+    // Dentro del diálogo, en línea: un toast quedaría detrás del modal, inerte.
+    if (error) return save.setMessage(error.message);
     window.location.reload();
   }
 
@@ -45,7 +46,7 @@ export function InventoryForm({ businessId, branchId, product, onClose }: { busi
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={save.busy}>
+              <Button type="submit" {...save.submitProps}>
                 {save.busy ? "Guardando…" : "Guardar"}
               </Button>
             </div>

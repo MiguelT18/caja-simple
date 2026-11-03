@@ -4,12 +4,17 @@
 //   data-minlength-message → menos caracteres que `minlength`
 //   data-match / data-match-message → debe coincidir con el campo de ese `name`
 
+import { isBusy, setBusy } from "./busy";
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const notice = document.querySelector<HTMLElement>("[data-auth-notice]");
 
+/** Error del envío: se anuncia (role="alert") y recibe el foco, así quien usa lector de pantalla no queda perdido. */
 function showNotice(message: string) {
-  if (notice) notice.textContent = message;
+  if (!notice) return;
+  notice.textContent = message;
+  if (message) notice.focus();
 }
 
 function getError(input: HTMLInputElement, form: HTMLFormElement): string {
@@ -67,6 +72,7 @@ document.querySelectorAll<HTMLFormElement>("form[data-auth-form]").forEach((form
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (isBusy(form.querySelector("button[type=submit]"))) return;
 
     const invalid = inputs.filter((input) => !validate(input, form));
     if (invalid.length > 0) {
@@ -78,10 +84,13 @@ document.querySelectorAll<HTMLFormElement>("form[data-auth-form]").forEach((form
   });
 });
 
+// Error que llega en la URL (?error=…, p. ej. un enlace vencido): se anuncia al cargar.
+if (notice?.textContent?.trim()) notice.focus();
+
 /** Envía el formulario al endpoint de acceso y sigue su respuesta: redirige o muestra el mensaje. */
 async function submit(form: HTMLFormElement) {
   const button = form.querySelector<HTMLButtonElement>("button[type=submit]");
-  if (button) button.disabled = true;
+  setBusy(button, true, "Un momento…");
   showNotice("");
   try {
     const response = await fetch(form.action, { method: "POST", body: new FormData(form), headers: { Accept: "application/json" } });
@@ -94,5 +103,5 @@ async function submit(form: HTMLFormElement) {
   } catch {
     showNotice("No hay conexión. Revisa tu internet e intenta de nuevo.");
   }
-  if (button) button.disabled = false;
+  setBusy(button, false);
 }

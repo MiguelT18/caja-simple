@@ -66,14 +66,15 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
     </div>
   </section>
 
-  <h2 class="section-title">Caja por turno</h2>
-  <section class="shift-grid">
+  <h2 class="section-title" id="shifts-title">Caja por turno</h2>
+  <section class="shift-grid" aria-labelledby="shifts-title">
     {
       shifts.map((shift) => {
         const t = shiftTotals(shift.id);
         return (
-          <article class:list={["card shift-card", { live: t.close.status === "en-curso" }]}>
+          <article class:list={["card shift-card", { live: t.close.status === "en-curso" }]} aria-labelledby={`shift-card-${shift.id}`}>
             <header class="shift-card-head">
+              <h3 class="sr-only" id={`shift-card-${shift.id}`}>Turno {shift.name}</h3>
               <ShiftChip shift={shift} />
               <span class="muted num">
                 {shiftHours(shift)}

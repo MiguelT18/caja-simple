@@ -1,14 +1,27 @@
 // Piezas de los formularios del catálogo: campo con error, envío a una acción y campos de stock.
-import { useState } from "react";
+import { cloneElement, isValidElement, useEffect, useRef, useState } from "react";
 import type { Product } from "@/data/types";
 import { Label } from "@/components/ui/label";
 
+/**
+ * Campo con etiqueta, ayuda y error. El control (hijo) recibe aria-invalid y aria-describedby enlazados a la ayuda
+ * y al error, así el lector de pantalla los lee al enfocarlo.
+ */
 export function Field({ id, label, error, hint, children }: { id: string; label: string; error?: string; hint?: string; children: React.ReactNode }) {
+  const describedBy = [hint && !error && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(" ") || undefined;
+  const control =
+    isValidElement<Record<string, unknown>>(children) && children.props.id === id
+      ? cloneElement(children, { "aria-invalid": error ? true : undefined, "aria-describedby": describedBy })
+      : children;
   return (
     <div className="grid min-w-0 gap-1.5">
       <Label htmlFor={id}>{label}</Label>
-      {children}
-      {hint && !error && <p className="field-hint">{hint}</p>}
+      {control}
+      {hint && !error && (
+        <p id={`${id}-hint`} className="field-hint">
+          {hint}
+        </p>
+      )}
       {error && (
         <p id={`${id}-error`} className="field-error">
           {error}
@@ -20,23 +33,49 @@ export function Field({ id, label, error, hint, children }: { id: string; label:
 
 export const selectClass = "input";
 
-/** Envía el formulario a una acción y recarga al guardar. Devuelve errores por campo o el general. */
-export function useActionForm(action: (form: FormData) => Promise<{ error?: { message: string; fields?: Record<string, string[] | undefined> } }>) {
+type ActionResult = { error?: { message: string; fields?: Record<string, string[] | undefined> } };
+
+/** Llama a una acción sin que una caída de red rompa la pantalla: la excepción vuelve como `{ error }`. */
+export async function safeAction<T extends ActionResult>(call: () => Promise<T>): Promise<T | { data?: undefined; error: { message: string } }> {
+  try {
+    return await call();
+  } catch {
+    return { error: { message: "No hay conexión. Revisa tu internet e intenta de nuevo." } };
+  }
+}
+
+/**
+ * Envía el formulario a una acción y recarga al guardar. Devuelve errores por campo o el general.
+ * `submitProps` va en el botón de envío: aria-disabled (no disabled) para que el foco no se pierda mientras guarda.
+ * Tras un error por campo, el foco pasa al primer campo inválido.
+ */
+export function useActionForm(action: (form: FormData) => Promise<ActionResult>) {
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
+  const formRef = useRef<HTMLFormElement | null>(null);
+
+  useEffect(() => {
+    if (Object.keys(errors).length > 0) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [errors]);
+
   async function onSubmit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return;
+    formRef.current = e.currentTarget;
     setBusy(true);
     setErrors({});
     setMessage("");
-    const { error } = await action(new FormData(e.currentTarget));
+    const form = new FormData(e.currentTarget);
+    const { error } = await safeAction(() => action(form));
     if (!error) return window.location.reload();
     setBusy(false);
-    if (error.fields) setErrors(Object.fromEntries(Object.entries(error.fields).map(([k, v]) => [k, v?.[0] ?? ""])));
+    const fields = "fields" in error ? error.fields : undefined;
+    if (fields && Object.keys(fields).length > 0) setErrors(Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v?.[0] ?? ""])));
     else setMessage(error.message);
   }
-  return { busy, errors, message, onSubmit };
+  const submitProps = { "aria-disabled": busy || undefined, "aria-busy": busy || undefined };
+  return { busy, errors, message, setMessage, onSubmit, submitProps };
 }
 
 /** Casilla con su texto: decide si se muestra un grupo de campos. */

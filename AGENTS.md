@@ -11,6 +11,7 @@ App web para llevar la caja de negocios pequeños con una o varias sucursales: v
 | [`DESIGN.md`](DESIGN.md) | Antes de tocar UI: tokens, color, tipografía, íconos, navegación y el mundo de las páginas de acceso. |
 | [`docs/modelo-de-datos.md`](docs/modelo-de-datos.md) | Antes de tocar `src/data/` o `/app/*`: persona → negocios → sucursales → inventario, roles y rutas. |
 | [`docs/planes-de-suscripcion.md`](docs/planes-de-suscripcion.md) | Si tocas precios, planes o sus límites (`src/data/plans.ts`, migración `plan_limits`). |
+| [`docs/plan-mvp.md`](docs/plan-mvp.md) | Antes de elegir qué construir: pendientes hacia el MVP, por prioridad. |
 
 No repitas en este archivo lo que ya dicen esos documentos. Enlázalos.
 

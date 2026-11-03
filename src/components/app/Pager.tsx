@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from "@/components/ui/pagination";
@@ -41,16 +41,29 @@ interface PagerProps {
 }
 
 export function Pager({ page, pageCount, from, to, total, onPage, noun = "resultados" }: PagerProps) {
+  const root = useRef<HTMLDivElement>(null);
   if (pageCount <= 1) return null;
+
+  /** Cambia de página y lleva la vista y el foco al inicio de la lista (si no, quedan abajo, en el paginador). */
+  const go = (target: number) => {
+    if (target < 1 || target > pageCount || target === page) return;
+    onPage(target);
+    const list = root.current?.parentElement;
+    if (!list) return;
+    list.tabIndex = -1;
+    list.focus({ preventScroll: true });
+    list.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  };
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
+    <div ref={root} className="flex flex-wrap items-center justify-between gap-3 pt-4">
       <p className="m-0 text-sm text-muted-foreground tabular-nums" aria-live="polite">
         {from}–{to} de {total} {noun}
       </p>
-      <Pagination className="mx-0 w-auto">
+      <Pagination className="mx-0 w-auto" aria-label={`Paginación de ${noun}`}>
         <PaginationContent>
           <PaginationItem>
-            <Button variant="ghost" size="sm" className="pointer-coarse:h-11 pointer-coarse:px-3" onClick={() => onPage(page - 1)} disabled={page === 1} aria-label="Página anterior">
+            <Button variant="ghost" size="sm" className="pointer-coarse:h-11 pointer-coarse:px-3" onClick={() => go(page - 1)} aria-disabled={page === 1 || undefined} aria-label="Página anterior">
               <ChevronLeft />
               <span className="hidden sm:inline">Anterior</span>
             </Button>
@@ -67,7 +80,7 @@ export function Pager({ page, pageCount, from, to, total, onPage, noun = "result
                   size="icon-sm"
                   aria-current={p === page ? "page" : undefined}
                   aria-label={`Página ${p}`}
-                  onClick={() => onPage(p)}
+                  onClick={() => go(p)}
                   className="tabular-nums pointer-coarse:size-11"
                 >
                   {p}
@@ -76,7 +89,7 @@ export function Pager({ page, pageCount, from, to, total, onPage, noun = "result
             ),
           )}
           <PaginationItem>
-            <Button variant="ghost" size="sm" className="pointer-coarse:h-11 pointer-coarse:px-3" onClick={() => onPage(page + 1)} disabled={page === pageCount} aria-label="Página siguiente">
+            <Button variant="ghost" size="sm" className="pointer-coarse:h-11 pointer-coarse:px-3" onClick={() => go(page + 1)} aria-disabled={page === pageCount || undefined} aria-label="Página siguiente">
               <span className="hidden sm:inline">Siguiente</span>
               <ChevronRight />
             </Button>

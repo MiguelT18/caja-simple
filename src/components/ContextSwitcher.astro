@@ -28,7 +28,8 @@ const current = options.find((o) => o.current) ?? options[0];
     type="button"
     class="switch-trigger"
     popovertarget={id}
-    aria-haspopup="true"
+    aria-controls={id}
+    aria-expanded="false"
     aria-label={`${label}: ${current.label}. Cambiar ${label.toLowerCase()}`}
   >
     <span class="switch-icon">
@@ -41,7 +42,7 @@ const current = options.find((o) => o.current) ?? options[0];
     <ChevronsUpDown class="switch-chevron" size={16} stroke-width={1.75} />
   </button>
 
-  <div id={id} class="switch-menu" popover>
+  <div id={id} class="switch-menu" popover aria-label={`Elegir ${label.toLowerCase()}`}>
     <ul>
       {
         options.map((option) => (
@@ -65,7 +66,8 @@ const current = options.find((o) => o.current) ?? options[0];
   document.querySelectorAll<HTMLElement>("[data-switcher]").forEach((root) => {
     const trigger = root.querySelector<HTMLButtonElement>(".switch-trigger")!;
     const menu = root.querySelector<HTMLElement>(".switch-menu")!;
-    const options = [...root.querySelectorAll<HTMLAnchorElement>(".switch-option")];
+    // Las flechas recorren también el enlace del pie («Ver todas…»).
+    const options = [...root.querySelectorAll<HTMLAnchorElement>(".switch-option, .switch-manage")];
 
     function position() {
       const rect = trigger.getBoundingClientRect();
@@ -87,14 +89,22 @@ const current = options.find((o) => o.current) ?? options[0];
     });
 
     menu.addEventListener("keydown", (event) => {
-      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      event.preventDefault();
       const index = options.indexOf(document.activeElement as HTMLAnchorElement);
-      const step = event.key === "ArrowDown" ? 1 : -1;
-      options[(index + step + options.length) % options.length].focus();
+      const next =
+        event.key === "ArrowDown" ? (index + 1) % options.length
+        : event.key === "ArrowUp" ? (index - 1 + options.length) % options.length
+        : event.key === "Home" ? 0
+        : event.key === "End" ? options.length - 1
+        : -1;
+      if (next < 0) return;
+      event.preventDefault();
+      options[next].focus();
     });
 
-    window.addEventListener("resize", () => menu.hidePopover());
+    // En el celular, la barra del navegador que se esconde dispara resize: se reubica en vez de cerrarse.
+    window.addEventListener("resize", () => {
+      if (menu.matches(":popover-open")) position();
+    });
   });
 </script>
 

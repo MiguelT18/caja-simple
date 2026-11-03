@@ -12,8 +12,9 @@ interface Props {
 
 /** Torta con hueco: el total al centro y una leyenda con nombre, monto y porcentaje (nada solo con color). */
 export default function DonutChart({ items, totalLabel, empty = "Todavía no hay datos." }: Props) {
-  if (items.length === 0) return <p className="empty-state">{empty}</p>;
   const total = items.reduce((a, b) => a + b.value, 0);
+  // Todo en cero: sin esto, la leyenda mostraría «NaN%».
+  if (items.length === 0 || total === 0) return <p className="empty-state">{empty}</p>;
   // Claves simples para las variables CSS; los nombres pueden llevar espacios o tildes.
   const config: ChartConfig = Object.fromEntries(
     items.map((item, i) => [`c${i}`, { label: item.name, color: `var(--color-branch-${(i % 6) + 1})` }]),
@@ -21,9 +22,12 @@ export default function DonutChart({ items, totalLabel, empty = "Todavía no hay
   const data = items.map((item, i) => ({ key: `c${i}`, value: item.value, fill: `var(--color-c${i})` }));
 
   return (
-    <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
-      <ChartContainer config={config} className="mx-auto aspect-square w-full max-w-48">
-        <PieChart accessibilityLayer>
+    // Contenedor: el lado a lado depende del ancho de la card, no de la pantalla.
+    <div className="@container">
+    <div className="grid items-center gap-4 @md:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
+      {/* La leyenda de al lado ya dice todo con texto (nombre, porcentaje y monto): la torta es visual. */}
+      <ChartContainer config={config} className="mx-auto aspect-square w-full max-w-48" aria-hidden="true">
+        <PieChart>
           <ChartTooltip cursor={false} content={<MoneyTooltip config={config} nameKey="key" hideLabel />} />
           <Pie data={data} dataKey="value" nameKey="key" innerRadius="62%" strokeWidth={2} stroke="var(--color-surface)">
             <Label
@@ -43,16 +47,17 @@ export default function DonutChart({ items, totalLabel, empty = "Todavía no hay
           </Pie>
         </PieChart>
       </ChartContainer>
-      <ul className="m-0 grid list-none gap-2 p-0 text-sm">
+      <ul className="m-0 grid list-none gap-2 p-0 text-sm" aria-label={`${totalLabel}: ${formatBs(total)}`}>
         {items.map((item, i) => (
           <li key={item.name} className="flex items-center gap-2">
-            <span className="size-2.5 shrink-0 rounded-[2px]" style={{ background: `var(--color-branch-${(i % 6) + 1})` }} />
+            <span className="size-2.5 shrink-0 rounded-[2px]" style={{ background: `var(--color-branch-${(i % 6) + 1})` }} aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate">{item.name}</span>
             <span className="text-muted-foreground tabular-nums">{Math.round((item.value / total) * 100)}%</span>
             <span className="w-24 text-right font-medium tabular-nums">{formatBs(item.value)}</span>
           </li>
         ))}
       </ul>
+    </div>
     </div>
   );
 }

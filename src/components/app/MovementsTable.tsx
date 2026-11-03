@@ -1,6 +1,6 @@
 import type { ShiftTone } from "@/data/types";
 import { formatBs } from "@/lib/format";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableCaption, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pager, usePage } from "./Pager";
 import { ShiftBadge } from "./ShiftBadge";
 
@@ -33,6 +33,7 @@ export default function MovementsTable({
     <div>
       <div className="table-wrap">
         <Table>
+          <TableCaption className="sr-only">Movimientos</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>{timeLabel}</TableHead>

@@ -33,7 +33,14 @@ const tones = [
     }
   </PageHeader>
 
-  {shifts.length === 0 && <p class="card empty-state">Esta sucursal todavía no tiene turnos.</p>}
+  {
+    shifts.length === 0 && (
+      <p class="card empty-state">
+        Esta sucursal todavía no tiene turnos.
+        {isOwner ? " Agrega el primero con «Agregar turno» para poder abrir la caja." : " Pide a quien administra el negocio que los configure."}
+      </p>
+    )
+  }
 
   <section class="shift-list">
     {
@@ -44,8 +51,9 @@ const tones = [
         const onSchedule = inShiftWindow(shift);
         const schedule = `${openFrom(shift)} a ${shift.end}`;
         return (
-          <article class:list={["card shift", { live: t.close.status === "en-curso" }]}>
+          <article class:list={["card shift", { live: t.close.status === "en-curso" }]} aria-labelledby={`shift-${shift.id}-title`}>
             <header class="shift-head">
+              <h2 class="sr-only" id={`shift-${shift.id}-title`}>Turno {shift.name}</h2>
               <ShiftChip shift={shift} />
               <span class="hours num">
                 {shiftHours(shift, true)}
@@ -67,7 +75,7 @@ const tones = [
 
             <div class="shift-body">
               <div>
-                <h2 class="label">A cargo</h2>
+                <h3 class="label">A cargo</h3>
                 {staff.length === 0 ? (
                   <p class="muted">
                     Nadie asignado.

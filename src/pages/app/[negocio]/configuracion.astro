@@ -20,7 +20,7 @@ const canAddBranch = limits.branches === null || branchSummary.length < limits.b
 const usage = [
   {
     label: "Sucursales",
-    value: limits.branches === null ? `${branchSummary.length} · sin tope` : `${branchSummary.length} de ${limits.branches}`,
+    value: limits.branches === null ? `${branchSummary.length} · sin tope` : `${branchSummary.length} de ${limits.branches}${canAddBranch ? "" : " · al tope"}`,
     ok: canAddBranch,
   },
   {

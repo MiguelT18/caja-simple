@@ -49,19 +49,19 @@ const tones = [
       presets[0].shifts.map((s, i) => (
         <li class="shift-row" data-row>
           <div class="field name">
-            <label class="field-label" for={`${form}-shift-${i}-name`}>Nombre</label>
-            <input class="input" id={`${form}-shift-${i}-name`} name="shiftName" value={s.name} required maxlength="40" />
+            <label class="field-label" for={`${form}-shift-${i}-name`}>Nombre<span class="sr-only" data-n> del turno {i + 1}</span></label>
+            <input class="input" id={`${form}-shift-${i}-name`} name="shiftName" value={s.name} aria-describedby={`${form}-shiftName-error`} required maxlength="40" />
           </div>
           <div class="field">
-            <label class="field-label" for={`${form}-shift-${i}-start`}>Empieza</label>
+            <label class="field-label" for={`${form}-shift-${i}-start`}>Empieza<span class="sr-only" data-n> del turno {i + 1}</span></label>
             <input class="input" id={`${form}-shift-${i}-start`} name="shiftStart" type="time" value={s.start} required />
           </div>
           <div class="field end">
-            <label class="field-label" for={`${form}-shift-${i}-end`}>Termina</label>
+            <label class="field-label" for={`${form}-shift-${i}-end`}>Termina<span class="sr-only" data-n> del turno {i + 1}</span></label>
             <input class="input" id={`${form}-shift-${i}-end`} name="shiftEnd" type="time" value={s.end} required />
           </div>
           <div class="field tone">
-            <label class="field-label" for={`${form}-shift-${i}-tone`}>Momento</label>
+            <label class="field-label" for={`${form}-shift-${i}-tone`}>Momento<span class="sr-only" data-n> del turno {i + 1}</span></label>
             <select class="input" id={`${form}-shift-${i}-tone`} name="shiftTone">
               {tones.map((t) => (
                 <option value={t.value} selected={t.value === s.tone}>
@@ -82,19 +82,19 @@ const tones = [
   <template data-row-template>
     <li class="shift-row" data-row>
       <div class="field name">
-        <label class="field-label" for={`${form}-shift-__i__-name`}>Nombre</label>
-        <input class="input" id={`${form}-shift-__i__-name`} name="shiftName" required maxlength="40" />
+        <label class="field-label" for={`${form}-shift-__i__-name`}>Nombre<span class="sr-only" data-n> del turno </span></label>
+        <input class="input" id={`${form}-shift-__i__-name`} name="shiftName" aria-describedby={`${form}-shiftName-error`} required maxlength="40" />
       </div>
       <div class="field">
-        <label class="field-label" for={`${form}-shift-__i__-start`}>Empieza</label>
+        <label class="field-label" for={`${form}-shift-__i__-start`}>Empieza<span class="sr-only" data-n> del turno </span></label>
         <input class="input" id={`${form}-shift-__i__-start`} name="shiftStart" type="time" required />
       </div>
       <div class="field end">
-        <label class="field-label" for={`${form}-shift-__i__-end`}>Termina</label>
+        <label class="field-label" for={`${form}-shift-__i__-end`}>Termina<span class="sr-only" data-n> del turno </span></label>
         <input class="input" id={`${form}-shift-__i__-end`} name="shiftEnd" type="time" required />
       </div>
       <div class="field tone">
-        <label class="field-label" for={`${form}-shift-__i__-tone`}>Momento</label>
+        <label class="field-label" for={`${form}-shift-__i__-tone`}>Momento<span class="sr-only" data-n> del turno </span></label>
         <select class="input" id={`${form}-shift-__i__-tone`} name="shiftTone">
           {tones.map((t) => <option value={t.value}>{t.label}</option>)}
         </select>
@@ -201,6 +201,8 @@ const tones = [
 </style>
 
 <script>
+  import { confirmDialog } from "@/scripts/dialogs";
+
   type Draft = { name: string; start: string; end: string; tone: string };
 
   for (const editor of document.querySelectorAll<HTMLElement>("[data-shifts-editor]")) {
@@ -208,6 +210,14 @@ const tones = [
     const template = editor.querySelector<HTMLTemplateElement>("[data-row-template]")!;
     const presets: Draft[][] = JSON.parse(editor.dataset.presets ?? "[]");
     let counter = rows.children.length;
+    let edited = false;
+
+    /** «del turno N» (solo para lectores de pantalla): cada fila repite las mismas etiquetas. */
+    const renumber = () => {
+      [...rows.children].forEach((row, i) => {
+        for (const n of row.querySelectorAll<HTMLElement>("[data-n]")) n.textContent = ` del turno ${i + 1}`;
+      });
+    };
 
     const syncRow = (row: HTMLElement) => {
       const start = row.querySelector<HTMLInputElement>("[name=shiftStart]")!.value;
@@ -232,6 +242,7 @@ const tones = [
       row.querySelector<HTMLSelectElement>("[name=shiftTone]")!.value = draft?.tone ?? "morning";
       rows.append(row);
       syncRow(row);
+      renumber();
       return row;
     };
 
@@ -245,6 +256,8 @@ const tones = [
       const row = button.closest<HTMLElement>("[data-row]")!;
       const next = row.nextElementSibling ?? row.previousElementSibling;
       row.remove();
+      renumber();
+      edited = true;
       // El foco no se pierde: pasa a la fila vecina o al botón de agregar.
       (next?.querySelector<HTMLElement>("[data-remove]") ?? editor.querySelector<HTMLElement>("[data-add]"))!.focus();
     });
@@ -252,11 +265,21 @@ const tones = [
     editor.addEventListener("input", (event) => {
       const row = (event.target as Element).closest<HTMLElement>("[data-row]");
       if (row) syncRow(row);
+      if (row) edited = true;
     });
 
-    editor.querySelector<HTMLSelectElement>("[data-preset]")?.addEventListener("change", (event) => {
+    // Cambiar el punto de partida reemplaza las filas: si ya se editaron, primero se pregunta.
+    const preset = editor.querySelector<HTMLSelectElement>("[data-preset]");
+    let presetValue = preset?.value;
+    preset?.addEventListener("change", async () => {
+      if (edited && !(await confirmDialog("Se reemplazan los turnos que editaste.", { title: "¿Cambiar los turnos?", confirmLabel: "Cambiar" }))) {
+        preset.value = presetValue!;
+        return;
+      }
+      presetValue = preset.value;
+      edited = false;
       rows.replaceChildren();
-      for (const draft of presets[Number((event.target as HTMLSelectElement).value)] ?? []) addRow(draft);
+      for (const draft of presets[Number(preset.value)] ?? []) addRow(draft);
     });
   }
 </script>

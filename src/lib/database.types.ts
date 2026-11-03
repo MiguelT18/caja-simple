@@ -695,6 +695,7 @@ export type Database = {
         Args: { p_business: string; p_page?: number; p_query: string };
         Returns: {
           avatar_url: string;
+          by_email: boolean;
           email: string;
           first_name: string;
           id: string;

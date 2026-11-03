@@ -26,7 +26,7 @@ const next = safeNext(Astro.url.searchParams.get("next"));
       data-required-message="Escribe el código de tu app"
       data-minlength-message="El código tiene 6 números"
     />
-    <button type="submit" class="btn btn-primary btn-block">Verificar</button>
+    <button type="submit" class="btn btn-primary btn-block" data-busy-label="Verificando…">Verificar</button>
   </form>
   <!-- Fuera del <p> de abajo: un form no puede ir dentro de un párrafo. -->
   <form id="verify-logout" method="post" action="/api/auth/logout"></form>

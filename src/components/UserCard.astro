@@ -112,6 +112,13 @@ const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? user.email[0] 
     height: 2rem;
   }
 
+  @media (pointer: coarse) {
+    .logout {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+  }
+
   .logout:hover {
     background: var(--color-expense-soft);
     color: var(--color-expense);

@@ -12,6 +12,8 @@ import { CategoryManager } from "./CategoryManager";
 import { ProductForm } from "./ProductForm";
 import { InventoryForm } from "./InventoryForm";
 import { AddToBranch } from "./AddToBranch";
+import { safeAction } from "./form";
+import { announce } from "@/scripts/dialogs";
 
 const ALL = "all";
 const PAGE_SIZE = 12;
@@ -39,11 +41,16 @@ export default function ProductCatalog({ products: initialProducts, categories: 
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<Item | "new" | null>(null);
 
+  // Optimista: el cambio se ve al instante y se deshace si la base lo rechaza.
   async function move(product: Item, categoryId: string | null) {
-    const { error } = await actions.moveProduct({ productId: product.id, categoryId });
-    if (error) return setError(error.message);
     const category = categories.find((c) => c.id === categoryId);
-    setProducts((list) => list.map((p) => (p.id === product.id ? { ...p, categoryId: category?.id, category: category?.name } : p)));
+    const swap = (to: Partial<Item>) => setProducts((list) => list.map((p) => (p.id === product.id ? { ...p, ...to } : p)));
+    setError("");
+    swap({ categoryId: category?.id, category: category?.name });
+    const { error } = await safeAction(() => actions.moveProduct({ productId: product.id, categoryId }));
+    if (!error) return announce(`${product.name}: ${category?.name ?? "sin categoría"}.`);
+    swap({ categoryId: product.categoryId, category: product.category });
+    setError(error.message);
   }
 
   const categoryOf = (p: Item) => (p.categoryId && categories.some((c) => c.id === p.categoryId) ? p.categoryId : null);
@@ -73,6 +80,13 @@ export default function ProductCatalog({ products: initialProducts, categories: 
 
   // Cada cambio de filtro empieza en la primera página.
   useEffect(() => pager.setPage(1), [activeFilter, lowOnly, query]);
+
+  // Cuántos quedan al buscar o filtrar: se anuncia al dejar de escribir, no en cada tecla.
+  useEffect(() => {
+    if (query === "" && activeFilter === ALL && !lowOnly) return;
+    const timer = setTimeout(() => announce(visible.length === 0 ? "Ningún producto coincide." : `${visible.length} ${visible.length === 1 ? "producto" : "productos"}`), 500);
+    return () => clearTimeout(timer);
+  }, [visible.length, activeFilter, lowOnly, query]);
 
   const lowCount = products.filter(isLow).length;
   const filtered = query !== "" || activeFilter !== ALL || lowOnly;
@@ -130,7 +144,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
 
         {/* En celular, una tira que se desliza de lado en vez de varios renglones de filtros. */}
         <div
-          className="flex flex-wrap gap-2 max-sm:-mx-4 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:[scrollbar-width:none]"
+          className="flex flex-wrap gap-2 max-sm:-mx-4 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,black_85%,transparent)]"
           role="group"
           aria-label="Filtrar productos"
         >

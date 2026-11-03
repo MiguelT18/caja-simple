@@ -13,7 +13,8 @@
 	--color-border-strong: light-dark(#8a8077, #7d736a);
 	--color-text: light-dark(#1a1613, #f5f1ec);
 	--color-text-muted: light-dark(#5c544c, #b3a99e);
-	--color-text-subtle: light-dark(#6f665e, #8f857b);
+	--color-text-subtle: light-dark(#665d55, #9a8f84);
+	--color-input-border: var(--color-border-strong);
 	/* En claro, el ámbar, el verde y el amarillo bajan un tono: el texto chico sobre el suelo y las superficies elevadas llega a AA. */
 	--color-primary: light-dark(#9c4708, #f0a04b);
 	--color-income: light-dark(#246a41, #5cc88a);

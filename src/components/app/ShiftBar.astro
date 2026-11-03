@@ -30,7 +30,7 @@ const here = Astro.url.pathname.replace(/\/$/, "");
       <p class="now-title">{shift ? `Turno ${shift.name.toLowerCase()}` : "Sin turno abierto"}</p>
       {
         shift ? (
-          <div data-status data-start={shift.start} data-end={shift.end} data-opened={data.openedOn}>
+          <div class="status" data-status data-start={shift.start} data-end={shift.end} data-opened={data.openedOn}>
             <p class="now-sub" data-on-time hidden={late}>
               <span class="live">
                 <span class="live-dot" aria-hidden="true" />
@@ -169,6 +169,11 @@ const here = Astro.url.pathname.replace(/\/$/, "");
 
   .now-text {
     display: grid;
+    min-width: 0;
+  }
+
+  /* Sin esto la línea de estado no se encoge y el nombre de la sucursal pisa la cuenta. */
+  .status {
     min-width: 0;
   }
 

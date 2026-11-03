@@ -20,7 +20,7 @@ const describedBy = [hint && `${id}-hint`, `${id}-error`].filter(Boolean).join("
   <label class="field-label" for={id}>{label}</label>
   {
     options ? (
-      <select class="input" id={id} name={name} aria-describedby={describedBy} required={rest.required}>
+      <select class="input" id={id} name={name} aria-describedby={describedBy} required={rest.required} disabled={rest.disabled} autocomplete={rest.autocomplete}>
         {options.map((o) => (
           <option value={o.value} selected={o.selected}>
             {o.label}

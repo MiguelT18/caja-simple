@@ -68,9 +68,13 @@ if (!reduceMotion) {
     const target = Number(el.dataset.count);
     const sign = el.dataset.sign as "+" | "−" | undefined;
     const start = performance.now() + Number(el.dataset.delay ?? 0);
+    // El lector de pantalla lee solo el valor final; la cuenta animada es visual (si no, lee números a medio contar).
+    const shown = Object.assign(document.createElement("span"), { textContent: el.textContent });
+    shown.setAttribute("aria-hidden", "true");
+    el.replaceChildren(shown, Object.assign(document.createElement("span"), { className: "sr-only", textContent: el.textContent }));
     const tick = (now: number) => {
       const t = Math.min(1, Math.max(0, (now - start) / 900));
-      el.textContent = formatBs(target * easeOutExpo(t), sign);
+      shown.textContent = formatBs(target * easeOutExpo(t), sign);
       if (t < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

@@ -48,7 +48,7 @@ const colorOf = (categoryId?: string) => {
 
   <div class="sale">
     <section class="catalog" aria-label="Productos">
-      <div class="toolbar">
+      <div class="toolbar" hidden={products.length === 0}>
         <label class="search">
           <Search size={18} stroke-width={1.75} />
           <span class="sr-only">Buscar producto</span>
@@ -75,11 +75,13 @@ const colorOf = (categoryId?: string) => {
         products.length === 0 && (
           <p class="card empty-state">
             Esta sucursal todavía no vende productos.
-            {ctx.role === "dueño" && (
+            {ctx.role === "dueño" ? (
               <>
                 {" "}
                 <a href={branchHref(business, branch, "inventario")}>Agrégalos en Inventario</a>.
               </>
+            ) : (
+              " Pide a quien administra el negocio que los agregue en Inventario."
             )}
           </p>
         )
@@ -208,7 +210,8 @@ const colorOf = (categoryId?: string) => {
 <script>
   import { actions } from "astro:actions";
   import { formatBs } from "@/lib/format";
-  import { confirmDialog, toast } from "@/scripts/dialogs";
+  import { isBusy, setBusy } from "@/scripts/busy";
+  import { announce, confirmDialog, flashToast } from "@/scripts/dialogs";
 
   // Una línea por producto; con precio al vender, una línea por prenda (cada una con su precio).
   // price null: falta escribirlo. stock Infinity: sin control de stock.
@@ -276,6 +279,7 @@ const colorOf = (categoryId?: string) => {
     cart.set(key, item);
     notice.textContent = "";
     render();
+    announceCart(`Agregado ${item.name}.`);
     // La prenda recién agregada pide su precio enseguida (en pantallas angostas, despliega la hoja para escribirlo).
     if (open) {
       setOpen(true);
@@ -295,12 +299,22 @@ const colorOf = (categoryId?: string) => {
     item.qty += delta;
     if (item.qty <= 0) cart.delete(key);
     render();
+    announceCart(item.qty <= 0 ? `Quitado ${item.name}.` : `${item.name}: ${item.qty}.`);
   }
 
   function remove(key: string) {
+    const item = cart.get(key);
     cart.delete(key);
     notice.textContent = "";
     render();
+    if (item) announceCart(`Quitado ${item.name}.`);
+  }
+
+  /** Cada cambio del carro se anuncia con el resumen: el total visible puede estar plegado en el celular. */
+  function announceCart(what: string) {
+    let n = 0;
+    for (const l of cart.values()) n += l.qty;
+    announce(n === 0 ? `${what} La venta quedó vacía.` : `${what} ${plural(n)}, total ${formatBs(totalValue)}.`);
   }
 
   /** Lo que da de cambio el efectivo recibido; si no alcanza, cuánto falta (con ícono, no solo color). */
@@ -352,10 +366,11 @@ const colorOf = (categoryId?: string) => {
       label.classList.toggle("low", low);
       label.classList.toggle("warn", low && left > 0);
       label.querySelector("[data-stock-text]")!.textContent = left <= 0 ? "Sin stock" : low ? `Quedan ${left}` : `${left} en stock`;
-      card.querySelector<HTMLButtonElement>('[data-step="1"]')?.toggleAttribute("disabled", left <= 0);
+      // aria-disabled y no disabled: si el botón tiene el foco, lo conserva (step/add avisan que no queda).
+      card.querySelector('[data-step="1"]')?.setAttribute("aria-disabled", String(left <= 0));
       // Agotado en la venta: la card se apaga; se reactiva al quitar unidades del carro.
       if (!confirm.dataset.shift) continue;
-      addButton.disabled = left <= 0;
+      addButton.setAttribute("aria-disabled", String(left <= 0));
       card.classList.toggle("sold-out", left <= 0 && inSale === 0);
     }
   }
@@ -363,6 +378,7 @@ const colorOf = (categoryId?: string) => {
   function iconButton(label: string, name: string, onClick: () => void, className = "") {
     const button = document.createElement("button");
     button.type = "button";
+    button.dataset.role = name;
     button.className = `icon-btn ${className}`;
     button.append(icon(name));
     button.setAttribute("aria-label", label);
@@ -385,12 +401,35 @@ const colorOf = (categoryId?: string) => {
   }
 
   const amountOf = new WeakMap<Line, HTMLElement>();
+  /** La cantidad sola es un número suelto para el lector de pantalla: se le agrega «unidades». */
+  const withUnits = (qty: HTMLElement) => (qty.append(el("span", "sr-only", " unidades")), qty);
   const el = (tag: string, className: string, text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
 
+  /** Qué botón del carro tenía el foco antes de redibujar: la línea, el botón y su posición. */
+  function focusedLine() {
+    const button = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
+    const li = button?.closest<HTMLLIElement>("[data-cart-lines] > li");
+    if (!button || !li) return null;
+    return { key: li.dataset.key!, role: button.dataset.role!, index: [...lines.children].indexOf(li) };
+  }
+
+  /** Devuelve el foco al mismo botón; si la línea ya no está, a la vecina; si el carro quedó vacío, a la búsqueda. */
+  function restoreFocus(previous: ReturnType<typeof focusedLine>) {
+    if (!previous) return;
+    const same = [...lines.children].find((li) => (li as HTMLElement).dataset.key === previous.key);
+    const target =
+      same?.querySelector<HTMLElement>(`[data-role="${previous.role}"]`) ??
+      lines.children[Math.min(previous.index, lines.children.length - 1)]?.querySelector<HTMLElement>('[data-role="remove"]') ??
+      search;
+    target.focus();
+  }
+
   function render() {
+    const previous = focusedLine();
     lines.replaceChildren();
     for (const [key, item] of cart) {
       const li = document.createElement("li");
+      li.dataset.key = key;
 
       const thumb = el("span", "line-thumb");
       thumb.setAttribute("aria-hidden", "true");
@@ -404,7 +443,7 @@ const colorOf = (categoryId?: string) => {
       const qty = el("span", "line-qty");
       qty.append(
         iconButton(`Quitar un ${item.name}`, "minus", () => step(key, -1), "qty-btn"),
-        el("span", "qty num", String(item.qty)),
+        withUnits(el("span", "qty num", String(item.qty))),
         iconButton(`Agregar un ${item.name}`, "plus", () => step(key, 1), "qty-btn"),
       );
 
@@ -423,11 +462,27 @@ const colorOf = (categoryId?: string) => {
       paid.value = "";
       setOpen(false);
     }
+    restoreFocus(previous);
+    keepCardFocus();
+  }
+
+  // El stepper de la card se oculta al llegar a 0: si tenía el foco, pasa al botón de la card.
+  function keepCardFocus() {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !active.closest(".stepper") || active.checkVisibility()) return;
+    active.closest("[data-product]")?.querySelector<HTMLElement>("[data-add]")?.focus();
   }
 
   for (const card of cards) {
     const id = card.dataset.id!;
-    card.querySelector("[data-add]")!.addEventListener("click", () => add(id));
+    const addButton = card.querySelector<HTMLButtonElement>("[data-add]")!;
+    addButton.addEventListener("click", () => {
+      if (addButton.getAttribute("aria-disabled") === "true") {
+        notice.textContent = `No queda stock de ${card.dataset.name}.`;
+        return;
+      }
+      add(id);
+    });
     for (const button of card.querySelectorAll<HTMLButtonElement>("[data-step]")) {
       button.addEventListener("click", () => step(id, Number(button.dataset.step)));
     }
@@ -438,41 +493,47 @@ const colorOf = (categoryId?: string) => {
     cart.clear();
     notice.textContent = "";
     render();
+    announce("La venta quedó vacía.");
+    search.focus();
   });
 
   confirm.addEventListener("click", async () => {
-    const missing = [...cart.values()].find((l) => l.price === null);
-    if (missing) {
+    if (isBusy(confirm)) return;
+    const missingIndex = [...cart.values()].findIndex((l) => l.price === null);
+    if (missingIndex >= 0) {
+      const missing = [...cart.values()][missingIndex];
       notice.textContent = `Escribe el precio de «${missing.name}».`;
       setOpen(true);
+      // Lleva al campo que falta, marcado como inválido.
+      const input = lines.children[missingIndex]?.querySelector<HTMLInputElement>(".line-price");
+      input?.setAttribute("aria-invalid", "true");
+      input?.addEventListener("input", () => input.removeAttribute("aria-invalid"), { once: true });
+      input?.focus();
       return;
     }
-    confirm.disabled = clear.disabled = true;
-    notice.textContent = "Guardando venta…";
-    const { error } = await actions.registerSale({
-      branchId: confirm.dataset.branch!,
-      shiftId: confirm.dataset.shift!,
-      items: [...cart.values()].map((l) => ({ productId: l.productId, qty: l.qty, ...(l.open && { price: l.price! }) })),
-    });
+    // aria-disabled (no disabled): el foco se queda en «Cobrar» mientras guarda.
+    setBusy(confirm, true, "Guardando venta…");
+    clear.disabled = true;
+    let error: { message: string } | undefined;
+    try {
+      ({ error } = await actions.registerSale({
+        branchId: confirm.dataset.branch!,
+        shiftId: confirm.dataset.shift!,
+        items: [...cart.values()].map((l) => ({ productId: l.productId, qty: l.qty, ...(l.open && { price: l.price! }) })),
+      }));
+    } catch {
+      error = { message: "No hay conexión. La venta no se guardó: intenta de nuevo." };
+    }
     if (error) {
       notice.textContent = error.message;
-      confirm.disabled = clear.disabled = false;
+      setBusy(confirm, false);
+      clear.disabled = false;
       return;
     }
     // Recarga para mostrar el stock actualizado; el aviso queda para la siguiente vista.
-    try {
-      sessionStorage.setItem("sale-notice", `Venta de ${formatBs(totalValue)} registrada.`);
-    } catch {}
+    flashToast(`Venta de ${formatBs(totalValue)} registrada.`);
     window.location.reload();
   });
-
-  try {
-    const saved = sessionStorage.getItem("sale-notice");
-    if (saved) {
-      toast(saved, "success");
-      sessionStorage.removeItem("sale-notice");
-    }
-  } catch {}
 
   // Búsqueda y filtro por categoría, combinados.
   const search = $<HTMLInputElement>("[data-search]");
@@ -489,7 +550,15 @@ const colorOf = (categoryId?: string) => {
       if (!li.hidden) visible++;
     }
     empty.hidden = visible > 0 || items.length === 0;
+    announceResults(visible);
     return [...items].filter((li) => !li.hidden);
+  }
+
+  // Cuántos productos quedan al buscar o filtrar: se anuncia al dejar de escribir, no en cada tecla.
+  let resultsTimer: ReturnType<typeof setTimeout> | undefined;
+  function announceResults(visible: number) {
+    clearTimeout(resultsTimer);
+    resultsTimer = setTimeout(() => announce(visible === 0 ? "Ningún producto coincide." : plural(visible)), 500);
   }
 
   function setCategory(value: string) {
@@ -512,7 +581,7 @@ const colorOf = (categoryId?: string) => {
       event.preventDefault();
       const visible = applyFilters();
       const button = visible.length === 1 ? visible[0].querySelector<HTMLButtonElement>("[data-add]") : null;
-      if (!button || button.disabled) return;
+      if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") return;
       button.click();
       search.value = "";
       applyFilters();
@@ -663,7 +732,7 @@ const colorOf = (categoryId?: string) => {
       box-shadow 150ms;
   }
 
-  .product:has(.product-add:not(:disabled)):hover {
+  .product:has(.product-add:not(:is(:disabled, [aria-disabled="true"]))):hover {
     background: var(--color-surface-hover);
   }
 
@@ -684,11 +753,11 @@ const colorOf = (categoryId?: string) => {
     cursor: pointer;
   }
 
-  .product-add:disabled {
+  .product-add:is(:disabled, [aria-disabled="true"]) {
     cursor: not-allowed;
   }
 
-  .product-add:active:not(:disabled) ~ .art {
+  .product-add:active:not(:is(:disabled, [aria-disabled="true"])) ~ .art {
     scale: 0.98;
   }
 
@@ -714,7 +783,7 @@ const colorOf = (categoryId?: string) => {
     object-fit: cover;
   }
 
-  .product:has(.product-add:disabled) .art > :not(.out-chip, .stepper) {
+  .product:has(.product-add:is(:disabled, [aria-disabled="true"])) .art > :not(.out-chip, .stepper) {
     opacity: 0.45;
   }
 
@@ -748,7 +817,7 @@ const colorOf = (categoryId?: string) => {
       transform 300ms var(--ease-out);
   }
 
-  .product:has(.product-add:not(:disabled)):is(:hover, :has(.product-add:focus-visible)) .add {
+  .product:has(.product-add:not(:is(:disabled, [aria-disabled="true"]))):is(:hover, :has(.product-add:focus-visible)) .add {
     opacity: 1;
     transform: none;
   }
@@ -783,7 +852,7 @@ const colorOf = (categoryId?: string) => {
     color: var(--color-text);
   }
 
-  .stepper .icon-btn:disabled {
+  .stepper .icon-btn:is(:disabled, [aria-disabled="true"]) {
     color: var(--color-text-subtle);
     cursor: not-allowed;
   }

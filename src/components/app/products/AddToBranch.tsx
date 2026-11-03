@@ -38,7 +38,7 @@ export function AddToBranch({ businessId, branchId, addable }: { businessId: str
             </p>
           )}
           <DialogFooter>
-            <Button type="submit" disabled={save.busy}>
+            <Button type="submit" {...save.submitProps}>
               {save.busy ? "Guardando…" : "Agregar"}
             </Button>
           </DialogFooter>

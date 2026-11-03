@@ -28,7 +28,7 @@ const describedBy = [hint && hintId, errorId].filter(Boolean).join(" ");
     <slot name="addon" />
   </div>
   {hint && <p class="field-hint" id={hintId}>{hint}</p>}
-  <p class="field-error" id={errorId} aria-live="polite"></p>
+  <p class="field-error" id={errorId}></p>
 </div>
 
 <style>

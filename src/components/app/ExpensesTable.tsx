@@ -1,6 +1,6 @@
 import type { ShiftTone } from "@/data/types";
 import { formatBs } from "@/lib/format";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableCaption, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pager, usePage } from "./Pager";
 import { ShiftBadge } from "./ShiftBadge";
 
@@ -46,6 +46,7 @@ export default function ExpensesTable({ rows, pageSize = 10 }: { rows: ExpenseRo
       </ul>
       <div className="table-wrap hidden @2xl:block">
         <Table>
+          <TableCaption className="sr-only">Gastos</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>Fecha</TableHead>

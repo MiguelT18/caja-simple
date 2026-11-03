@@ -208,6 +208,10 @@ html:has(.landing) {
 }
 
 .footer-nav a {
+  /* 24px de alto como mínimo para el dedo (WCAG 2.5.8). */
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
   border-radius: 0.25rem;
   color: var(--color-text-muted);
   text-decoration: underline;
