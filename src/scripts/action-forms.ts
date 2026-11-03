@@ -9,8 +9,7 @@
 //   data-success="Cambios guardados."    → al recargar tras guardar, lo muestra en un toast
 // Diálogos: <button data-open-dialog="id"> abre <dialog id="id" class="modal">; [data-close-dialog] lo cierra.
 import { actions, isInputError } from "astro:actions";
-import { isBusy, setBusy } from "./busy";
-import { confirmDialog, flashToast, toast } from "./dialogs";
+import { confirmDialog, toast } from "./dialogs";
 import { showPageSkeleton } from "./nav-skeleton";
 
 type ActionFn = (input: FormData) => Promise<{ data?: Record<string, unknown>; error?: Error & { code?: string } }>;
@@ -23,25 +22,22 @@ document.addEventListener("submit", async (event) => {
   const action = (actions as unknown as Record<string, ActionFn>)[form.dataset.action];
   const notice = form.querySelector<HTMLElement>("[data-form-notice]");
   const submit = form.querySelector<HTMLButtonElement>("button[type=submit]");
-  if (isBusy(submit)) return;
   const confirmText = form.dataset.confirm;
   if (confirmText && !(await confirmDialog(confirmText, { confirmLabel: form.dataset.confirmLabel, danger: "danger" in form.dataset }))) return;
 
   for (const el of form.querySelectorAll<HTMLElement>(".field-error")) el.textContent = "";
   for (const el of form.querySelectorAll("[aria-invalid]")) el.removeAttribute("aria-invalid");
   if (notice) notice.textContent = "";
-  setBusy(submit, true);
+  if (submit) submit.disabled = true;
 
-  let result: Awaited<ReturnType<ActionFn>>;
-  try {
-    result = await action(new FormData(form));
-  } catch {
-    result = { error: new Error("No hay conexión. Revisa tu internet e intenta de nuevo.") };
-  }
-  const { data, error } = result;
+  const { data, error } = await action(new FormData(form));
   if (!error) {
     unsaved.delete(form);
-    if (form.dataset.success) flashToast(form.dataset.success);
+    if (form.dataset.success) {
+      try {
+        sessionStorage.setItem(SUCCESS_KEY, form.dataset.success);
+      } catch {}
+    }
     const target = form.dataset.redirect?.replace(/\{(\w+)\}/g, (_, key) => String(data?.[key] ?? ""));
     if (target) {
       const url = new URL(target, location.href);
@@ -52,7 +48,7 @@ document.addEventListener("submit", async (event) => {
     return;
   }
 
-  setBusy(submit, false);
+  if (submit) submit.disabled = false;
   if (isInputError(error)) {
     let first: HTMLElement | null = null;
     for (const [field, messages] of Object.entries(error.fields)) {
@@ -66,14 +62,12 @@ document.addEventListener("submit", async (event) => {
     first?.focus();
     return;
   }
-  if (notice) {
-    notice.textContent = error.message || "No se pudo guardar. Intenta de nuevo.";
-    // El aviso está al final del formulario: que se vea aunque el diálogo tenga scroll.
-    notice.scrollIntoView({ block: "nearest" });
-  } else toast(error.message || "No se pudo guardar. Intenta de nuevo.", "error");
+  if (notice) notice.textContent = error.message || "No se pudo guardar. Intenta de nuevo.";
+  else toast(error.message || "No se pudo guardar. Intenta de nuevo.", "error");
 });
 
 // Cambios sin guardar: se compara lo que hay en el formulario con lo que tenía al cargar.
+const SUCCESS_KEY = "action-form-success";
 const unsaved = new Set<HTMLFormElement>();
 
 /** Los valores del formulario como texto comparable; de un archivo, su nombre y tamaño. */
@@ -104,35 +98,25 @@ window.addEventListener("beforeunload", (event) => {
   if ([...unsaved].some((form) => form.isConnected && !form.closest("dialog:not([open])"))) event.preventDefault();
 });
 
+try {
+  const saved = sessionStorage.getItem(SUCCESS_KEY);
+  if (saved) {
+    sessionStorage.removeItem(SUCCESS_KEY);
+    toast(saved, "success");
+  }
+} catch {}
+
 document.addEventListener("click", (event) => {
   const target = event.target instanceof Element ? event.target : null;
   const opener = target?.closest<HTMLElement>("[data-open-dialog]");
   if (opener) {
     const dialog = document.getElementById(opener.dataset.openDialog!) as HTMLDialogElement | null;
-    if (!dialog) return;
-    dialog.showModal();
-    opened.set(dialog, dialogSnapshot(dialog));
-    dialog.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea")?.focus();
+    dialog?.showModal();
+    dialog?.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea")?.focus();
     return;
   }
   const closer = target?.closest<HTMLElement>("[data-close-dialog]");
   if (closer) closer.closest("dialog")?.close();
-  // Clic en el fondo del diálogo: lo cierra solo si no hay nada escrito (un toque de más en el celular no borra lo cargado).
-  if (target instanceof HTMLDialogElement && target.classList.contains("modal") && dialogSnapshot(target) === opened.get(target)) target.close();
+  // Clic en el fondo del diálogo: lo cierra.
+  if (target instanceof HTMLDialogElement && target.classList.contains("modal")) target.close();
 });
-
-// Lo que tenía cada diálogo al abrirse, para saber si el clic en el fondo perdería cambios.
-const opened = new WeakMap<HTMLDialogElement, string>();
-const dialogSnapshot = (dialog: HTMLDialogElement) => [...dialog.querySelectorAll("form")].map(snapshot).join("|");
-
-// Al cerrar un diálogo, sus errores no quedan para la próxima vez que se abra.
-document.addEventListener(
-  "close",
-  (event) => {
-    const dialog = event.target;
-    if (!(dialog instanceof HTMLDialogElement) || !dialog.classList.contains("modal")) return;
-    for (const el of dialog.querySelectorAll<HTMLElement>(".field-error, [data-form-notice]")) el.textContent = "";
-    for (const el of dialog.querySelectorAll("[aria-invalid]")) el.removeAttribute("aria-invalid");
-  },
-  true,
-);
