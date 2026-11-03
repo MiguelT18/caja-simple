@@ -50,7 +50,7 @@ export function Pager({ page, pageCount, from, to, total, onPage, noun = "result
       <Pagination className="mx-0 w-auto">
         <PaginationContent>
           <PaginationItem>
-            <Button variant="ghost" size="sm" onClick={() => onPage(page - 1)} disabled={page === 1} aria-label="Página anterior">
+            <Button variant="ghost" size="sm" className="pointer-coarse:h-11 pointer-coarse:px-3" onClick={() => onPage(page - 1)} disabled={page === 1} aria-label="Página anterior">
               <ChevronLeft />
               <span className="hidden sm:inline">Anterior</span>
             </Button>
@@ -68,7 +68,7 @@ export function Pager({ page, pageCount, from, to, total, onPage, noun = "result
                   aria-current={p === page ? "page" : undefined}
                   aria-label={`Página ${p}`}
                   onClick={() => onPage(p)}
-                  className="tabular-nums"
+                  className="tabular-nums pointer-coarse:size-11"
                 >
                   {p}
                 </Button>
@@ -76,7 +76,7 @@ export function Pager({ page, pageCount, from, to, total, onPage, noun = "result
             ),
           )}
           <PaginationItem>
-            <Button variant="ghost" size="sm" onClick={() => onPage(page + 1)} disabled={page === pageCount} aria-label="Página siguiente">
+            <Button variant="ghost" size="sm" className="pointer-coarse:h-11 pointer-coarse:px-3" onClick={() => onPage(page + 1)} disabled={page === pageCount} aria-label="Página siguiente">
               <span className="hidden sm:inline">Siguiente</span>
               <ChevronRight />
             </Button>

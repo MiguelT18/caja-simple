@@ -49,7 +49,7 @@ const rows = expenseHistory.map((g) => {
         </button>
       ) : (
         <a class="btn btn-secondary" href={branchHref(business, branch, "turnos")}>
-          Abre un turno para registrar gastos
+          Abre un turno<span class="label-rest"> para registrar gastos</span>
         </a>
       )
     }
@@ -162,6 +162,23 @@ const rows = expenseHistory.map((g) => {
   @media (max-width: 1100px) {
     .top {
       grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* Celular: el enlace sin turno se acorta para no salirse del ancho (el resto queda para lectores de pantalla). */
+  @media (max-width: 480px) {
+    .label-rest {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .totals,
+    .chart-card {
+      padding: 1rem;
     }
   }
 </style>

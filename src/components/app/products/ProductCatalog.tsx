@@ -128,7 +128,12 @@ export default function ProductCatalog({ products: initialProducts, categories: 
           </p>
         )}
 
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar productos">
+        {/* En celular, una tira que se desliza de lado en vez de varios renglones de filtros. */}
+        <div
+          className="flex flex-wrap gap-2 max-sm:-mx-4 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:[scrollbar-width:none]"
+          role="group"
+          aria-label="Filtrar productos"
+        >
           <FilterChip active={activeFilter === ALL} onClick={() => setFilter(ALL)} count={products.length}>
             Todas
           </FilterChip>
@@ -148,7 +153,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
               Sin categoría
             </FilterChip>
           )}
-          <span className="mx-1 w-px self-stretch bg-border" aria-hidden="true" />
+          <span className="mx-1 w-px shrink-0 self-stretch bg-border" aria-hidden="true" />
           <FilterChip active={lowOnly} onClick={() => setLowOnly(!lowOnly)} count={lowCount} warning>
             <TriangleAlert className="size-3.5" aria-hidden="true" />
             Stock bajo
@@ -185,7 +190,9 @@ export default function ProductCatalog({ products: initialProducts, categories: 
           </Button>
         </div>
       ) : (
-        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4 p-0">
+        // Con espacio, mosaicos con foto; en un contenedor angosto (celular), filas compactas con miniatura cuadrada.
+        <div className="@container/list">
+        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4 p-0 @max-lg/list:grid-cols-1 @max-lg/list:gap-2">
           {pager.pageItems.map(({ product, categoryId }) => {
             const index = categories.findIndex((c) => c.id === categoryId);
             return (
@@ -202,6 +209,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
             );
           })}
         </ul>
+        </div>
       )}
 
       <Pager {...pager} onPage={pager.setPage} noun="productos" />
@@ -249,7 +257,7 @@ function FilterChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors",
+        "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm font-medium whitespace-nowrap transition-colors pointer-coarse:min-h-11",
         active
           ? warning
             ? "border-transparent bg-[var(--color-warning-soft)] text-[var(--color-warning)]"

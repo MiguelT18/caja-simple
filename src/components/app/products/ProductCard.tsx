@@ -60,19 +60,21 @@ export function ProductCard({
 }) {
   const low = isLow(product);
   return (
-    <Card className="h-full gap-0 overflow-hidden py-0 hover:bg-[var(--color-surface-hover)]">
+    // Mosaico: foto 16:10 arriba. En la lista angosta (@container/list de ProductCatalog): fila con miniatura cuadrada a la izquierda.
+    <Card className="relative h-full gap-0 overflow-hidden py-0 hover:bg-[var(--color-surface-hover)] @max-lg/list:flex-row @max-lg/list:items-start">
       <div
-        className="relative aspect-[16/10]"
+        className="relative aspect-[16/10] @max-lg/list:m-3 @max-lg/list:mr-0 @max-lg/list:aspect-square @max-lg/list:w-20 @max-lg/list:shrink-0 @max-lg/list:overflow-hidden @max-lg/list:rounded-md"
         style={{
           background: `color-mix(in srgb, ${color} 12%, var(--color-surface))`,
         }}
       >
         <ProductImage src={product.image} color={color} />
+      </div>
         {onEdit && !onMove && (
           <Button
             variant="secondary"
             size="icon-sm"
-            className="absolute top-2 right-2 bg-card shadow-sm"
+            className="absolute top-2 right-2 bg-card shadow-sm pointer-coarse:size-11"
             aria-label={`Editar precio y stock de ${product.name}`}
             onClick={onEdit}
           >
@@ -85,7 +87,7 @@ export function ProductCard({
               <Button
                 variant="secondary"
                 size="icon-sm"
-                className="absolute top-2 right-2 bg-card shadow-sm"
+                className="absolute top-2 right-2 bg-card shadow-sm pointer-coarse:size-11"
                 aria-label={`Opciones de ${product.name}`}
               >
                 <FolderInput />
@@ -114,16 +116,15 @@ export function ProductCard({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-      </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-4">
+      <div className={cn("flex min-w-0 flex-1 flex-col gap-2 p-4 @max-lg/list:gap-1 @max-lg/list:p-3", (onEdit || onMove) && "@max-lg/list:pr-14")}>
         <Badge variant="outline" className="max-w-full gap-1.5 truncate font-medium text-muted-foreground">
           <span className="size-1.5 shrink-0 rounded-full" style={{ background: color }} aria-hidden="true" />
           {category?.name ?? "Sin categoría"}
         </Badge>
         <h3 className="m-0 text-base leading-snug font-semibold">{product.name}</h3>
-        {!("soldIn" in product) && <p className="m-0 text-xl font-bold tabular-nums">{priceLabel(product.price)}</p>}
-        <p className="m-0 flex items-center gap-1.5 text-sm text-muted-foreground">
+        {!("soldIn" in product) && <p className="m-0 text-xl font-bold tabular-nums @max-lg/list:text-lg">{priceLabel(product.price)}</p>}
+        <p className={cn("m-0 flex items-center gap-1.5 text-sm text-muted-foreground", !product.barcode && "@max-lg/list:hidden")}>
           <ScanBarcode className="size-4 shrink-0" aria-hidden="true" />
           {product.barcode ? <span className="tabular-nums">{product.barcode}</span> : <span>Sin código</span>}
         </p>
@@ -144,11 +145,11 @@ export function ProductCard({
                 <tbody>
                   {product.soldIn.map((s) => (
                     <tr key={s.branchId} className="border-t border-border first:border-t-0">
-                      <th scope="row" className="truncate py-1 text-left font-normal text-muted-foreground">
+                      <th scope="row" className="w-full max-w-0 truncate py-1 text-left font-normal text-muted-foreground">
                         {s.branch}
                       </th>
-                      <td className="py-1 text-right tabular-nums">{priceLabel(s.price)}</td>
-                      <td className={cn("py-1 pl-3 text-right tabular-nums", s.low && "font-semibold text-[var(--color-warning)]")}>
+                      <td className="py-1 pl-3 text-right whitespace-nowrap tabular-nums">{priceLabel(s.price)}</td>
+                      <td className={cn("py-1 pl-3 text-right whitespace-nowrap tabular-nums", s.low && "font-semibold text-[var(--color-warning)]")}>
                         {s.low && <TriangleAlert className="mr-1 inline size-3.5 align-[-2px]" aria-label="Stock bajo:" />}
                         {s.stock ?? "Sin control"}
                       </td>
@@ -159,7 +160,7 @@ export function ProductCard({
             )}
           </div>
         ) : (
-          <div className="mt-auto flex items-center justify-between gap-2 pt-2 text-sm">
+          <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2 text-sm @max-lg/list:pt-0">
             {product.stock === null ? (
               <span className="text-muted-foreground">Sin control de stock</span>
             ) : (
