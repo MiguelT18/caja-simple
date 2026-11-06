@@ -6,7 +6,7 @@ import DonutChart from "@/components/app/charts/DonutChart";
 import WeekChart from "@/components/app/charts/WeekChart";
 import MovementsTable from "@/components/app/MovementsTable";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, shiftBarData, branchHref, isLowStock } from "@/data/queries";
+import { branchColor, branchContext, headerBackdrop, shiftBarData, branchHref, isLowStock, orderLabels, receiptUrls } from "@/data/queries";
 import { differenceLabel, formatBs, plural, shiftHours } from "@/lib/format";
 import { longDate } from "@/lib/dates";
 
@@ -15,10 +15,17 @@ const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx || ctx.role !== "dueño") return Astro.rewrite("/404");
 const { today, branch, expenses, products, sales, salesByCategory, salesTotal, expensesTotal, shiftById, shiftTotals, shifts, weekSummary } = ctx;
 const balance = salesTotal - expensesTotal;
+// Única página de la sucursal con la foto del negocio de fondo: la de la sucursal va en la portada (ctx.backdrop).
+const [orderNames, receipts, businessBackdrop] = await Promise.all([
+  orderLabels(Astro.locals.supabase, branch.id, today, today),
+  receiptUrls(Astro.locals.supabase, sales),
+  headerBackdrop(Astro.locals, ctx.membership),
+]);
+const cover = ctx.backdrop;
 
 const movements = [
-  ...sales.map((s) => ({ ...s, label: `Venta · ${s.items} ${s.items === 1 ? "producto" : "productos"}`, amount: s.total, kind: "sale" as const })),
-  ...expenses.map((g) => ({ ...g, label: g.concept, amount: g.amount, kind: "expense" as const })),
+  ...sales.map((s) => ({ ...s, ...ctx.receiptOf(s, receipts), label: `${orderNames.has(s.id) ? `Pedido «${orderNames.get(s.id)}»` : "Venta"} · ${plural(s.items, "producto", "productos")}`, amount: s.voided ?? s.total, kind: "sale" as const, payment: s.payment })),
+  ...expenses.map((g) => ({ ...g, label: g.concept, amount: g.voided ?? g.amount, kind: "expense" as const, payment: undefined, receipt: undefined, missingReceipt: false, canAttach: false })),
 ]
   .sort((a, b) => b.time.localeCompare(a.time))
   .map((m) => {
@@ -31,6 +38,11 @@ const movements = [
       by: m.recordedBy.firstName,
       amount: m.amount,
       kind: m.kind,
+      payment: m.payment,
+      voided: m.voided !== null,
+      receipt: m.receipt,
+      missingReceipt: m.missingReceipt,
+      canAttach: m.canAttach,
     };
   });
 
@@ -42,9 +54,11 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
 ---
 
 <Layout title={`Resumen · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader tint={color} eyebrow={longDate(today)} title={branch.name} description={meta}>
+  <PageHeader {...businessBackdrop} tint={color} eyebrow={longDate(today)} title={branch.name} description={meta}>
     <span slot="cover" class="cover-art" style={`--branch: ${color}`}>
       <Store size={64} stroke-width={1.5} />
+      {/* Mismo view-transition-name que la foto de la BranchCard: la fachada pasa de la tarjeta a la portada. */}
+      {cover.image && <img src={cover.image} alt="" decoding="async" style={cover.transition && `view-transition-name: ${cover.transition}`} data-fallback />}
     </span>
   </PageHeader>
 
@@ -191,12 +205,22 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
   }
 
   .cover-art {
+    position: relative;
     display: grid;
     place-items: center;
     width: 100%;
     height: 100%;
     background: linear-gradient(135deg, color-mix(in oklab, var(--branch) 55%, var(--color-surface)), color-mix(in oklab, var(--branch) 20%, var(--color-surface)));
     color: var(--color-text);
+  }
+
+  /* La foto tapa el ícono; si no carga (data-fallback), queda el ícono sobre el color de la sucursal. */
+  .cover-art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .shift-grid {

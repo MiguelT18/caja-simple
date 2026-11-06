@@ -576,10 +576,14 @@ html {
 	pointer-events: none;
 }
 
+/* En el celular, arriba y al centro: abajo lo tapan la barra del turno y el teclado. */
 @media (max-width: 480px) {
 	.toast-region {
 		top: 1rem;
+		right: auto;
 		bottom: auto;
+		left: 50%;
+		translate: -50% 0;
 	}
 }
 
@@ -627,6 +631,10 @@ html {
 
 .toast-success {
 	border-left-color: var(--color-income);
+}
+
+.toast-warning {
+	border-left-color: var(--color-warning);
 }
 
 .toast-leaving {

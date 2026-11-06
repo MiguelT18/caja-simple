@@ -27,9 +27,9 @@ export default function DonutChart({ items, totalLabel, empty = "Todavía no hay
     <div className="grid items-center gap-4 @md:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
       {/* La leyenda de al lado ya dice todo con texto (nombre, porcentaje y monto): la torta es visual. */}
       <ChartContainer config={config} className="mx-auto aspect-square w-full max-w-48" aria-hidden="true">
-        <PieChart>
+        <PieChart accessibilityLayer={false}>
           <ChartTooltip cursor={false} content={<MoneyTooltip config={config} nameKey="key" hideLabel />} />
-          <Pie data={data} dataKey="value" nameKey="key" innerRadius="62%" strokeWidth={2} stroke="var(--color-surface)">
+          <Pie data={data} dataKey="value" nameKey="key" rootTabIndex={-1} innerRadius="62%" strokeWidth={2} stroke="var(--color-surface)">
             <Label
               content={({ viewBox }) =>
                 viewBox && "cx" in viewBox ? (

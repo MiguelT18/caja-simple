@@ -16,7 +16,7 @@ const canAddBranch = maxBranches === null || branchSummary.length < maxBranches;
 ---
 
 <Layout title={`Sucursales · ${business.name}`} context={{ membership: ctx.membership }}>
-  <PageHeader title="Sucursales" description={`${plural(branchSummary.length, "sucursal", "sucursales")} de ${business.name}, con las cifras de hoy.`}>
+  <PageHeader {...ctx.backdrop} title="Sucursales" description={`${plural(branchSummary.length, "sucursal", "sucursales")} de ${business.name}, con las cifras de hoy.`}>
     {
       canAddBranch ? (
         <button type="button" class="btn btn-primary" data-open-dialog="branch-new">

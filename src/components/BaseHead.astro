@@ -15,6 +15,10 @@ const { title } = Astro.props;
 <link rel="icon" href="/favicon.ico" />
 <!-- El manifest permite agregar la app a la pantalla de inicio: en iPhone es requisito para las notificaciones push. -->
 <link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<!-- Las meta no leen var(): son --color-bg de tokens.css en cada tema. -->
+<meta name="theme-color" content="#faf8f5" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#171310" media="(prefers-color-scheme: dark)" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="generator" content={Astro.generator} />
 <script is:inline>

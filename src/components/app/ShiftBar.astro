@@ -3,7 +3,8 @@
 // (apertura + ventas − gastos = esperado) y el botón para registrar una venta. Del reproductor de música toma
 // solo la forma (barra fija abajo, arte cuadrado, botón redondo), nunca sus metáforas de audio.
 // Sin turno abierto, invita a abrir uno. Los datos salen de shiftBarData() (src/data/branch.ts).
-import { Clock, LockOpen, Moon, Plus, Sun, Sunset, TriangleAlert } from "@lucide/astro";
+import { Clock, Hourglass, LockOpen, Moon, Plus, RotateCcw, Sun, Sunset, TriangleAlert } from "@lucide/astro";
+import FormInput from "@/components/app/FormInput.astro";
 import type { ShiftBarData } from "@/data/queries";
 import { shiftProgress } from "@/lib/dates";
 import { formatBs, overnight } from "@/lib/format";
@@ -14,23 +15,32 @@ interface Props {
 
 const { data } = Astro.props;
 const shift = data.shift;
-const late = shift && data.openedOn ? shiftProgress(shift, data.openedOn).late : false;
+// Más de 24 h abierto (un turno olvidado): el aviso no se va solo, hay que cerrarlo con el arqueo.
+const stale = !!data.stale;
+const late = stale || (shift && data.openedOn ? shiftProgress(shift, data.openedOn).late : false);
 const Icon = shift ? { morning: Sun, afternoon: Sunset, night: Moon }[shift.tone] : Clock;
 const expected = data.expected ?? 0;
 // Si el botón llevaría a la página actual («Registrar venta» o «Turnos»), no se muestra: la página ya tiene esa acción.
 const here = Astro.url.pathname.replace(/\/$/, "");
 ---
 
-<aside class="shift-bar" aria-label={shift ? "Turno en curso" : "Turno"} data-shift-bar>
+<aside id="shift-bar" class="shift-bar" aria-label={shift ? "Turno en curso" : "Turno"} data-shift-bar data-region="shift-bar">
   <div class="now">
     <span class:list={["art", shift && `art-${shift.tone}`]} aria-hidden="true">
       <Icon size={22} stroke-width={1.75} />
+      {/* La foto tapa el ícono; si no carga (data-fallback), queda el ícono. Con turno, su ícono va de insignia. */}
+      {data.image && <img class="art-img" src={data.image} alt="" decoding="async" data-fallback />}
+      {data.image && shift && (
+        <span class:list={["art-badge", `art-${shift.tone}`]}>
+          <Icon size={12} stroke-width={2} />
+        </span>
+      )}
     </span>
     <div class="now-text">
       <p class="now-title">{shift ? `Turno ${shift.name.toLowerCase()}` : "Sin turno abierto"}</p>
       {
         shift ? (
-          <div class="status" data-status data-start={shift.start} data-end={shift.end} data-opened={data.openedOn}>
+          <div class="status" data-status data-start={shift.start} data-end={shift.end} data-opened={data.openedOn} data-stale={stale ? "" : undefined}>
             <p class="now-sub" data-on-time hidden={late}>
               <span class="live">
                 <span class="live-dot" aria-hidden="true" />
@@ -44,9 +54,15 @@ const here = Astro.url.pathname.replace(/\/$/, "");
             </p>
             <p class="now-sub late" data-late hidden={!late}>
               <TriangleAlert size={14} stroke-width={1.75} />
-              <span class="late-text">
-                Pasó <span class="late-long">la hora de cierre</span><span class="late-short">el cierre</span> (<span class="num">{shift.end}</span>)
-              </span>
+              {stale ? (
+                <span class="late-text">
+                  Lleva más de 24 h abierto<span class="late-long">. Ciérralo con el arqueo</span>
+                </span>
+              ) : (
+                <span class="late-text">
+                  Pasó <span class="late-long">la hora de cierre</span><span class="late-short">el cierre</span> (<span class="num">{shift.end}</span>)
+                </span>
+              )}
             </p>
           </div>
         ) : (
@@ -68,8 +84,9 @@ const here = Astro.url.pathname.replace(/\/$/, "");
             <dd class="num">{formatBs(data.opening ?? 0)}</dd>
           </div>
           <div class="term term-flow">
-            <dt>Ventas</dt>
-            <dd class="num amount-income">{formatBs(data.sales ?? 0, "+")}</dd>
+            {/* Solo el efectivo entra al cajón: QR y transferencias no van en el arqueo. */}
+            <dt>Ventas en efectivo</dt>
+            <dd class="num amount-income">{formatBs(data.cash ?? 0, "+")}</dd>
           </div>
           <div class="term term-flow">
             <dt>Gastos</dt>
@@ -92,32 +109,146 @@ const here = Astro.url.pathname.replace(/\/$/, "");
           )}
         </div>
       </>
+    ) : data.reopen ? (
+      // Su turno ya se cerró hoy: se pide a la dueña que lo reabra (requestReopen); ella acepta o rechaza en sus avisos.
+      data.reopen.pending ? (
+        <p class="reopen-wait">
+          <Hourglass size={16} stroke-width={1.75} aria-hidden="true" />
+          <span>Pediste reabrir el turno {data.reopen.shiftName.toLowerCase()}. Esperando respuesta.</span>
+        </p>
+      ) : (
+        <button type="button" class="btn btn-primary open" data-open-dialog="bar-reopen-shift">
+          <RotateCcw size={18} stroke-width={1.75} />
+          {data.reopen.direct ? "Reabrir turno" : "Pedir reabrir"}
+        </button>
+      )
+    ) : data.wait ? (
+      // Fuera del horario de todo turno: se dice desde cuándo se abre el próximo (la base no lo dejaría antes).
+      <p class="reopen-wait">
+        <Clock size={16} stroke-width={1.75} aria-hidden="true" />
+        <span>El turno {data.wait.shiftName.toLowerCase()} se abre a partir de las <span class="num">{data.wait.from}</span>.</span>
+      </p>
     ) : (
-      here !== data.shiftsHref && (
+      here !== data.shiftsHref &&
+      (data.open ? (
+        // Se abre aquí mismo, sin ir a Turnos. Sin data-form-notice: los errores salen en un toast (scripts/action-forms.ts).
+        <button type="button" class="btn btn-primary open" data-open-dialog="bar-open-shift">
+          <LockOpen size={18} stroke-width={1.75} />
+          Abrir turno
+        </button>
+      ) : (
         <a class="btn btn-primary open" href={data.shiftsHref}>
           <LockOpen size={18} stroke-width={1.75} />
           Abrir turno
         </a>
-      )
+      ))
     )
   }
 </aside>
+
+{
+  !shift && data.reopen && !data.reopen.pending && (
+    <dialog id="bar-reopen-shift" class="modal" aria-labelledby="bar-reopen-shift-title">
+      {
+        data.reopen.direct ? (
+          // La dueña reabre directo: el mismo turno de hoy, con lo vendido y sin lo contado (public.reopen_shift).
+          <form id="bar-reopen-shift-form" class="modal-form" method="dialog" data-action="reopenShift" data-reload data-success={`Turno ${data.reopen.shiftName.toLowerCase()} reabierto.`} novalidate>
+            <header class="modal-head">
+              <h2 id="bar-reopen-shift-title">¿Reabrir el turno {data.reopen.shiftName.toLowerCase()}?</h2>
+              <p>Ya se cerró hoy. Al reabrirlo se borra lo contado y se sigue vendiendo en el mismo turno hasta volver a cerrarlo con el arqueo.</p>
+            </header>
+            <input type="hidden" name="closeId" value={data.reopen.closeId} />
+            <p class="notice notice-error" role="alert" data-form-notice></p>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-secondary" data-close-dialog>Cancelar</button>
+              <button type="submit" class="btn btn-primary">Reabrir turno</button>
+            </div>
+          </form>
+        ) : (
+          <form
+            id="bar-reopen-shift-form"
+            class="modal-form"
+            method="dialog"
+            data-action="requestReopen"
+            data-reload
+            data-success="Listo: le avisamos a quien administra el negocio."
+            novalidate
+          >
+            <header class="modal-head">
+              <h2 id="bar-reopen-shift-title">¿Pedir reabrir el turno {data.reopen.shiftName.toLowerCase()}?</h2>
+              <p>
+                Ya se cerró hoy. Para volver a abrirlo, quien administra el negocio tiene que estar de acuerdo: le llega un
+                aviso y decide. El pedido también queda en tus avisos; si acepta, sigues vendiendo en el mismo turno.
+              </p>
+            </header>
+            <input type="hidden" name="closeId" value={data.reopen.closeId} />
+            <FormInput form="bar-reopen-shift-form" name="reason" label="Motivo (opcional)" hint="Por ejemplo: lo cerré antes de tiempo, faltaba registrar una venta." maxlength={200} />
+            <p class="notice notice-error" role="alert" data-form-notice></p>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-secondary" data-close-dialog>Cancelar</button>
+              <button type="submit" class="btn btn-primary">Confirmar y avisar</button>
+            </div>
+          </form>
+        )
+      }
+    </dialog>
+  )
+}
+
+{
+  !shift && data.open && (
+    <dialog id="bar-open-shift" class="modal" aria-labelledby="bar-open-shift-title">
+      <form id="bar-open-shift-form" class="modal-form" method="dialog" data-action="openShift" data-reload data-success="Turno abierto." novalidate>
+        <header class="modal-head">
+          <h2 id="bar-open-shift-title">Abrir turno</h2>
+          <p>En {data.branchName}. Las ventas y los gastos que registres cuentan en este turno.</p>
+        </header>
+        <input type="hidden" name="branchId" value={data.open.branchId} />
+        {data.open.shifts.length === 1 ? (
+          <input type="hidden" name="shiftId" value={data.open.shifts[0].id} />
+        ) : (
+          <FormInput
+            form="bar-open-shift-form"
+            name="shiftId"
+            label="Turno"
+            options={data.open.shifts.map((s) => ({ value: s.id, label: `${s.name} (${s.start}–${s.end})`, selected: s.selected }))}
+            required
+          />
+        )}
+        <FormInput
+          form="bar-open-shift-form"
+          name="opening"
+          type="number"
+          inputmode="decimal"
+          step="0.01"
+          min="0"
+          label={data.open.shifts.length === 1 ? `Dinero en caja al abrir el turno ${data.open.shifts[0].name.toLowerCase()} (Bs)` : "Dinero en caja al abrir (Bs)"}
+          value={data.open.opening === undefined ? undefined : String(data.open.opening)}
+          hint={data.open.opening === undefined ? undefined : "Lo contado al cerrar el último turno. Cámbialo si no es lo que hay."}
+          required
+        />
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close-dialog>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Abrir turno</button>
+        </div>
+      </form>
+    </dialog>
+  )
+}
 
 <script>
   import { shiftProgress } from "@/lib/dates";
 
   // Pasada la hora de cierre, la línea de estado cambia a un aviso. Se revisa cada minuto en hora de Bolivia.
-  const box = document.querySelector<HTMLElement>("[data-shift-bar] [data-status]");
-  if (box) {
+  // Busca la barra en cada vuelta: tras una venta o un gasto se cambia por una nueva (scripts/refresh.ts).
+  setInterval(() => {
+    const box = document.querySelector<HTMLElement>("[data-shift-bar] [data-status]");
+    if (!box || "stale" in box.dataset) return;
     const { start = "", end = "", opened = "" } = box.dataset;
-    const onTime = box.querySelector<HTMLElement>("[data-on-time]")!;
-    const late = box.querySelector<HTMLElement>("[data-late]")!;
-    setInterval(() => {
-      const isLate = shiftProgress({ start, end }, opened).late;
-      late.hidden = !isLate;
-      onTime.hidden = isLate;
-    }, 60_000);
-  }
+    const isLate = shiftProgress({ start, end }, opened).late;
+    box.querySelector<HTMLElement>("[data-late]")!.hidden = !isLate;
+    box.querySelector<HTMLElement>("[data-on-time]")!.hidden = isLate;
+  }, 60_000);
 </script>
 
 <style>
@@ -142,6 +273,7 @@ const here = Astro.url.pathname.replace(/\/$/, "");
 
   /* Portada del turno: el ícono del tono sobre su color. */
   .art {
+    position: relative;
     display: grid;
     flex-shrink: 0;
     place-items: center;
@@ -150,6 +282,28 @@ const here = Astro.url.pathname.replace(/\/$/, "");
     border-radius: 0.375rem;
     background: var(--color-surface-hover);
     color: var(--color-text-muted);
+  }
+
+  .art-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+  }
+
+  /* Insignia del turno sobre la foto: el borde del color de la barra la separa de la imagen. */
+  .art-badge {
+    position: absolute;
+    right: -0.25rem;
+    bottom: -0.25rem;
+    display: grid;
+    place-items: center;
+    width: 1.375rem;
+    height: 1.375rem;
+    border: 2px solid var(--color-bg);
+    border-radius: 50%;
   }
 
   .art-morning {
@@ -314,9 +468,20 @@ const here = Astro.url.pathname.replace(/\/$/, "");
     background: var(--color-primary-hover);
   }
 
-  .open {
+  .open,
+  .reopen-wait {
     grid-column: 3;
     justify-self: end;
+  }
+
+  /* Pedido de reapertura enviado: texto con ícono (no solo color), sin botón. */
+  .reopen-wait {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
   }
 
   /* Escritorio angosto: sin la apertura la suma ya no cierra, así que se va también el «=»;
@@ -412,7 +577,8 @@ const here = Astro.url.pathname.replace(/\/$/, "");
       height: 2.75rem;
     }
 
-    .open {
+    .open,
+    .reopen-wait {
       grid-column: 2 / -1;
     }
   }

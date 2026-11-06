@@ -1,13 +1,17 @@
 import { actions } from "astro:actions";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, selectClass, useActionForm, StockFields } from "./form";
 
 export function AddToBranch({ businessId, branchId, addable }: { businessId: string; branchId: string; addable: { id: string; name: string }[] }) {
-  const save = useActionForm((form) => actions.saveInventory(form) as never);
+  const [open, setOpen] = useState(false);
+  const save = useActionForm((form) => actions.saveInventory(form) as never, () => setOpen(false), (form) =>
+    `«${addable.find((p) => p.id === form.get("productId"))?.name ?? "El producto"}» se agregó a esta sucursal.`,
+  );
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="h-11">
           <Plus />

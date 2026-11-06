@@ -102,7 +102,7 @@ export function announce(message: string, politeness: "polite" | "assertive" = "
  * Aviso flotante abajo a la derecha (arriba del todo en móvil). Se va solo, salvo los errores y los que llevan enlace
  * (hay que poder leerlos y usarlos sin apuro, WCAG 2.2.1). Con el mouse encima o con foco dentro, no se cierra.
  */
-export function toast(message: string, tone: "error" | "success" | "info" = "info", link?: { href: string; label: string }) {
+export function toast(message: string, tone: "error" | "success" | "warning" | "info" = "info", link?: { href: string; label: string }) {
   const { toasts } = regions();
   const el = document.createElement("div");
   el.className = `toast toast-${tone}`;

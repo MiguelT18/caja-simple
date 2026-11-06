@@ -3,6 +3,7 @@
 import { ActionError, type ActionAPIContext } from "astro:actions";
 import { z } from "astro/zod";
 import { rateLimit } from "@/lib/cache";
+import { imageInfo, tooLarge } from "@/lib/image";
 
 export const uuid = z.uuid();
 export const name = (max: number, message: string) => z.string().trim().min(1, message).max(max, `Máximo ${max} caracteres`);
@@ -44,7 +45,8 @@ export function check(error: { code?: string; message: string } | null, duplicat
   if (error.code === "P0001") throw new ActionError({ code: "BAD_REQUEST", message: error.message });
   if (error.code === "42501" || error.code === "PGRST116")
     throw new ActionError({ code: "FORBIDDEN", message: "No tienes permiso para hacer esto." });
-  console.error(error);
+  // Una línea JSON por error: el log drain de Vercel la recoge y se puede filtrar por level/code.
+  console.error(JSON.stringify({ level: "error", source: "action", code: error.code ?? null, message: error.message }));
   throw new ActionError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo guardar. Intenta de nuevo." });
 }
 
@@ -113,21 +115,45 @@ export const imageFile = z
   .instanceof(File)
   .optional()
   .refine((f) => !f || f.size === 0 || IMAGE_TYPES.includes(f.type), "La foto debe ser JPG, PNG o WebP")
-  .refine((f) => !f || f.size <= 2 * 1024 * 1024, "La foto pesa más de 2 MB");
+  .refine((f) => !f || f.size <= 2 * 1024 * 1024, "La foto pesa más de 2 MB")
+  // El tipo lo pone quien envía: se mira el contenido. Así nadie sube un HTML, un SVG o un ejecutable con nombre de foto,
+  // y el contentType con que se guarda (f.type) queda verificado.
+  .superRefine(async (f, ctx) => {
+    if (!f || f.size === 0 || f.size > 2 * 1024 * 1024) return;
+    const info = imageInfo(new Uint8Array(await f.arrayBuffer()));
+    if (!info || info.type !== f.type) ctx.addIssue({ code: "custom", message: "Esta imagen no es un JPG, PNG o WebP válido" });
+    else if (tooLarge(info)) ctx.addIssue({ code: "custom", message: "La imagen es demasiado grande en píxeles. Usa una foto más chica." });
+  });
 
-/** Sube, reemplaza o quita la foto de una sucursal o un producto (bucket privado, <negocio>/<id>.<ext>) y guarda su image_path. */
+/** Tope de subidas por persona (llenar el Storage con un script). Solo cuenta si viene algún archivo. */
+export async function uploadLimit(context: ActionAPIContext, ...files: (File | undefined)[]) {
+  if (files.some((f) => f && f.size > 0)) await limit(context, "upload", 60, 60 * 60);
+}
+
+/** Sube, reemplaza o quita la foto de una sucursal o un producto (bucket privado, <negocio>/<id>-<timestamp>.<ext>) y guarda su image_path. */
+/** Las fotos viven en <negocio>/… de cada bucket, y Storage solo deja borrarlas mientras el negocio existe. */
+// shortcut: borra hasta 1000 fotos por bucket, si un negocio llega a más, paginar el list().
+export async function removeBusinessPhotos(sb: ReturnType<typeof db>, businessId: string) {
+  for (const bucket of ["product-images", "branch-images"]) {
+    const { data: files } = await sb.storage.from(bucket).list(businessId, { limit: 1000 });
+    if (files?.length) await sb.storage.from(bucket).remove(files.map((f) => `${businessId}/${f.name}`));
+  }
+}
+
 export async function storeImage(
   sb: ReturnType<typeof db>,
-  table: "branches" | "products",
+  table: "businesses" | "branches" | "products",
   businessId: string,
   row: { id: string; image_path: string | null },
   image: File | undefined,
   remove: boolean,
 ) {
-  const bucket = sb.storage.from(table === "branches" ? "branch-images" : "product-images");
+  // El logo del negocio comparte bucket y carpeta con las fachadas: <negocio>/<negocio>.<ext>.
+  const bucket = sb.storage.from(table === "products" ? "product-images" : "branch-images");
   if (image && image.size > 0) {
-    const path = `${businessId}/${row.id}.${extension(image.type)}`;
-    const upload = await bucket.upload(path, image, { upsert: true, contentType: image.type });
+    // Nombre nuevo en cada cambio: la URL de la foto nueva nunca coincide con la vieja, y así se puede guardar un año.
+    const path = `${businessId}/${row.id}-${Date.now()}.${extension(image.type)}`;
+    const upload = await bucket.upload(path, image, { contentType: image.type, cacheControl: "31536000" });
     if (upload.error) throw new ActionError({ code: "BAD_REQUEST", message: "No se pudo subir la foto. Intenta de nuevo." });
     if (row.image_path && row.image_path !== path) await bucket.remove([row.image_path]);
     check((await sb.from(table).update({ image_path: path }).eq("id", row.id)).error);

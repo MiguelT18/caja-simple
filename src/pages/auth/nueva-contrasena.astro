@@ -1,0 +1,41 @@
+---
+import AuthLayout from "../../layouts/AuthLayout.astro";
+import PasswordField from "../../components/auth/PasswordField.astro";
+import { needsSecondFactor, verifyHref } from "@/lib/auth";
+
+// Se llega con la sesión que abre el enlace del correo (ver /api/auth/recover). Sin ella, el enlace venció.
+if (!Astro.locals.userId)
+  return Astro.redirect(`/auth/iniciar-sesion?error=${encodeURIComponent("El enlace venció o ya se usó. Pide uno nuevo en «¿Olvidaste tu contraseña?».")}`);
+// Con la verificación en dos pasos activa, primero el código: el enlace solo no alcanza para cambiar la contraseña.
+if (await needsSecondFactor(Astro.locals.supabase)) return Astro.redirect(verifyHref(Astro.url.pathname));
+---
+
+<AuthLayout
+  title="Contraseña nueva"
+  heading="Elige una contraseña nueva"
+  description="La usarás desde ahora para entrar"
+  pitch="Listo. Una contraseña nueva y vuelves a tu caja."
+>
+  <form class="auth-form" method="post" action="/api/auth/password" novalidate data-auth-form>
+    <PasswordField
+      id="password"
+      label="Contraseña nueva"
+      autocomplete="new-password"
+      required
+      minlength={8}
+      hint="Mínimo 8 caracteres"
+      data-required-message="Ingresa una contraseña"
+      data-minlength-message="La contraseña debe tener al menos 8 caracteres"
+    />
+    <PasswordField
+      id="passwordConfirm"
+      label="Repetir contraseña"
+      autocomplete="new-password"
+      required
+      data-required-message="Repite tu contraseña"
+      data-match="password"
+      data-match-message="Las contraseñas no coinciden"
+    />
+    <button type="submit" class="btn btn-primary btn-block" data-busy-label="Guardando…">Guardar y entrar</button>
+  </form>
+</AuthLayout>

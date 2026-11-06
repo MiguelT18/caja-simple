@@ -1,0 +1,283 @@
+---
+// Reportes de la sucursal por día, semana o mes, con exportar a CSV (Excel) e imprimir (PDF). Plan Negocio o superior.
+import { Download, Printer } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import DonutChart from "@/components/app/charts/DonutChart";
+import WeekChart from "@/components/app/charts/WeekChart";
+import RangeFilter from "@/components/app/RangeFilter.astro";
+import Layout from "@/layouts/Layout.astro";
+import { planLimits } from "@/data/plans";
+import {
+  branchColor,
+  branchContext,
+  businessHref,
+  byPeriod,
+  expensesByCategory,
+  movements,
+  saleLines,
+  shiftBarData,
+  sum,
+  totalsBy,
+} from "@/data/queries";
+import { longDate, parseRange, shortDate, today as todayOf, type Period } from "@/lib/dates";
+import { formatBs, paymentLabel, plural } from "@/lib/format";
+
+const { negocio, sucursal } = Astro.params;
+const MAX_DAYS = 366;
+const range = parseRange(Astro.url.searchParams, todayOf(), MAX_DAYS);
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+if (!ctx || ctx.role !== "dueño") return Astro.rewrite("/404");
+const { branch, business, today } = ctx;
+const allowed = planLimits[business.plan].reports;
+
+const periods: Record<Period, string> = { dia: "Por día", semana: "Por semana", mes: "Por mes" };
+const asked = Astro.url.searchParams.get("periodo");
+const period: Period = asked === "semana" || asked === "mes" ? asked : "dia";
+
+const loaded = allowed
+  ? await Promise.all([movements(Astro.locals.supabase, [branch.id], range.from, range.to), saleLines(Astro.locals.supabase, branch.id, range.from, range.to)])
+  : undefined;
+const moves = loaded?.[0] ?? { sales: [], expenses: [] };
+
+const salesTotal = sum(moves.sales.map((s) => s.total));
+const expensesTotal = sum(moves.expenses.map((g) => g.amount));
+const live = moves.sales.filter((s) => s.voided === null);
+const byPayment = totalsBy(live.map((s): [string, number] => [paymentLabel[s.payment], s.total]));
+
+const monthFormat = new Intl.DateTimeFormat("es-BO", { month: "short", year: "numeric", timeZone: "UTC" });
+const periodLabel = (date: string) =>
+  period === "mes" ? monthFormat.format(new Date(`${date}T12:00:00Z`)).replace(".", "") : period === "semana" ? `Sem. del ${shortDate(date)}` : shortDate(date);
+const rows = byPeriod(moves.sales, moves.expenses, period).map((r) => ({ ...r, label: periodLabel(r.date) }));
+
+// Lo vendido por producto, sin las ventas anuladas.
+const liveIds = new Set(live.map((s) => s.id));
+const topProducts = totalsBy(
+  [...(loaded?.[1] ?? [])].filter(([id]) => liveIds.has(id)).flatMap(([, items]) => items.map((i): [string, number] => [i.name, i.qty * i.price])),
+).slice(0, 10);
+
+const rangeText = `del ${shortDate(range.from)} al ${shortDate(range.to)}`;
+const csvHref = `reportes.csv?desde=${range.from}&hasta=${range.to}`;
+---
+
+<Layout title={`Reportes · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
+  <PageHeader {...ctx.backdrop}
+    tint={branchColor(ctx.membership, branch.id)}
+    eyebrow={longDate(today)}
+    title="Reportes"
+    description={allowed ? `Ventas y gastos ${rangeText} en ${branch.name}.` : `Ventas y gastos de ${branch.name} por día, semana y mes.`}
+  >
+    {
+      allowed && (
+        <>
+          <a class="btn btn-secondary" href={csvHref} download>
+            <Download size={18} stroke-width={1.75} />
+            Descargar para Excel
+          </a>
+          <button type="button" class="btn btn-secondary" data-print>
+            <Printer size={18} stroke-width={1.75} />
+            Imprimir o guardar PDF
+          </button>
+        </>
+      )
+    }
+  </PageHeader>
+
+  {
+    !allowed ? (
+      <p class="notice">
+        Los reportes y la exportación a Excel o PDF son del plan Negocio. <a href={`${businessHref(business)}/plan`}>Ver los planes</a>
+      </p>
+    ) : (
+      <>
+        <RangeFilter from={range.from} to={range.to} max={today} maxDays={MAX_DAYS}>
+          <div class="field">
+            <label class="field-label" for="range-period">Agrupar</label>
+            <select class="input" id="range-period" name="periodo">
+              {Object.entries(periods).map(([value, label]) => (
+                <option value={value} selected={value === period}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </RangeFilter>
+
+        <dl class="card totals">
+          <div>
+            <dt>Ventas</dt>
+            <dd class="num amount-income">{formatBs(salesTotal, "+")}</dd>
+            <dd class="totals-note">{plural(live.length, "venta", "ventas")}</dd>
+          </div>
+          <div>
+            <dt>Gastos</dt>
+            <dd class="num amount-expense">{formatBs(expensesTotal, "−")}</dd>
+          </div>
+          <div>
+            <dt>Balance</dt>
+            <dd class="num">{formatBs(salesTotal - expensesTotal)}</dd>
+          </div>
+          {byPayment.map((p) => (
+            <div>
+              <dt>{p.name}</dt>
+              <dd class="num">{formatBs(p.value)}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <section class="card chart-card" aria-labelledby="period-title">
+          <h2 id="period-title" class="card-title">
+            {periods[period]}
+          </h2>
+          <WeekChart
+            client:visible
+            days={rows}
+            caption={`Ventas y gastos ${periods[period].toLowerCase()}, ${rangeText}`}
+            empty={`Sin ventas ni gastos ${rangeText}.`}
+          />
+          {rows.length > 0 && (
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Período</th>
+                    <th scope="col" class="end">Ventas</th>
+                    <th scope="col" class="end">Gastos</th>
+                    <th scope="col" class="end">Balance</th>
+                    <th scope="col" class="end">N.º de ventas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr>
+                      <th scope="row">{r.label}</th>
+                      <td class="end num">{formatBs(r.sales)}</td>
+                      <td class="end num">{formatBs(r.expenses)}</td>
+                      <td class="end num">{formatBs(r.sales - r.expenses)}</td>
+                      <td class="end num">{r.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <div class="chart-grid">
+          <section class="card chart-card" aria-labelledby="top-title">
+            <h2 id="top-title" class="card-title">Lo más vendido</h2>
+            {topProducts.length === 0 ? (
+              <p class="empty-state">Sin ventas {rangeText}.</p>
+            ) : (
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Producto</th>
+                      <th scope="col" class="end">Vendido</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topProducts.map((p) => (
+                      <tr>
+                        <th scope="row">{p.name}</th>
+                        <td class="end num">{formatBs(p.value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+          <section class="card chart-card" aria-labelledby="expense-title">
+            <h2 id="expense-title" class="card-title">Gastos por categoría</h2>
+            <DonutChart client:visible items={expensesByCategory(moves.expenses)} totalLabel="gastado" empty={`Sin gastos ${rangeText}.`} />
+          </section>
+        </div>
+      </>
+    )
+  }
+</Layout>
+
+<script>
+  document.querySelector("[data-print]")?.addEventListener("click", () => window.print());
+</script>
+
+<style>
+  .totals {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1.25rem;
+    margin: 0 0 1rem;
+    padding: 1.25rem;
+  }
+
+  .totals div {
+    display: grid;
+    align-content: start;
+    gap: 0.375rem;
+  }
+
+  .totals dt {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .totals dd {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: var(--font-semibold);
+  }
+
+  .totals dd.totals-note {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--font-regular);
+  }
+
+  .chart-card {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1.25rem;
+  }
+
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: 1rem;
+  }
+
+  .table th[scope="row"] {
+    font-weight: var(--font-regular);
+    text-align: left;
+  }
+
+  @media (max-width: 480px) {
+    .totals,
+    .chart-card {
+      padding: 1rem;
+    }
+  }
+
+  /* Imprimir o guardar PDF: solo el reporte, sin el panel, la barra del turno ni los controles. */
+  @media print {
+    :global(body) {
+      display: block;
+      height: auto;
+      overflow: visible;
+    }
+    :global(main) {
+      overflow: visible;
+    }
+    :global(.sidebar),
+    :global(.shift-bar),
+    :global(.skip-link),
+    :global(.page-actions),
+    :global(form.range) {
+      display: none !important;
+    }
+    .card {
+      break-inside: avoid;
+    }
+  }
+</style>

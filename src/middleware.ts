@@ -10,10 +10,24 @@ export const safeNext = (next: string | null) => (next && next.startsWith("/") &
 
 /** Acciones que solo tocan datos que nunca van a la caché (caja, stock, avisos, seguridad): no la invalidan. */
 const LIVE_ACTIONS = new Set([
+  "requestReopen",
+  "answerReopen",
+  "sendFeedback",
   "registerSale",
+  "saveOrder",
+  "deleteOrder",
+  "chargeOrder",
+  "voidSale",
+  "attachSaleReceipt",
+  "createPlanCharge",
   "createExpense",
+  "updateExpense",
+  "voidExpense",
   "openShift",
   "closeShift",
+  "saveCloseNote",
+  "reopenShift",
+  "recordStockMove",
   "markNotificationsRead",
   "deleteNotification",
   "clearNotifications",
@@ -45,7 +59,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     // Sin el código, RLS (private.mfa_ok) no le deja leer nada: mejor pedirlo antes.
     if (await needsSecondFactor(supabase)) return context.redirect(verifyHref(pathname + search));
     context.locals.session = await loadSession(supabase, userId);
-  } else if (pathname.startsWith("/auth/") && pathname !== "/auth/verificar" && userId) {
+  } else if (pathname.startsWith("/auth/") && pathname !== "/auth/verificar" && pathname !== "/auth/nueva-contrasena" && userId) {
+    // verificar y nueva-contrasena se usan con sesión (la del enlace de recuperar contraseña); las demás no.
     return context.redirect(safeNext(context.url.searchParams.get("next")));
   }
 
@@ -56,7 +71,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const businessIds = async () => ((await supabase.from("businesses").select("id")).data ?? []).map((b) => b.id);
   const before = invalidates ? await businessIds() : [];
 
-  const response = await next();
+  let response: Response;
+  try {
+    response = await next();
+  } catch (error) {
+    // Sin datos personales: ruta, acción e id de la persona, para cruzar con los logs de Supabase.
+    console.error(
+      JSON.stringify({ level: "error", source: "request", path: pathname, action: action?.name ?? null, user: userId, message: error instanceof Error ? error.message : String(error) }),
+    );
+    throw error;
+  }
   if (invalidates) await bump(userVersion(userId), ...[...before, ...(await businessIds())].map(businessVersion));
   cacheHeaders.forEach((value, key) => response.headers.set(key, value));
   return response;

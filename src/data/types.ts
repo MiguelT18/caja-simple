@@ -17,9 +17,14 @@ export interface Business {
   slug: string;
   name: string;
   ownerId: string;
+  /** El plan que vale hoy: si `planUntil` ya pasó, Gratis (igual que private.effective_plan). */
   plan: "Gratis" | "Negocio" | "Sucursales";
+  /** Último día pagado (AAAA-MM-DD); sin él, el plan no vence. */
+  planUntil?: string;
   /** Rubro: solo cambia textos y secciones de la app (ver docs/modelo-de-datos.md › Rubros). */
   kind: BusinessKind;
+  /** Logo o foto del negocio, en branch-images (<negocio>/<negocio>.<ext>). */
+  imagePath?: string;
 }
 
 export type BusinessKind = "tienda" | "ropa" | "restaurante";
@@ -63,6 +68,8 @@ export interface CatalogProduct {
   category?: string;
   // EAN-13 del envase; los productos a granel o por peso no tienen.
   barcode?: string;
+  /** Texto libre de la dueña (hasta 500 caracteres): se ve en el detalle del producto. */
+  description?: string;
   /** URL firmada de la foto, si tiene. */
   image?: string;
 }
@@ -96,6 +103,8 @@ export interface Recorder {
   lastName: string;
 }
 
+export type PaymentMethod = "efectivo" | "qr" | "transferencia";
+
 export interface Sale {
   id: string;
   branchId: string;
@@ -103,8 +112,48 @@ export interface Sale {
   time: string; // HH:MM, hora de Bolivia
   shiftId: string;
   recordedBy: Recorder;
+  recordedById: string | null;
   items: number;
+  /** Lo que cuenta en los totales: 0 si la venta se anuló. */
   total: number;
+  /** Lo que se anuló (el total original), o null. */
+  voided: number | null;
+  payment: PaymentMethod;
+  /** Comprobante del pago por QR o transferencia (ruta en el bucket sale-receipts), o null. */
+  receiptPath: string | null;
+}
+
+export interface SaleLine {
+  name: string;
+  qty: number;
+  price: number;
+}
+
+export interface ClosedShift {
+  id: string;
+  shiftId: string;
+  date: string;
+  closedAt: string | null;
+  openedBy: string;
+  closedBy: string;
+  closedById: string | null;
+  expected: number;
+  counted: number;
+  /** Contado − esperado: positivo sobra, negativo falta. */
+  difference: number;
+  note: string | null;
+  reopened: boolean;
+}
+
+export interface StockMove {
+  id: string;
+  kind: "entrada" | "merma" | "ajuste";
+  /** Con signo: lo que sumó o restó al stock. */
+  qty: number;
+  reason: string | null;
+  product: string;
+  by: string;
+  at: string;
 }
 
 export interface Expense {
@@ -114,9 +163,13 @@ export interface Expense {
   time: string;
   shiftId: string;
   recordedBy: Recorder;
+  recordedById: string | null;
   concept: string;
   category: string;
+  /** Lo que cuenta en los totales: 0 si el gasto se anuló. */
   amount: number;
+  /** Lo que se anuló (el monto original), o null. */
+  voided: number | null;
 }
 
 export interface DaySummary {
@@ -140,8 +193,28 @@ export type Notification = {
     }
   | { kind: "invitation_answer"; data: { person: string; business: string; accepted: boolean } }
   | { kind: "cash_mismatch"; data: { branch: string; shift: string; date: string; difference: number } }
+  | { kind: "shift_closed"; data: { branch: string; shift: string; person: string | null; date: string; difference: number } }
+  | { kind: "shift_reminder"; data: { branch: string; shift: string; start: string; minutes: number } }
+  | { kind: "shift_late"; data: { branch: string; shift: string; start: string } }
   | { kind: "low_stock"; data: { product: string; branch: string; stock: number; minStock: number } }
   | { kind: "shift_change"; data: { person: string; business: string; branch: string; from: string | null; to: string } }
+  | { kind: "plan_expiring"; data: { business: string; plan: string; until: string; days: number } }
+  | { kind: "plan_expired"; data: { business: string; plan: string } }
+  | {
+      kind: "reopen_request";
+      requestId: string;
+      /** El pedido sigue esperando respuesta de la dueña. */
+      pending: boolean;
+      data: { person: string; branch: string; shift: string; date: string; reason: string | null };
+    }
+  | { kind: "reopen_answer"; data: { accepted: boolean; person: string; branch: string; shift: string; date: string } }
+  | {
+      /** Copia del pedido en la bandeja de quien lo hizo. */
+      kind: "reopen_sent";
+      requestId: string;
+      pending: boolean;
+      data: { person: string; owner: string; branch: string; shift: string; date: string; reason: string | null };
+    }
 );
 
 export interface ShiftClose {
@@ -151,4 +224,31 @@ export interface ShiftClose {
   opening: number;
   // Contado − esperado. Solo existe cuando el turno está cerrado.
   difference?: number;
+}
+
+/** Pedido abierto: un carro con nombre que la sucursal cobra después. price solo en productos con precio al vender. */
+export interface Order {
+  id: string;
+  label: string;
+  items: { productId: string; qty: number; price?: number }[];
+}
+
+/** Cobro de un plan (docs/planes-de-suscripcion.md): el monto en Bs queda fijo hasta `expiresAt`. */
+export interface PlanCharge {
+  id: string;
+  plan: "Negocio" | "Sucursales";
+  period: "mensual" | "anual";
+  extraBranches: number;
+  /** US$ sin impuestos. */
+  usd: number;
+  /** Tipo de cambio usado y su día (el de ese día o, si no se pudo obtener, el último). */
+  rate: number;
+  rateDate: string;
+  taxRate: number;
+  amountBs: number;
+  method: "qr" | "transferencia" | "tarjeta";
+  createdAt: string;
+  expiresAt: string;
+  paidAt: string | null;
+  status: "pendiente" | "vencido" | "pagado";
 }

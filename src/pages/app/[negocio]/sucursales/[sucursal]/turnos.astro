@@ -1,19 +1,30 @@
 ---
-import { CircleCheck, Clock, LockOpen, Pencil, Plus, Trash, TriangleAlert } from "@lucide/astro";
+import { CircleCheck, Hourglass, LockOpen, MessageSquareText, Pencil, Plus, RotateCcw, Trash, TriangleAlert } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
+import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, businessHref, shiftBarData, fullName } from "@/data/queries";
+import { branchColor, branchContext, businessHref, closesBetween, shiftBarData, fullName } from "@/data/queries";
 import { differenceLabel, formatBs, initials, overnight, shiftHours } from "@/lib/format";
-import { addDays, inShiftWindow, longDate, openFrom } from "@/lib/dates";
+import { addDays, inShiftWindow, longDate, openFrom, parseRange, shortDate, stamp } from "@/lib/dates";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx) return Astro.rewrite("/404");
-const { branch, currentShift, employees, role, shiftTotals, shifts, today } = ctx;
+const { branch, currentShift, employees, lastCount, reopenPending, role, shiftById, shiftTotals, shifts, today } = ctx;
 const isOwner = role === "dueño";
+// El turno de quien trabaja aquí: solo ese puede abrir (la base lo exige, private.check_shift_schedule).
+const myShiftId = ctx.membership.employee?.shiftId;
+const range = parseRange(Astro.url.searchParams, today);
+const history = await closesBetween(Astro.locals.supabase, branch.id, range.from, range.to);
+// Solo el último cierre de cada turno, de hoy o de ayer, se puede reabrir (igual que public.reopen_shift).
+const latestClose = new Map<string, string>();
+for (const c of history) if (!latestClose.has(c.shiftId)) latestClose.set(c.shiftId, c.id);
+const canReopen = (c: (typeof history)[number]) =>
+  isOwner && latestClose.get(c.shiftId) === c.id && c.date >= addDays(today, -1) && !currentShift;
+const canNote = (c: (typeof history)[number]) => isOwner || c.closedById === Astro.locals.userId;
 const tones = [
   { value: "morning", label: "Mañana" },
   { value: "afternoon", label: "Tarde" },
@@ -22,7 +33,7 @@ const tones = [
 ---
 
 <Layout title={`Turnos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader tint={branchColor(ctx.membership, branch.id)} eyebrow={longDate(today)} title="Turnos" description={`Horarios, quién está a cargo y el cuadre de caja de hoy en ${branch.name}.`}>
+  <PageHeader {...ctx.backdrop} tint={branchColor(ctx.membership, branch.id)} eyebrow={longDate(today)} title="Turnos" description={`Horarios, quién está a cargo y el cuadre de caja de hoy en ${branch.name}.`}>
     {
       isOwner && (
         <button type="button" class="btn btn-primary" data-open-dialog="shift-new">
@@ -33,6 +44,8 @@ const tones = [
     }
   </PageHeader>
 
+  {/* Región: tarjetas, historial y modales dependen unos de otros (abrir un turno cambia los demás). */}
+  <div data-region="shifts">
   {
     shifts.length === 0 && (
       <p class="card empty-state">
@@ -47,7 +60,7 @@ const tones = [
       shifts.map((shift) => {
         const t = shiftTotals(shift.id);
         const staff = employees.filter((e) => e.shiftId === shift.id);
-        // Fuera de horario solo abre quien administra, y confirmándolo; la base lo exige igual (check_shift_schedule).
+        // Fuera de horario la empleada ve el formulario igual: la base lo rechaza (check_shift_schedule) y el error sale en un aviso flotante. La dueña lo abre confirmándolo.
         const onSchedule = inShiftWindow(shift);
         const schedule = `${openFrom(shift)} a ${shift.end}`;
         return (
@@ -109,8 +122,8 @@ const tones = [
                   <dd class="num">{t.close.status === "pendiente" ? "—" : formatBs(t.close.opening)}</dd>
                 </div>
                 <div>
-                  <dt>Ventas</dt>
-                  <dd class="num amount-income">{formatBs(t.sales, "+")}</dd>
+                  <dt>Ventas en efectivo</dt>
+                  <dd class="num amount-income">{formatBs(t.cash, "+")}</dd>
                 </div>
                 <div>
                   <dt>Gastos</dt>
@@ -126,31 +139,23 @@ const tones = [
                     {t.close.difference === undefined ? "Por contar" : formatBs(t.expected + t.close.difference)}
                   </dd>
                 </div>
+                {t.sales !== t.cash && (
+                  <div>
+                    <dt>QR y transferencia (no van a la caja)</dt>
+                    <dd class="num">{formatBs(t.sales - t.cash)}</dd>
+                  </div>
+                )}
               </dl>
             </div>
 
-            {t.close.difference === 0 && (
-              <p class="status chip-income">
-                <CircleCheck size={16} stroke-width={2} />
-                La caja cuadró
-              </p>
-            )}
-            {t.close.difference !== undefined && t.close.difference !== 0 && (
-              <p class="status chip-warning">
-                <TriangleAlert size={16} stroke-width={2} />
-                <span class="num">{differenceLabel(t.close.difference)}</span>
-              </p>
-            )}
-
+            {/* Cómo cerró la caja: un aviso de unos segundos al cerrar (closeShift) y, fijo, en el historial de cierres. */}
             {t.close.status === "pendiente" &&
               (currentShift ? (
                 <p class="muted">Cierra el turno {currentShift.name.toLowerCase()} antes de abrir este.</p>
-              ) : !onSchedule && !isOwner ? (
+              ) : !isOwner && shift.id !== myShiftId ? (
                 <p class="status chip-neutral">
-                  <Clock size={16} stroke-width={2} />
-                  <span>
-                    Se abre de <span class="num">{schedule}</span>. Fuera de ese horario, solo quien administra el negocio puede abrirlo.
-                  </span>
+                  <LockOpen size={16} stroke-width={2} />
+                  <span>Lo abre quien trabaja en este turno o quien administra el negocio.</span>
                 </p>
               ) : (
                 <form
@@ -158,11 +163,20 @@ const tones = [
                   class="inline-form"
                   data-action="openShift"
                   data-confirm={
-                    onSchedule
-                      ? undefined
-                      : `Estás fuera del horario del turno ${shift.name.toLowerCase()} (se abre de ${schedule}). Las ventas y los gastos que registres contarán en este turno. ¿Abrirlo igual?`
+                    // La dueña abre cualquier turno, pero lo confirma: lo abre a su nombre, en lugar de quien está asignado.
+                    isOwner
+                      ? [
+                          staff.length > 0
+                            ? `Vas a abrir el turno ${shift.name.toLowerCase()} a tu nombre, en lugar de ${staff.map((e) => e.firstName).join(", ").replace(/, ([^,]*)$/, " y $1")}.`
+                            : `Vas a abrir el turno ${shift.name.toLowerCase()} a tu nombre.`,
+                          !onSchedule && `Estás fuera de su horario (se abre de ${schedule}).`,
+                          "Las ventas y los gastos que se registren contarán en este turno. ¿Abrirlo?",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")
+                      : undefined
                   }
-                  data-confirm-label="Abrir fuera de horario"
+                  data-confirm-label={onSchedule ? "Abrir turno" : "Abrir fuera de horario"}
                   novalidate
                 >
                   <input type="hidden" name="branchId" value={branch.id} />
@@ -175,12 +189,66 @@ const tones = [
                     step="0.01"
                     min="0"
                     label="Dinero en caja al abrir (Bs)"
-                    hint={overnight(shift) ? "Lo que vendas pasada la medianoche cuenta para hoy." : undefined}
+                    value={lastCount ? String(lastCount.counted) : undefined}
+                    hint={[
+                      !onSchedule && !isOwner && `Se abre de ${schedule}.`,
+                      lastCount && `Lo contado al cerrar ${lastCount.shiftName ? `el turno ${lastCount.shiftName.toLowerCase()}` : "el último turno"}. Cámbialo si no es lo que hay.`,
+                      overnight(shift) && "Lo que vendas pasada la medianoche cuenta para hoy.",
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined}
                     required
                   />
                   <button type="submit" class="btn btn-primary">
                     <LockOpen size={18} stroke-width={2} />
                     Abrir turno
+                  </button>
+                  {/* Sin data-form-notice: el error (por ejemplo, fuera de horario) sale en el aviso flotante (toast). */}
+                </form>
+              ))}
+
+            {/* Cerrado hoy: la dueña lo reabre; quien trabaja en él lo pide y la dueña acepta o rechaza en sus avisos. */}
+            {t.close.status === "cerrado" && t.closeId && !currentShift &&
+              (isOwner ? (
+                <form
+                  id={`reopen-today-${shift.id}`}
+                  class="inline-form"
+                  data-action="reopenShift"
+                  data-confirm={`¿Reabrir el turno ${shift.name.toLowerCase()}? Se borra lo contado y se puede seguir vendiendo hasta volver a cerrarlo.`}
+                  data-confirm-label="Reabrir"
+                  novalidate
+                >
+                  <input type="hidden" name="closeId" value={t.closeId} />
+                  <button type="submit" class="btn btn-secondary">
+                    <RotateCcw size={18} stroke-width={1.75} />
+                    Reabrir turno
+                  </button>
+                  <p class="notice notice-error" role="alert" data-form-notice />
+                </form>
+              ) : shift.id !== myShiftId ? null : reopenPending.has(t.closeId) ? (
+                <p class="status chip-neutral">
+                  <Hourglass size={16} stroke-width={2} />
+                  <span>Pediste reabrirlo. Te avisamos cuando quien administra el negocio responda.</span>
+                </p>
+              ) : (
+                <form
+                  id={`reopen-ask-${shift.id}`}
+                  class="inline-form"
+                  data-action="requestReopen"
+                  data-success="Listo: le avisamos a quien administra el negocio."
+                  novalidate
+                >
+                  <input type="hidden" name="closeId" value={t.closeId} />
+                  <FormInput
+                    form={`reopen-ask-${shift.id}`}
+                    name="reason"
+                    label="¿Necesitas reabrirlo? Motivo (opcional)"
+                    hint="Quien administra el negocio recibe un aviso y decide si se reabre."
+                    maxlength={200}
+                  />
+                  <button type="submit" class="btn btn-secondary">
+                    <RotateCcw size={18} stroke-width={1.75} />
+                    Pedir reabrir
                   </button>
                   <p class="notice notice-error" role="alert" data-form-notice />
                 </form>
@@ -207,6 +275,13 @@ const tones = [
                   hint={`Debería haber ${formatBs(t.expected)}`}
                   required
                 />
+                <FormInput
+                  form={`close-${shift.id}`}
+                  name="note"
+                  label="Nota (opcional)"
+                  hint="Si no cuadra, cuenta por qué: un cambio mal dado, un gasto sin anotar…"
+                  maxlength={300}
+                />
                 <button type="submit" class="btn btn-secondary">Cerrar turno</button>
                 <p class="notice notice-error" role="alert" data-form-notice />
               </form>
@@ -216,6 +291,107 @@ const tones = [
       })
     }
   </section>
+
+  <section class="history" aria-labelledby="history-title">
+    <h2 class="section-title" id="history-title">Historial de cierres</h2>
+    <RangeFilter from={range.from} to={range.to} max={today} historyStart={ctx.business.plan === "Gratis" ? addDays(today, -60) : undefined} />
+    {
+      history.length === 0 ? (
+        <p class="card empty-state">No hay turnos cerrados entre el {shortDate(range.from)} y el {shortDate(range.to)}.</p>
+      ) : (
+        <ul class="close-list" role="list">
+          {history.map((c) => {
+            const shift = shiftById(c.shiftId);
+            const which = `turno ${shift.name.toLowerCase()}, ${c.date === today ? "hoy" : shortDate(c.date)}`;
+            return (
+              <li class="card close">
+                <div class="close-head">
+                  <ShiftChip shift={shift} />
+                  <span class="close-date">{c.date === today ? "Hoy" : longDate(c.date)}</span>
+                  {c.difference === 0 ? (
+                    <span class="status chip-income">
+                      <CircleCheck size={16} stroke-width={2} />
+                      Cuadró
+                    </span>
+                  ) : (
+                    <span class="status chip-warning">
+                      <TriangleAlert size={16} stroke-width={2} />
+                      <span class="num">{differenceLabel(c.difference)}</span>
+                    </span>
+                  )}
+                </div>
+                <dl class="close-facts">
+                  <div>
+                    <dt>Abrió</dt>
+                    <dd>{c.openedBy}</dd>
+                  </div>
+                  <div>
+                    <dt>Cerró</dt>
+                    <dd>
+                      {c.closedBy}
+                      {c.closedAt && <span class="muted num"> · {stamp(c.closedAt)}</span>}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Esperado</dt>
+                    <dd class="num">{formatBs(c.expected)}</dd>
+                  </div>
+                  <div>
+                    <dt>Contado</dt>
+                    <dd class="num">{formatBs(c.counted)}</dd>
+                  </div>
+                </dl>
+                {c.note && <p class="close-note">«{c.note}»</p>}
+                {c.reopened && <p class="muted">Se reabrió por un error y se volvió a cerrar.</p>}
+                {(canNote(c) || canReopen(c)) && (
+                  <div class="close-actions">
+                    {canNote(c) && (
+                      <button type="button" class="btn btn-secondary" data-open-dialog={`note-${c.id}`} aria-label={`${c.note ? "Editar nota" : "Agregar nota"}: ${which}`}>
+                        <MessageSquareText size={18} stroke-width={1.75} />
+                        {c.note ? "Editar nota" : "Agregar nota"}
+                      </button>
+                    )}
+                    {canReopen(c) && (
+                      <form
+                        id={`reopen-${c.id}`}
+                        data-action="reopenShift"
+                        data-confirm={`¿Reabrir el turno ${shift.name.toLowerCase()}? Se borra lo contado y se puede seguir vendiendo hasta volver a cerrarlo.`}
+                        data-confirm-label="Reabrir"
+                        novalidate
+                      >
+                        <input type="hidden" name="closeId" value={c.id} />
+                        <button type="submit" class="btn btn-secondary" aria-label={`Reabrir ${which}`}>
+                          <RotateCcw size={18} stroke-width={1.75} />
+                          Reabrir
+                        </button>
+                        <p class="notice notice-error" role="alert" data-form-notice />
+                      </form>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )
+    }
+  </section>
+
+  {
+    history.filter(canNote).map((c) => (
+      <Modal
+        id={`note-${c.id}`}
+        title="Nota del cierre"
+        description={`Turno ${shiftById(c.shiftId).name.toLowerCase()}, ${longDate(c.date).toLowerCase()}.`}
+        action="saveCloseNote"
+        submitLabel="Guardar"
+        hidden={{ closeId: c.id }}
+        success="Nota guardada"
+      >
+        <FormInput form={`note-${c.id}-form`} name="note" label="Qué pasó" value={c.note ?? ""} maxlength={300} hint="Déjala vacía para quitarla." />
+      </Modal>
+    ))
+  }
 
   {
     isOwner &&
@@ -264,9 +440,74 @@ const tones = [
         );
       })
   }
+  </div>
 </Layout>
 
 <style>
+  .history {
+    margin-top: 2rem;
+  }
+
+  .close-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .close {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .close-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .close-date {
+    margin-right: auto;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .close-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 0.75rem 1.5rem;
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .close-facts dt {
+    color: var(--color-text-muted);
+  }
+
+  .close-facts dd {
+    margin: 0;
+    font-weight: var(--font-medium);
+  }
+
+  .close-note {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .close-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .close-actions form {
+    display: grid;
+    gap: 0.5rem;
+  }
+
   .shift-list {
     display: grid;
     gap: 1rem;

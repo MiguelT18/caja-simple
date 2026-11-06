@@ -1,0 +1,107 @@
+---
+// Mensual o anual (por la URL, ?periodo=anual) y de dónde sale el «hoy Bs …»: tipo de cambio del BCB, su día e impuestos.
+import { shortDate } from "@/lib/dates";
+import type { Period, Quote } from "@/data/plans";
+
+interface Props {
+  period: Period;
+  quote: Quote | null;
+}
+
+const { period, quote } = Astro.props;
+const href = (p: Period) => {
+  const url = new URL(Astro.url);
+  if (p === "anual") url.searchParams.set("periodo", "anual");
+  else url.searchParams.delete("periodo");
+  return `${url.pathname}${url.search}`;
+};
+const rate = quote?.rate.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const tax = quote && Math.round(quote.tax * 100);
+---
+
+<div class="period-row" data-region="period">
+  <nav class="period" aria-label="Período de pago">
+    <a id="period-mensual" href={href("mensual")} aria-current={period === "mensual" ? "page" : undefined} data-period="mensual">Mensual</a>
+    <a id="period-anual" href={href("anual")} aria-current={period === "anual" ? "page" : undefined} data-period="anual">Anual <span class="save">2 meses gratis</span></a>
+  </nav>
+  <p class="rate-note">
+    {
+      quote
+        ? `Precios en dólares sin impuestos. En bolivianos, con el tipo de cambio oficial del BCB del ${shortDate(quote.rateDate)} (Bs ${rate}) e impuestos (${tax}%: IVA e IT). El monto queda fijo al generar el cobro.`
+        : "Precios en dólares sin impuestos. Pagas en bolivianos, con el tipo de cambio oficial del BCB del día de tu cobro más impuestos."
+    }
+  </p>
+</div>
+
+<script>
+  import { refreshRegions } from "@/scripts/refresh";
+
+  // Cambiar de período sin recargar: la URL cambia (se puede compartir y volver atrás) y solo se cambian los precios.
+  // Avisa con «period:change» a lo que guarda estado propio (la calculadora conserva sus locales).
+  async function show(url: string, period: string) {
+    await refreshRegions(undefined, url);
+    document.dispatchEvent(new CustomEvent("period:change", { detail: period }));
+  }
+
+  document.addEventListener("click", (event) => {
+    const link = (event.target as Element).closest<HTMLAnchorElement>(".period a[data-period]");
+    if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    if (link.getAttribute("aria-current") === "page") return;
+    history.pushState(null, "", link.href);
+    show(link.href, link.dataset.period!);
+  });
+
+  window.addEventListener("popstate", () => {
+    if (!document.querySelector(".period")) return;
+    show(location.href, new URL(location.href).searchParams.get("periodo") === "anual" ? "anual" : "mensual");
+  });
+</script>
+
+<style>
+  .period-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .period {
+    display: inline-flex;
+    padding: 0.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+  }
+
+  .period a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    border-radius: 999px;
+    color: var(--color-text-muted);
+    font-weight: var(--font-semibold);
+    text-decoration: none;
+  }
+
+  /* La opción elegida: fondo y texto (no solo color) más aria-current. */
+  .period a[aria-current="page"] {
+    background: var(--color-text);
+    color: var(--color-surface);
+  }
+
+  .save {
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+  }
+
+  .rate-note {
+    flex: 1 1 18rem;
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+</style>

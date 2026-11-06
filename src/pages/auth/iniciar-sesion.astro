@@ -37,6 +37,7 @@ const query = next ? `?next=${encodeURIComponent(next)}` : "";
       required
       data-required-message="Ingresa tu contraseña"
     />
+    <a class="forgot" href="/auth/recuperar">¿Olvidaste tu contraseña?</a>
     <button type="submit" class="btn btn-primary btn-block" data-busy-label="Entrando…">Iniciar sesión</button>
   </form>
 
@@ -44,3 +45,18 @@ const query = next ? `?next=${encodeURIComponent(next)}` : "";
     ¿No tienes cuenta? <a href="/auth/crear-cuenta">Crear cuenta</a>
   </Fragment>
 </AuthLayout>
+
+<style>
+  .forgot {
+    align-self: flex-end;
+    margin-top: -0.25rem;
+    padding-block: 0.25rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  .forgot:hover {
+    color: var(--color-text);
+  }
+</style>

@@ -4,10 +4,11 @@ import type { Product } from "@/data/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { safeAction, useActionForm, StockFields } from "./form";
-import { confirmDialog } from "@/scripts/dialogs";
+import { refreshRegions } from "@/scripts/refresh";
+import { confirmDialog, toast } from "@/scripts/dialogs";
 
 export function InventoryForm({ businessId, branchId, product, onClose }: { businessId: string; branchId: string; product: Product; onClose: () => void }) {
-  const save = useActionForm((form) => actions.saveInventory(form) as never);
+  const save = useActionForm((form) => actions.saveInventory(form) as never, onClose, `Precio y stock de «${product.name}» guardados.`);
 
   async function remove() {
     if (!(await confirmDialog(`¿Dejar de vender «${product.name}» en esta sucursal? Sigue en el catálogo.`, { confirmLabel: "Dejar de vender", danger: true }))) return;
@@ -17,14 +18,16 @@ export function InventoryForm({ businessId, branchId, product, onClose }: { busi
     const { error } = await safeAction(() => actions.removeInventory(form));
     // Dentro del diálogo, en línea: un toast quedaría detrás del modal, inerte.
     if (error) return save.setMessage(error.message);
-    window.location.reload();
+    onClose();
+    await refreshRegions();
+    toast(`«${product.name}» ya no se vende en esta sucursal.`, "success");
   }
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{product.name}</DialogTitle>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-lg">
+        <DialogHeader className="pr-8 text-left">
+          <DialogTitle className="[overflow-wrap:anywhere]">{product.name}</DialogTitle>
           <DialogDescription>Precio y stock en esta sucursal.</DialogDescription>
         </DialogHeader>
         <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
@@ -37,12 +40,13 @@ export function InventoryForm({ businessId, branchId, product, onClose }: { busi
               {save.message}
             </p>
           )}
-          <DialogFooter className="gap-2 sm:justify-between">
-            <Button type="button" variant="ghost" className="text-destructive" onClick={remove}>
+          {/* Quitar, separado y a la izquierda; Cancelar y Guardar a la derecha (en el celular, a lo ancho). */}
+          <DialogFooter className="mt-2 flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <Button type="button" variant="ghost" className="text-destructive sm:-ml-3" onClick={remove}>
               <Trash2 />
               Quitar de la sucursal
             </Button>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>

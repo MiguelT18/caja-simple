@@ -1,6 +1,6 @@
 ---
 // Campo de foto con vista previa antes de guardar: manda `image` (archivo) y `removeImage`.
-// Lo usan el diálogo de sucursal (fachada, 16:9) y Tu cuenta (perfil, redonda).
+// Lo usan el diálogo de sucursal (fachada, 16:9), Tu cuenta (perfil, redonda) y Configuración (logo, cuadrado).
 import { ImagePlus, Store, UserRound } from "@lucide/astro";
 
 interface Props {
@@ -10,17 +10,21 @@ interface Props {
   /** URL de la foto actual, si tiene. */
   image?: string;
   round?: boolean;
+  /** Logo: cuadrado chico y la imagen entera (contain), sin recortar. */
+  square?: boolean;
 }
 
-const { form, label, image, round = false } = Astro.props;
+const { form, label, image, round = false, square = false } = Astro.props;
 const Placeholder = round ? UserRound : Store;
+// Lado mayor al subirla: perfil y logo se ven chicos; la fachada, a lo ancho de una tarjeta (pantallas 2x).
+const max = round || square ? 512 : 1280;
 ---
 
-<div class:list={["field", { round }]} data-photo-field>
+<div class:list={["field", { round, square }]} data-photo-field data-form={form} data-max={max}>
   <span class="field-label" id={`${form}-image-label`}>{label}</span>
   <div class="photo-row">
     <div class="photo-preview">
-      <img src={image} alt="" hidden={!image} data-photo-preview />
+      <img src={image} alt="" hidden={!image} decoding="async" data-photo-preview data-fallback />
       <Placeholder size={28} stroke-width={1.5} aria-hidden="true" />
     </div>
     <div class="photo-actions">
@@ -48,12 +52,15 @@ const Placeholder = round ? UserRound : Store;
       }
     </div>
   </div>
-  <p class="field-hint" id={`${form}-image-hint`}>Opcional · JPG, PNG o WebP, hasta 2 MB</p>
+  <p class="field-hint" id={`${form}-image-hint`}>Opcional · JPG, PNG o WebP. La achicamos al subirla</p>
   <p class="field-error" id={`${form}-image-error`}></p>
 </div>
 
 <script>
-  // Vista previa de la foto elegida antes de guardar.
+  import { setBusy } from "@/scripts/busy";
+  import { shrinkInput } from "@/scripts/shrink-image";
+
+  // Vista previa de la foto elegida antes de guardar. La foto se achica antes, así se sube y se ve la liviana.
   for (const field of document.querySelectorAll<HTMLElement>("[data-photo-field]")) {
     const input = field.querySelector<HTMLInputElement>("[data-photo-input]")!;
     const preview = field.querySelector<HTMLImageElement>("[data-photo-preview]")!;
@@ -66,9 +73,14 @@ const Placeholder = round ? UserRound : Store;
       preview.hidden = !src;
     };
 
-    input.addEventListener("change", () => {
+    const submit = document.getElementById(field.dataset.form!)?.querySelector<HTMLButtonElement>("button[type=submit]");
+
+    input.addEventListener("change", async () => {
+      // Mientras se achica, no se puede guardar: se enviaría el original.
+      setBusy(submit, true, "Preparando foto…");
+      const file = await shrinkInput(input, Number(field.dataset.max));
+      setBusy(submit, false);
       if (objectUrl) URL.revokeObjectURL(objectUrl);
-      const file = input.files?.[0];
       objectUrl = file ? URL.createObjectURL(file) : undefined;
       if (remove && file) remove.checked = false;
       show(objectUrl ?? original);
@@ -107,8 +119,9 @@ const Placeholder = round ? UserRound : Store;
     object-fit: cover;
   }
 
-  /* Foto de perfil: círculo chico al lado de los botones. */
-  .round .photo-row {
+  /* Foto de perfil y logo: chicos, al lado de los botones. */
+  .round .photo-row,
+  .square .photo-row {
     grid-template-columns: auto 1fr;
     align-items: center;
     gap: 1rem;
@@ -118,6 +131,16 @@ const Placeholder = round ? UserRound : Store;
     width: 4.5rem;
     aspect-ratio: 1;
     border-radius: 50%;
+  }
+
+  .square .photo-preview {
+    width: 5rem;
+    aspect-ratio: 1;
+    border-radius: 0.75rem;
+  }
+
+  .square .photo-preview img {
+    object-fit: contain;
   }
 
   .photo-actions {

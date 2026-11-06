@@ -5,6 +5,8 @@ export * from "./session"; // sesión, negocios y rol de la persona
 export * from "./routes"; // rutas de /app y color de sucursal
 export * from "./branch"; // página de sucursal y barra del turno
 export * from "./business"; // páginas del negocio
-export { expensesByCategory, isLowStock, sum } from "./cash"; // cuentas puras
-export { branchImages } from "./shared";
+export { exportMyData } from "./account"; // descargar tus datos
+export { byPeriod, expensesByCategory, isLowStock, sum, totalsBy } from "./cash"; // cuentas puras
+export { branchImages, businessImages, headerBackdrop, closesBetween, movements, openOrders, orderLabels, receiptUrls, saleLines, stockMoves } from "./shared";
+export { currentQuote, paymentDetails, planCharges } from "./billing"; // cobro de planes
 export { today } from "@/lib/dates";

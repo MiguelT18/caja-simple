@@ -1,0 +1,77 @@
+---
+// Filtro de días por la URL (?desde=&hasta=), para los historiales. Ver parseRange en src/lib/dates.ts.
+import DateRangePicker from "@/components/app/DateRangePicker";
+import { plural } from "@/lib/format";
+
+interface Props {
+  from: string;
+  to: string;
+  /** Hoy: el último día que se puede elegir. */
+  max: string;
+  /** En Gratis el historial llega a 60 días: avisa si el rango pide más atrás. */
+  historyStart?: string;
+  /** El tope de parseRange que usa la página. */
+  maxDays?: number;
+  /** Ofrece «Incluir hora» (?desdeHora=&hastaHora=); la página filtra con inRange de src/lib/dates.ts. */
+  withTime?: boolean;
+  fromTime?: string;
+  toTime?: string;
+}
+
+// El slot agrega campos al mismo formulario (p. ej., el período de Reportes).
+const { from, to, max, historyStart, maxDays = 92, withTime, fromTime, toTime } = Astro.props;
+const id = "range";
+const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
+---
+
+<form class="range" method="get" aria-label="Elegir días">
+  <div class="field range-days">
+    <label class="field-label" for={`${id}-days`}>Días</label>
+    <DateRangePicker client:load id={`${id}-days`} from={from} to={to} max={max} withTime={withTime} fromTime={fromTime} toTime={toTime} submitOnApply />
+  </div>
+  <slot />
+  <button type="submit" class="btn btn-secondary">Ver</button>
+  <p class="range-note">{plural(days, "día", "días")} · hasta {maxDays} días por vez</p>
+  {
+    historyStart && from < historyStart && (
+      <p class="notice range-notice" role="status">
+        En el plan Gratis el historial muestra los últimos 60 días. Lo anterior sigue guardado y aparece al pasar a un plan pago.
+      </p>
+    )
+  }
+</form>
+
+<style>
+  .range {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.75rem 1rem;
+    margin: 0 0 1rem;
+  }
+
+  .range .field {
+    flex: 0 1 11rem;
+  }
+
+  .range .range-days {
+    flex: 0 1 14rem;
+  }
+
+  .range-note {
+    margin: 0 0 0.75rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .range-notice {
+    flex-basis: 100%;
+    margin: 0;
+  }
+
+  @media (max-width: 480px) {
+    .range .field {
+      flex: 1 1 8rem;
+    }
+  }
+</style>

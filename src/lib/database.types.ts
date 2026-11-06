@@ -1,8 +1,42 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export type Database = {
   public: {
     Tables: {
+      billing_settings: {
+        Row: {
+          bank_details: string | null;
+          card_note: string;
+          charge_days: number;
+          id: boolean;
+          qr_image_url: string | null;
+          tax_rate: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          bank_details?: string | null;
+          card_note?: string;
+          charge_days?: number;
+          id?: boolean;
+          qr_image_url?: string | null;
+          tax_rate?: number;
+        };
+        Update: {
+          bank_details?: string | null;
+          card_note?: string;
+          charge_days?: number;
+          id?: boolean;
+          qr_image_url?: string | null;
+          tax_rate?: number;
+        };
+        Relationships: [];
+      };
       branches: {
         Row: {
           address: string;
@@ -46,29 +80,35 @@ export type Database = {
         Row: {
           created_at: string;
           id: string;
+          image_path: string | null;
           kind: Database["public"]["Enums"]["business_kind"];
           name: string;
           owner_id: string;
           plan: Database["public"]["Enums"]["plan"];
+          plan_until: string | null;
           slug: string;
         };
         ComputedFields: never;
         Insert: {
           created_at?: string;
           id?: string;
+          image_path?: string | null;
           kind?: Database["public"]["Enums"]["business_kind"];
           name: string;
           owner_id?: string;
           plan?: Database["public"]["Enums"]["plan"];
+          plan_until?: string | null;
           slug: string;
         };
         Update: {
           created_at?: string;
           id?: string;
+          image_path?: string | null;
           kind?: Database["public"]["Enums"]["business_kind"];
           name?: string;
           owner_id?: string;
           plan?: Database["public"]["Enums"]["plan"];
+          plan_until?: string | null;
           slug?: string;
         };
         Relationships: [
@@ -177,6 +217,28 @@ export type Database = {
           },
         ];
       };
+      exchange_rates: {
+        Row: {
+          date: string;
+          fetched_at: string;
+          source: string;
+          usd_bob: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          date: string;
+          fetched_at?: string;
+          source: string;
+          usd_bob: number;
+        };
+        Update: {
+          date?: string;
+          fetched_at?: string;
+          source?: string;
+          usd_bob?: number;
+        };
+        Relationships: [];
+      };
       expenses: {
         Row: {
           amount: number;
@@ -188,6 +250,8 @@ export type Database = {
           occurred_at: string;
           recorded_by: string | null;
           shift_id: string;
+          voided_at: string | null;
+          voided_by: string | null;
         };
         ComputedFields: never;
         Insert: {
@@ -200,6 +264,8 @@ export type Database = {
           occurred_at?: string;
           recorded_by?: string | null;
           shift_id: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
         };
         Update: {
           amount?: number;
@@ -211,6 +277,8 @@ export type Database = {
           occurred_at?: string;
           recorded_by?: string | null;
           shift_id?: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
         };
         Relationships: [
           {
@@ -233,6 +301,52 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "shifts";
             referencedColumns: ["id", "branch_id"];
+          },
+          {
+            foreignKeyName: "expenses_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      feedback: {
+        Row: {
+          created_at: string;
+          id: string;
+          images: string[];
+          kind: string;
+          message: string;
+          page: string | null;
+          person_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          id?: string;
+          images?: string[];
+          kind: string;
+          message: string;
+          page?: string | null;
+          person_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          images?: string[];
+          kind?: string;
+          message?: string;
+          page?: string | null;
+          person_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "feedback_person_id_fkey";
+            columns: ["person_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -288,6 +402,7 @@ export type Database = {
           id: string;
           kind: Database["public"]["Enums"]["notification_kind"];
           read_at: string | null;
+          reopen_request_id: string | null;
           user_id: string;
         };
         ComputedFields: never;
@@ -299,6 +414,7 @@ export type Database = {
           id?: string;
           kind: Database["public"]["Enums"]["notification_kind"];
           read_at?: string | null;
+          reopen_request_id?: string | null;
           user_id: string;
         };
         Update: {
@@ -309,6 +425,7 @@ export type Database = {
           id?: string;
           kind?: Database["public"]["Enums"]["notification_kind"];
           read_at?: string | null;
+          reopen_request_id?: string | null;
           user_id?: string;
         };
         Relationships: [
@@ -327,8 +444,197 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "notifications_reopen_request_id_fkey";
+            columns: ["reopen_request_id"];
+            isOneToOne: false;
+            referencedRelation: "reopen_requests";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "notifications_user_id_fkey";
             columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      orders: {
+        Row: {
+          branch_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          items: NonNullable<Json>;
+          label: string;
+          sale_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          branch_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          items?: NonNullable<Json>;
+          label: string;
+          sale_id?: string | null;
+        };
+        Update: {
+          branch_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          items?: NonNullable<Json>;
+          label?: string;
+          sale_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "orders_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "orders_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "orders_sale_id_fkey";
+            columns: ["sale_id"];
+            isOneToOne: true;
+            referencedRelation: "sale_totals";
+            referencedColumns: ["sale_id"];
+          },
+          {
+            foreignKeyName: "orders_sale_id_fkey";
+            columns: ["sale_id"];
+            isOneToOne: true;
+            referencedRelation: "sales";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reopen_requests: {
+        Row: {
+          branch_id: string;
+          close_id: string;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          id: string;
+          reason: string | null;
+          requested_by: string | null;
+          status: Database["public"]["Enums"]["reopen_status"];
+        };
+        ComputedFields: never;
+        Insert: {
+          branch_id: string;
+          close_id: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          reason?: string | null;
+          requested_by?: string | null;
+          status?: Database["public"]["Enums"]["reopen_status"];
+        };
+        Update: {
+          branch_id?: string;
+          close_id?: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          reason?: string | null;
+          requested_by?: string | null;
+          status?: Database["public"]["Enums"]["reopen_status"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reopen_requests_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reopen_requests_close_id_fkey";
+            columns: ["close_id"];
+            isOneToOne: false;
+            referencedRelation: "shift_closes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      plan_charges: {
+        Row: {
+          amount_bs: number;
+          business_id: string;
+          created_at: string;
+          created_by: string | null;
+          expires_at: string;
+          extra_branches: number;
+          id: string;
+          method: Database["public"]["Enums"]["charge_method"];
+          paid_at: string | null;
+          period: Database["public"]["Enums"]["plan_period"];
+          plan: Database["public"]["Enums"]["plan"];
+          rate: number;
+          rate_date: string;
+          tax_rate: number;
+          usd: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount_bs: number;
+          business_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at: string;
+          extra_branches?: number;
+          id?: string;
+          method: Database["public"]["Enums"]["charge_method"];
+          paid_at?: string | null;
+          period: Database["public"]["Enums"]["plan_period"];
+          plan: Database["public"]["Enums"]["plan"];
+          rate: number;
+          rate_date: string;
+          tax_rate: number;
+          usd: number;
+        };
+        Update: {
+          amount_bs?: number;
+          business_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string;
+          extra_branches?: number;
+          id?: string;
+          method?: Database["public"]["Enums"]["charge_method"];
+          paid_at?: string | null;
+          period?: Database["public"]["Enums"]["plan_period"];
+          plan?: Database["public"]["Enums"]["plan"];
+          rate?: number;
+          rate_date?: string;
+          tax_rate?: number;
+          usd?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "plan_charges_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "plan_charges_created_by_fkey";
+            columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -341,6 +647,7 @@ export type Database = {
           business_id: string;
           category_id: string | null;
           created_at: string;
+          description: string | null;
           id: string;
           image_path: string | null;
           name: string;
@@ -351,6 +658,7 @@ export type Database = {
           business_id: string;
           category_id?: string | null;
           created_at?: string;
+          description?: string | null;
           id?: string;
           image_path?: string | null;
           name: string;
@@ -360,6 +668,7 @@ export type Database = {
           business_id?: string;
           category_id?: string | null;
           created_at?: string;
+          description?: string | null;
           id?: string;
           image_path?: string | null;
           name?: string;
@@ -498,8 +807,12 @@ export type Database = {
           business_date: string;
           id: string;
           occurred_at: string;
+          payment_method: Database["public"]["Enums"]["payment_method"];
+          receipt_path: string | null;
           recorded_by: string | null;
           shift_id: string;
+          voided_at: string | null;
+          voided_by: string | null;
         };
         ComputedFields: never;
         Insert: {
@@ -507,16 +820,24 @@ export type Database = {
           business_date?: string;
           id?: string;
           occurred_at?: string;
+          payment_method?: Database["public"]["Enums"]["payment_method"];
+          receipt_path?: string | null;
           recorded_by?: string | null;
           shift_id: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
         };
         Update: {
           branch_id?: string;
           business_date?: string;
           id?: string;
           occurred_at?: string;
+          payment_method?: Database["public"]["Enums"]["payment_method"];
+          receipt_path?: string | null;
           recorded_by?: string | null;
           shift_id?: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
         };
         Relationships: [
           {
@@ -540,6 +861,13 @@ export type Database = {
             referencedRelation: "shifts";
             referencedColumns: ["id", "branch_id"];
           },
+          {
+            foreignKeyName: "sales_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
         ];
       };
       shift_closes: {
@@ -547,10 +875,15 @@ export type Database = {
           branch_id: string;
           business_date: string;
           closed_at: string | null;
+          closed_by: string | null;
           counted: number | null;
           id: string;
+          note: string | null;
+          opened_at: string;
           opened_by: string | null;
           opening: number;
+          reopened_at: string | null;
+          reopened_by: string | null;
           shift_id: string;
           status: Database["public"]["Enums"]["close_status"];
         };
@@ -559,10 +892,15 @@ export type Database = {
           branch_id: string;
           business_date?: string;
           closed_at?: string | null;
+          closed_by?: string | null;
           counted?: number | null;
           id?: string;
+          note?: string | null;
+          opened_at?: string;
           opened_by?: string | null;
           opening: number;
+          reopened_at?: string | null;
+          reopened_by?: string | null;
           shift_id: string;
           status?: Database["public"]["Enums"]["close_status"];
         };
@@ -570,17 +908,36 @@ export type Database = {
           branch_id?: string;
           business_date?: string;
           closed_at?: string | null;
+          closed_by?: string | null;
           counted?: number | null;
           id?: string;
+          note?: string | null;
+          opened_at?: string;
           opened_by?: string | null;
           opening?: number;
+          reopened_at?: string | null;
+          reopened_by?: string | null;
           shift_id?: string;
           status?: Database["public"]["Enums"]["close_status"];
         };
         Relationships: [
           {
+            foreignKeyName: "shift_closes_closed_by_fkey";
+            columns: ["closed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "shift_closes_opened_by_fkey";
             columns: ["opened_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shift_closes_reopened_by_fkey";
+            columns: ["reopened_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -636,6 +993,72 @@ export type Database = {
           },
         ];
       };
+      stock_movements: {
+        Row: {
+          branch_id: string;
+          business_id: string;
+          id: string;
+          kind: Database["public"]["Enums"]["stock_move_kind"];
+          occurred_at: string;
+          product_id: string;
+          qty: number;
+          reason: string | null;
+          recorded_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          branch_id: string;
+          business_id: string;
+          id?: string;
+          kind: Database["public"]["Enums"]["stock_move_kind"];
+          occurred_at?: string;
+          product_id: string;
+          qty: number;
+          reason?: string | null;
+          recorded_by?: string | null;
+        };
+        Update: {
+          branch_id?: string;
+          business_id?: string;
+          id?: string;
+          kind?: Database["public"]["Enums"]["stock_move_kind"];
+          occurred_at?: string;
+          product_id?: string;
+          qty?: number;
+          reason?: string | null;
+          recorded_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_movements_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_movements_recorded_by_fkey";
+            columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       sale_totals: {
@@ -644,10 +1067,13 @@ export type Database = {
           business_date: string;
           items: number | null;
           occurred_at: string;
+          payment_method: Database["public"]["Enums"]["payment_method"];
+          receipt_path: string | null;
           recorded_by: string | null;
           sale_id: string;
           shift_id: string;
           total: number | null;
+          voided_at: string | null;
         };
         ComputedFields: never;
         Relationships: [
@@ -676,7 +1102,36 @@ export type Database = {
       };
     };
     Functions: {
-      change_my_shift: { Args: { p_employee: string; p_shift: string }; Returns: undefined };
+      attach_sale_receipt: {
+        Args: { p_path: string; p_sale: string };
+        Returns: undefined;
+      };
+      branch_team: {
+        Args: { p_branch: string };
+        Returns: {
+          avatar_url: string;
+          first_name: string;
+          is_owner: boolean;
+          job_title: string;
+          last_name: string;
+          person_id: string;
+          shift_id: string;
+        }[];
+      };
+      change_my_shift: {
+        Args: { p_employee: string; p_shift: string };
+        Returns: undefined;
+      };
+      charge_order: {
+        Args: {
+          p_items: Json;
+          p_order: string;
+          p_payment: Database["public"]["Enums"]["payment_method"];
+          p_sale: string;
+          p_shift: string;
+        };
+        Returns: string;
+      };
       create_business: {
         Args: {
           p_branch_address: string;
@@ -689,8 +1144,46 @@ export type Database = {
         };
         Returns: string;
       };
-      register_sale: { Args: { p_branch: string; p_items: Json; p_shift: string }; Returns: string };
-      respond_invitation: { Args: { p_accept: boolean; p_employee: string }; Returns: undefined };
+      create_plan_charge: {
+        Args: {
+          p_business: string;
+          p_method: Database["public"]["Enums"]["charge_method"];
+          p_period: Database["public"]["Enums"]["plan_period"];
+          p_plan: Database["public"]["Enums"]["plan"];
+        };
+        Returns: string;
+      };
+      delete_my_account: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+      record_stock_move: {
+        Args: {
+          p_branch: string;
+          p_kind: Database["public"]["Enums"]["stock_move_kind"];
+          p_product: string;
+          p_qty: number;
+          p_reason: string;
+        };
+        Returns: undefined;
+      };
+      register_sale: {
+        Args: {
+          p_branch: string;
+          p_items: Json;
+          p_payment: Database["public"]["Enums"]["payment_method"];
+          p_sale: string;
+          p_shift: string;
+        };
+        Returns: string;
+      };
+      answer_reopen: { Args: { p_accept: boolean; p_request: string }; Returns: undefined };
+      reopen_shift: { Args: { p_close: string }; Returns: undefined };
+      request_reopen: { Args: { p_close: string; p_reason?: string }; Returns: string };
+      respond_invitation: {
+        Args: { p_accept: boolean; p_employee: string };
+        Returns: undefined;
+      };
       search_people: {
         Args: { p_business: string; p_page?: number; p_query: string };
         Returns: {
@@ -703,14 +1196,37 @@ export type Database = {
           total: number;
         }[];
       };
+      set_close_note: {
+        Args: { p_close: string; p_note: string };
+        Returns: undefined;
+      };
+      void_sale: { Args: { p_sale: string }; Returns: undefined };
     };
     Enums: {
       business_kind: "tienda" | "ropa" | "restaurante";
+      charge_method: "qr" | "transferencia" | "tarjeta";
       close_status: "en-curso" | "cerrado";
       employee_status: "activo" | "invitado";
-      notification_kind: "invitation" | "invitation_answer" | "cash_mismatch" | "low_stock" | "shift_change";
+      notification_kind:
+        | "invitation"
+        | "invitation_answer"
+        | "cash_mismatch"
+        | "low_stock"
+        | "shift_change"
+        | "plan_expiring"
+        | "plan_expired"
+        | "shift_closed"
+        | "shift_reminder"
+        | "shift_late"
+        | "reopen_request"
+        | "reopen_answer"
+        | "reopen_sent";
+      payment_method: "efectivo" | "qr" | "transferencia";
       plan: "Gratis" | "Negocio" | "Sucursales";
+      plan_period: "mensual" | "anual";
+      reopen_status: "pendiente" | "aceptada" | "rechazada";
       shift_tone: "morning" | "afternoon" | "night";
+      stock_move_kind: "entrada" | "merma" | "ajuste";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -720,26 +1236,34 @@ export type Database = {
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
+type DefaultSchema = DatabaseWithoutInternals[Extract<
+  keyof Database,
+  "public"
+>];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    keyof (DefaultSchema["Tables"] & DefaultSchema["Views"]) | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R;
       }
       ? R
@@ -747,13 +1271,16 @@ export type Tables<
     : never;
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  DefaultSchemaTableNameOrOptions extends
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I;
     }
@@ -768,13 +1295,16 @@ export type TablesInsert<
     : never;
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  DefaultSchemaTableNameOrOptions extends
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U;
     }
@@ -789,26 +1319,33 @@ export type TablesUpdate<
     : never;
 
 export type Enums<
-  DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  DefaultSchemaEnumNameOrOptions extends
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never) = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never;
 
 export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never) = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
@@ -818,11 +1355,30 @@ export const Constants = {
   public: {
     Enums: {
       business_kind: ["tienda", "ropa", "restaurante"],
+      charge_method: ["qr", "transferencia", "tarjeta"],
       close_status: ["en-curso", "cerrado"],
       employee_status: ["activo", "invitado"],
-      notification_kind: ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change"],
+      notification_kind: [
+        "invitation",
+        "invitation_answer",
+        "cash_mismatch",
+        "low_stock",
+        "shift_change",
+        "plan_expiring",
+        "plan_expired",
+        "shift_closed",
+        "shift_reminder",
+        "shift_late",
+        "reopen_request",
+        "reopen_answer",
+        "reopen_sent",
+      ],
+      payment_method: ["efectivo", "qr", "transferencia"],
       plan: ["Gratis", "Negocio", "Sucursales"],
+      plan_period: ["mensual", "anual"],
+      reopen_status: ["pendiente", "aceptada", "rechazada"],
       shift_tone: ["morning", "afternoon", "night"],
+      stock_move_kind: ["entrada", "merma", "ajuste"],
     },
   },
 } as const;

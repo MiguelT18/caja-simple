@@ -1,6 +1,6 @@
 ---
 // Encabezado de página de /app: un degradado del color de la entidad (sucursal o negocio) que se funde con el panel,
-// el título grande y, debajo, las acciones. Con el slot `cover`, se arma como la portada de un álbum a la izquierda.
+// el título grande y, debajo, las acciones. El slot `back` pone un enlace de volver sobre el título. Con el slot `cover`, se arma como la portada de un álbum a la izquierda.
 interface Props {
   title: string;
   description?: string;
@@ -10,14 +10,28 @@ interface Props {
   compact?: boolean;
   /** Color del degradado: el de la sucursal (branchColor) o, por defecto, el ámbar del negocio. */
   tint?: string;
+  /** La descripción muestra datos que cambian al guardar (p. ej., «12 productos»): se actualiza sin recargar (scripts/refresh.ts). */
+  live?: boolean;
+  /** Foto de fondo detrás del degradado (la del negocio). */
+  image?: string;
+  /** view-transition-name del fondo: el mismo que el arte de la tarjeta (MediaCard) para que pase de una página a otra. */
+  transition?: string;
 }
 
-const { title, description, eyebrow, compact, tint = "var(--color-primary)" } = Astro.props;
+const { title, description, eyebrow, compact, live, image, transition, tint = "var(--color-primary)" } = Astro.props;
+const hasBackdrop = Boolean(image);
 const hasCover = Astro.slots.has("cover");
 const hasActions = Astro.slots.has("default");
 ---
 
-<header class:list={["page-head", { "has-cover": hasCover, compact }]} style={`--tint: ${tint}`}>
+<header class:list={["page-head", { "has-cover": hasCover, "has-backdrop": hasBackdrop, compact }]} style={`--tint: ${tint}`}>
+  {
+    hasBackdrop && (
+      <div class="page-backdrop" style={transition && `view-transition-name: ${transition}`} aria-hidden="true">
+        <img src={image} alt="" decoding="async" data-fallback />
+      </div>
+    )
+  }
   {
     hasCover && (
       <div class="page-cover">
@@ -26,9 +40,10 @@ const hasActions = Astro.slots.has("default");
     )
   }
   <div class="page-head-text">
-    {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+    <slot name="back" />
+    {eyebrow &&<p class="eyebrow">{eyebrow}</p>}
     <h1>{title}</h1>
-    {description && <p>{description}</p>}
+    {description && <p data-region={live ? "page-description" : undefined}>{description}</p>}
   </div>
   {
     hasActions && (
@@ -51,6 +66,45 @@ const hasActions = Astro.slots.has("default");
       180deg,
       color-mix(in oklab, var(--tint) 40%, var(--color-surface)) 0%,
       color-mix(in oklab, var(--tint) 16%, var(--color-surface)) 65%,
+      var(--color-surface) 100%
+    );
+  }
+
+  /* Con foto: la foto (o el arte del color) va al fondo y el degradado encima, cada vez más sólido hacia el texto
+     para que el título y la fecha mantengan el contraste en los dos temas. */
+  .page-head.has-backdrop {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: none;
+  }
+
+  .page-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--tint) 70%, var(--color-surface)),
+      color-mix(in oklab, var(--tint) 25%, var(--color-surface))
+    );
+  }
+
+  .page-backdrop img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .page-head.has-backdrop::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--tint) 25%, transparent) 0%,
+      color-mix(in oklab, var(--color-surface) 92%, transparent) 50%,
       var(--color-surface) 100%
     );
   }

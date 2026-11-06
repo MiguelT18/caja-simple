@@ -15,14 +15,16 @@ interface Props {
   round?: boolean;
   /** Para lectores de pantalla: qué hace el enlace («Entrar a Almacén López»). */
   label?: string;
+  /** view-transition-name del arte: el encabezado de la página destino usa el mismo para recibir la imagen. */
+  transition?: string;
 }
 
-const { href, title, subtitle, monogram, image, color = "var(--color-primary)", round = false, label } = Astro.props;
+const { href, title, subtitle, monogram, image, color = "var(--color-primary)", round = false, label, transition } = Astro.props;
 ---
 
-<article class="media-card" style={`--art: ${color}`}>
-  <div class:list={["art", { round }]}>
-    {image ? <img src={image} alt="" loading="lazy" /> : <span class="monogram" aria-hidden="true">{monogram}</span>}
+<article class="media-card" style={`--art: ${color}`} data-morph={transition ? "" : undefined}>
+  <div class:list={["art", { round }]} style={transition && `view-transition-name: ${transition}`}>
+    {image ? <img src={image} alt="" loading="lazy" decoding="async" data-fallback /> : <span class="monogram" aria-hidden="true">{monogram}</span>}
     <span class="play-btn" aria-hidden="true">
       <ArrowRight size={22} stroke-width={1.75} />
     </span>

@@ -7,8 +7,10 @@ interface Props {
   /** Nombre de la acción de src/actions. */
   action: string;
   submitLabel: string;
-  /** A dónde ir al guardar; sin él, la página se recarga. */
+  /** A dónde ir al guardar; sin él, se actualizan solo las regiones de la página (scripts/refresh.ts). */
   redirect?: string;
+  /** Recargar la página entera al guardar: cuando cambia algo fuera de las regiones (el Sidebar, la sesión). */
+  reload?: boolean;
   confirm?: string;
   hidden?: Record<string, string | undefined>;
   enctype?: string;
@@ -20,11 +22,11 @@ interface Props {
   success?: string;
 }
 
-const { id, title, description, action, submitLabel, redirect, confirm, hidden = {}, enctype, danger, trackChanges, success } = Astro.props;
+const { id, title, description, action, submitLabel, redirect, reload, confirm, hidden = {}, enctype, danger, trackChanges, success } = Astro.props;
 ---
 
 <dialog id={id} class="modal" aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-desc` : undefined}>
-  <form id={`${id}-form`} class="modal-form" method="dialog" data-action={action} data-redirect={redirect} data-confirm={confirm} data-track-changes={trackChanges || undefined} data-success={success} enctype={enctype} novalidate>
+  <form id={`${id}-form`} class="modal-form" method="dialog" data-action={action} data-redirect={redirect} data-reload={reload || undefined} data-confirm={confirm} data-track-changes={trackChanges || undefined} data-success={success} enctype={enctype} novalidate>
     <header class="modal-head">
       <h2 id={`${id}-title`}>{title}</h2>
       {description && <p id={`${id}-desc`}>{description}</p>}

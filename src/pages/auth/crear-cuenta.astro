@@ -63,6 +63,7 @@ import PasswordField from "../../components/auth/PasswordField.astro";
       data-match-message="Las contraseñas no coinciden"
     />
     <button type="submit" class="btn btn-primary btn-block" data-busy-label="Creando tu cuenta…">Crear cuenta</button>
+    <p class="legal-note">Al crear tu cuenta aceptas los <a href="/terminos">términos</a> y la <a href="/privacidad">política de privacidad</a>.</p>
   </form>
 
   <Fragment slot="switch">
@@ -71,6 +72,19 @@ import PasswordField from "../../components/auth/PasswordField.astro";
 </AuthLayout>
 
 <style>
+  .legal-note {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    text-align: center;
+  }
+
+  .legal-note a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
   .field-row {
     display: grid;
     gap: 1rem;

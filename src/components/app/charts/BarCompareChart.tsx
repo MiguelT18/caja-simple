@@ -19,7 +19,7 @@ export default function BarCompareChart({ rows }: Props) {
     <>
     <ChartTable caption="Ventas y gastos de hoy" columns={["Ventas", "Gastos"]} rows={rows.map((r) => ({ label: r.label, values: [r.sales, r.expenses] }))} />
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: `${rows.length * 3.5 + 3}rem` }} aria-hidden="true">
-      <BarChart data={rows} layout="vertical" margin={{ left: 0, right: 8 }}>
+      <BarChart accessibilityLayer={false} data={rows} layout="vertical" margin={{ left: 0, right: 8 }}>
         <CartesianGrid horizontal={false} />
         <YAxis dataKey="label" type="category" tickLine={false} axisLine={false} width={96} />
         <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={axisBs} />

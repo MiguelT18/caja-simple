@@ -3,11 +3,15 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+// La tabla puede tener scroll horizontal en pantallas angostas: el contenedor recibe foco para moverla con el teclado.
+function Table({ className, label = "Tabla", ...props }: React.ComponentProps<"table"> & { label?: string }) {
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
+      role="region"
+      aria-label={label}
+      tabIndex={0}
     >
       <table
         data-slot="table"

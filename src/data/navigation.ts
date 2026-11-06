@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, ChartColumn, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound } from "@lucide/astro";
+import { BriefcaseBusiness, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
 import { catalogLabel } from "./kinds";
 import type { Branch } from "./types";
 import { branchHref, businessHref, type Membership } from "./queries";
@@ -13,6 +13,7 @@ export function appNav(m?: Membership, branch?: Branch) {
         items: [
           { id: "negocios", label: "Tus negocios", href: "/app", icon: BriefcaseBusiness },
           { id: "cuenta", label: "Tu cuenta", href: "/app/cuenta", icon: UserRound },
+          { id: "ayuda", label: "Ayuda y comentarios", href: "/app/ayuda", icon: LifeBuoy },
         ],
       },
     ];
@@ -30,6 +31,9 @@ export function appNav(m?: Membership, branch?: Branch) {
         { id: "gastos", label: "Gastos", href: href("gastos"), icon: Wallet },
         { id: "inventario", label: "Inventario", href: href("inventario"), icon: Boxes },
         { id: "turnos", label: "Turnos", href: href("turnos"), icon: Clock },
+        ...(m.role === "dueño" ? [{ id: "reportes", label: "Reportes", href: href("reportes"), icon: ChartLine }] : []),
+        // La dueña ve y administra a su equipo en Empleados; la empleada, quién trabaja en su sucursal.
+        ...(m.role !== "dueño" ? [{ id: "equipo", label: "Equipo", href: href("equipo"), icon: Users }] : []),
       ],
     });
   }

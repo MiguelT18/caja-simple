@@ -336,3 +336,23 @@
 		border-left: none;
 	}
 }
+
+/* Transiciones entre páginas de /app (nativas del navegador, sin router): fundido general y, con un
+   view-transition-name en común, la imagen del negocio pasa de la tarjeta al encabezado. Firefox navega sin animar. */
+@media (prefers-reduced-motion: no-preference) {
+	@view-transition {
+		navigation: auto;
+	}
+}
+
+::view-transition-group(*) {
+	animation-duration: 320ms;
+	animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* La tarjeta es cuadrada y el encabezado es ancho: se recorta en vez de estirarse. */
+::view-transition-old(*),
+::view-transition-new(*) {
+	height: 100%;
+	object-fit: cover;
+}

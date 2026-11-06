@@ -1,0 +1,72 @@
+---
+// Términos de uso. Borrador honesto: describe el servicio como es hoy. Los [corchetes] los completa quien opera el servicio.
+export const prerender = false;
+
+import SiteLayout from "../layouts/SiteLayout.astro";
+---
+
+<SiteLayout title="Términos de uso" description="Las reglas para usar Caja Simple: tu cuenta, tus datos, los planes y lo que no podemos garantizar.">
+  <article class="legal wrap" aria-labelledby="legal-title">
+    <header>
+      <h1 id="legal-title">Términos de uso</h1>
+      <p class="legal-updated">Última actualización: 3 de noviembre de 2026</p>
+    </header>
+
+    <p>
+      Al crear una cuenta en Caja Simple aceptas estos términos. El servicio lo ofrece <strong>[Responsable]</strong>. Para cualquier consulta,
+      escríbenos a <strong>[correo de contacto]</strong>.
+    </p>
+
+    <h2>Qué es Caja Simple</h2>
+    <p>
+      Una app para registrar ventas, gastos, productos y turnos de tu negocio y saber si la caja cuadra. No es un sistema de facturación ni
+      reemplaza tus obligaciones contables o tributarias.
+    </p>
+
+    <h2>Tu cuenta</h2>
+    <ul>
+      <li>La cuenta es personal: no compartas tu contraseña. Te recomendamos activar la verificación en dos pasos en <a href="/app/cuenta">Tu cuenta</a>.</li>
+      <li>Eres responsable de lo que se registra con tu cuenta y de que los datos que cargas sean correctos.</li>
+      <li>Quien administra un negocio decide a quién invita y puede quitarle el acceso cuando quiera.</li>
+    </ul>
+
+    <h2>Tus datos</h2>
+    <p>
+      Los datos de tu negocio son tuyos. Nosotros solo los guardamos y los procesamos para darte el servicio, como explica la
+      <a href="/privacidad">política de privacidad</a>.
+    </p>
+
+    <h2>Planes y pagos</h2>
+    <ul>
+      <li>El plan Gratis no tiene costo. Trabajar como parte del equipo de un negocio ajeno nunca cuesta.</li>
+      <li>
+        Los planes pagos se cobran por negocio y por sucursal, según los <a href="/planes">precios publicados</a>. Hoy se pagan por QR, transferencia
+        o tarjeta y se activan a mano tras el pago.
+      </li>
+      <li>Si un plan pago vence y no se renueva, el negocio vuelve al plan Gratis. Tus registros no se borran.</li>
+      <li>Las funciones marcadas «Próximamente» todavía no existen: no se cobran ni se prometen con fecha.</li>
+    </ul>
+
+    <h2>Uso permitido</h2>
+    <p>
+      No uses la app para actividades ilegales, para cargar datos de otras personas sin su permiso ni para intentar entrar a cuentas o negocios
+      ajenos. Podemos suspender una cuenta que lo haga.
+    </p>
+
+    <h2>Lo que no podemos garantizar</h2>
+    <p>
+      Hacemos lo posible para que la app funcione siempre y tus datos estén seguros, pero puede haber cortes o errores. Revisa tu caja con el
+      arqueo de cada turno. No respondemos por pérdidas que vengan de datos mal cargados, de una contraseña compartida o de cortes del servicio,
+      salvo lo que la ley no permita excluir.
+    </p>
+
+    <h2>Cambios y fin del servicio</h2>
+    <p>
+      Si cambiamos estos términos, te avisamos en la app antes de que rijan. Si algún día cerramos el servicio, te avisaremos con al menos
+      [plazo] días para que puedas pedir una copia de tus datos.
+    </p>
+
+    <h2>Ley aplicable</h2>
+    <p>Estos términos se rigen por las leyes de [país].</p>
+  </article>
+</SiteLayout>

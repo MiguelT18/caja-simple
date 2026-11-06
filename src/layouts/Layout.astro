@@ -22,6 +22,11 @@ const { title, context } = Astro.props;
 		<BaseHead title={title} />
 	</head>
 	<body class="app-surface">
+		<!-- Antes que las imágenes: una foto que no carga (enlace vencido, sin conexión) se oculta y queda el fondo
+		     o el ícono de su contenedor, nunca el ícono de imagen rota. Inline para no perder errores tempranos. -->
+		<script is:inline>
+			document.addEventListener('error', (e) => { if (e.target instanceof HTMLImageElement && e.target.hasAttribute('data-fallback')) e.target.hidden = true; }, true);
+		</script>
 		<a class="skip-link" href="#main">Saltar al contenido</a>
 		<Sidebar user={currentUser(Astro.locals)} context={context} />
 		<main id="main" tabindex="-1">
@@ -32,6 +37,8 @@ const { title, context } = Astro.props;
 		<script>
 			import '../scripts/action-forms.ts';
 			import '../scripts/nav-skeleton.ts';
+			// El service worker da los avisos push, la página sin conexión y Vender sin conexión.
+			if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 		</script>
 	</body>
 </html>
@@ -45,7 +52,8 @@ const { title, context } = Astro.props;
 		height: 100dvh;
 		gap: 0.5rem;
 		padding: 0.5rem;
-		overflow: hidden;
+		/* clip y no hidden: hidden se puede desplazar por código (scrollIntoView del paginador) y subía toda la app sin forma de volver. */
+		overflow: clip;
 	}
 
 	body:has(> .shift-bar) {

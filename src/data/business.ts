@@ -5,7 +5,7 @@ import { cashStatus, isLowStock, shiftCash, sum } from "./cash";
 import { EMPLOYEE_COLUMNS, fail, toCatalogProduct, toEmployee, toShift } from "./mappers";
 import { branchHref } from "./routes";
 import { membership } from "./session";
-import { closesOf, imageUrls, movements } from "./shared";
+import { closesOf, headerBackdrop, imageUrls, movements } from "./shared";
 import type { CatalogProduct, Category } from "./types";
 
 export interface CatalogEntry extends Omit<CatalogProduct, "businessId"> {
@@ -36,13 +36,15 @@ export async function businessContext(locals: App.Locals, businessSlug: string) 
       fail(staff.error);
       return { shifts: shifts.data ?? [], products: products.data ?? [], categories: categories.data ?? [], staff: staff.data ?? [] };
     });
-  const [rows, inventory, closes, moves, branchImages] = await Promise.all([
+  const [rows, inventory, closes, moves, branchImages, backdrop] = await Promise.all([
     cached(`b:${locals.userId}:${business.id}`, 600, slow, () => [businessVersion(business.id)]),
     sb.from("inventory").select("*").eq("business_id", business.id),
     closesOf(sb, branchIds, day),
     // Desde ayer: un turno nocturno abierto ayer sigue sumando a su caja.
     movements(sb, branchIds, addDays(day, -1)),
     imageUrls(sb, m.branches.map((b) => b.imagePath), "branch-images"),
+    // Foto del encabezado (PageHeader): junto con lo demás, sin sumar una vuelta a la base.
+    headerBackdrop(locals, m),
   ]);
   fail(inventory.error);
   const shiftRows = { data: rows.shifts };
@@ -90,6 +92,7 @@ export async function businessContext(locals: App.Locals, businessSlug: string) 
   return {
     ...m,
     membership: m,
+    backdrop,
     branchSummary,
     catalog,
     categories: (categoryRows.data ?? []) as Category[],
@@ -100,4 +103,16 @@ export async function businessContext(locals: App.Locals, businessSlug: string) 
     salesTotal: sum(branchSummary.map((b) => b.sales)),
     expensesTotal: sum(branchSummary.map((b) => b.expenses)),
   };
+}
+
+/** Para el checklist de inicio: ¿alguna vez se abrió un turno o se vendió en el negocio? */
+export async function firstSteps(locals: App.Locals, branchIds: string[]) {
+  const sb = locals.supabase;
+  const [opened, sold] = await Promise.all([
+    sb.from("shift_closes").select("id").in("branch_id", branchIds).limit(1),
+    sb.from("sales").select("id").in("branch_id", branchIds).limit(1),
+  ]);
+  fail(opened.error);
+  fail(sold.error);
+  return { opened: (opened.data?.length ?? 0) > 0, sold: (sold.data?.length ?? 0) > 0 };
 }

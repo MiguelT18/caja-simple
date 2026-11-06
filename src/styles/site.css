@@ -303,3 +303,55 @@ html:has(.landing) {
   color: var(--color-text);
   font-weight: var(--font-semibold);
 }
+
+/* Páginas de texto legal (/privacidad, /terminos): una columna de lectura. */
+.legal {
+  max-width: 44rem;
+  padding-block: var(--section-gap);
+  line-height: 1.65;
+}
+
+.legal h1 {
+  margin: 0;
+  font-size: clamp(2rem, 1.6rem + 1.8vw, 2.75rem);
+  line-height: 1.1;
+  font-weight: var(--font-bold);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.legal-updated {
+  margin: 0.75rem 0 2rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.legal h2 {
+  margin: 2.5rem 0 0.75rem;
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  font-weight: var(--font-bold);
+}
+
+.legal p,
+.legal ul {
+  margin: 0 0 1rem;
+  max-width: 68ch;
+}
+
+.legal ul {
+  display: grid;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.legal a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.legal-see {
+  margin-top: 2.5rem;
+  color: var(--color-text-muted);
+}

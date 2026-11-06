@@ -1,17 +1,19 @@
 ---
-import { ArrowLeftRight, Bell, BellOff, PackageMinus, TriangleAlert, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
+import { AlarmClock, ArrowLeftRight, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Hourglass, PackageMinus, RotateCcw, TriangleAlert, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
 import type { HTMLAttributes } from "astro/types";
 import { inbox } from "@/data/queries";
 import type { Notification } from "@/data/types";
-import { stamp as when } from "@/lib/dates";
+import { shortDate, stamp as when, today } from "@/lib/dates";
 import { formatBs } from "@/lib/format";
 
 type Props = HTMLAttributes<"div">;
 
 const { class: className, ...rest } = Astro.props;
 const { notifications, unread } = inbox(Astro.locals);
-// Una invitación sin responder no se borra: es donde se acepta o se rechaza.
-const removable = (n: Notification) => !(n.kind === "invitation" && n.pending);
+// Una invitación o un pedido sin responder no se borra: es donde se acepta o se rechaza.
+const removable = (n: Notification) => !((n.kind === "invitation" || n.kind === "reopen_request") && n.pending);
+// «de hoy», «de ayer» o la fecha del turno.
+const dayOf = (date: string) => (date === today() ? "de hoy" : `del ${shortDate(date)}`);
 const canClear = notifications.some(removable);
 
 function describe(n: Notification) {
@@ -35,6 +37,17 @@ function describe(n: Notification) {
         detail: `Turno ${n.data.shift}: ${formatBs(n.data.difference)} de diferencia`,
         tone: "warning",
       };
+    case "shift_closed": {
+      const { branch, shift, person, difference } = n.data;
+      const who = person ? `${person} lo cerró` : "Se cerró";
+      return Number(difference) === 0
+        ? { icon: CircleCheck, title: `Turno ${shift.toLowerCase()} cerrado en ${branch}`, detail: `${who}: la caja cuadró` }
+        : { icon: TriangleAlert, title: `Turno ${shift.toLowerCase()} cerrado en ${branch}`, detail: `${who}: ${Number(difference) > 0 ? "sobran" : "faltan"} ${formatBs(Math.abs(Number(difference)))}`, tone: "warning" };
+    }
+    case "shift_reminder":
+      return { icon: AlarmClock, title: `Turno ${n.data.shift.toLowerCase()} en ${n.data.branch}: abre en ${n.data.minutes === 60 ? "1 hora" : `${n.data.minutes} minutos`}`, detail: `Hora de abrir: ${n.data.start}` };
+    case "shift_late":
+      return { icon: TriangleAlert, title: `Turno ${n.data.shift.toLowerCase()} sin abrir en ${n.data.branch}`, detail: `Debía abrir a las ${n.data.start}`, tone: "warning" };
     case "low_stock":
       return {
         icon: PackageMinus,
@@ -48,25 +61,56 @@ function describe(n: Notification) {
         title: `${n.data.person} cambió su turno`,
         detail: `${n.data.from ? `De ${n.data.from} a ${n.data.to}` : `Ahora en ${n.data.to}`} · ${n.data.branch}`,
       };
+    case "plan_expiring":
+      return {
+        icon: CalendarClock,
+        title: `Tu plan ${n.data.plan} de ${n.data.business} vence ${n.data.days === 1 ? "mañana" : `en ${n.data.days} días`}`,
+        detail: "Renuévalo para no volver al plan Gratis",
+        tone: "warning",
+      };
+    case "plan_expired":
+      return {
+        icon: CalendarClock,
+        title: `${n.data.business} volvió al plan Gratis`,
+        detail: `Venció el plan ${n.data.plan}. Tus datos siguen guardados`,
+        tone: "warning",
+      };
+    case "reopen_request":
+      return {
+        icon: RotateCcw,
+        title: `${n.data.person} pide reabrir el turno ${n.data.shift.toLowerCase()} ${dayOf(n.data.date)}`,
+        detail: [n.data.branch, n.data.reason && `«${n.data.reason}»`].filter(Boolean).join(" · "),
+        tone: n.pending ? "warning" : undefined,
+      };
+    case "reopen_sent":
+      return {
+        icon: n.pending ? Hourglass : RotateCcw,
+        title: `Pediste reabrir el turno ${n.data.shift.toLowerCase()} ${dayOf(n.data.date)}`,
+        detail: `${n.data.branch} · ${n.pending ? `Esperando respuesta de ${n.data.owner}` : "Ya respondieron tu pedido"}`,
+      };
+    case "reopen_answer":
+      return n.data.accepted
+        ? { icon: RotateCcw, title: `${n.data.person} reabrió tu turno ${n.data.shift.toLowerCase()}`, detail: `${n.data.branch}: ya puedes seguir vendiendo y ciérralo de nuevo al terminar` }
+        : { icon: CircleX, title: `${n.data.person} no reabrió tu turno ${n.data.shift.toLowerCase()}`, detail: `${n.data.branch}: el turno ${dayOf(n.data.date)} sigue cerrado` };
   }
 }
 
 const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin leer`;
 ---
 
-<div class:list={["bell", className]} data-bell {...rest}>
+<div class:list={["bell", className]} data-bell data-unread={unread} {...rest}>
   <button type="button" class="icon-btn bell-trigger" popovertarget="notifications" aria-controls="notifications" aria-expanded="false" aria-label={label} title={label}>
     <Bell size={18} stroke-width={1.75} />
     {unread > 0 && <span class="bell-count" aria-hidden="true">{unread > 9 ? "9+" : unread}</span>}
   </button>
 
-  <div id="notifications" class="bell-panel" popover role="region" aria-labelledby="notifications-title">
+  <div id="notifications" class="bell-panel" popover tabindex="-1" role="region" aria-labelledby="notifications-title">
     <header class="bell-head">
       <h2 id="notifications-title">Notificaciones</h2>
       <div class="bell-tools">
         {
           unread > 0 && (
-            <form data-action="markNotificationsRead">
+            <form data-bell-read>
               <button type="submit" class="bell-link">
                 Marcar como leído
               </button>
@@ -75,7 +119,7 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
         }
         {
           canClear && (
-            <form data-action="clearNotifications" data-confirm="¿Borrar todos los avisos? Las invitaciones sin responder se quedan." data-confirm-label="Limpiar" data-danger>
+            <form data-bell-clear data-confirm="Se borran todos tus avisos. Las invitaciones y los pedidos sin responder se quedan." data-confirm-title="¿Borrar todos los avisos?" data-confirm-label="Borrar todos" data-danger>
               <button type="submit" class="bell-link">
                 Limpiar
               </button>
@@ -85,21 +129,20 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
       </div>
     </header>
 
+    <div class="bell-empty" hidden={notifications.length > 0} data-bell-empty>
+      <span class="bell-empty-icon" aria-hidden="true">
+        <BellOff size={24} stroke-width={1.75} />
+      </span>
+      <p class="bell-empty-title">No tienes avisos</p>
+      <p>Aquí verás invitaciones, descuadres de caja, stock bajo y cambios de turno.</p>
+    </div>
     {
-      notifications.length === 0 ? (
-        <div class="bell-empty">
-          <span class="bell-empty-icon" aria-hidden="true">
-            <BellOff size={24} stroke-width={1.75} />
-          </span>
-          <p class="bell-empty-title">No tienes avisos</p>
-          <p>Aquí verás invitaciones, descuadres de caja, stock bajo y cambios de turno.</p>
-        </div>
-      ) : (
+      notifications.length > 0 && (
         <ul class="bell-list" role="list">
           {notifications.map((n) => {
             const { icon: Icon, title, detail, tone } = describe(n);
             return (
-              <li class:list={["bell-item", { unread: !n.read }]}>
+              <li class:list={["bell-item", { unread: !n.read }]} data-id={n.read ? undefined : n.id}>
                 <span class:list={["bell-icon", tone]} aria-hidden="true">
                   <Icon size={16} stroke-width={1.75} />
                   {!n.read && <span class="bell-dot" />}
@@ -114,14 +157,14 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
                   {n.kind === "invitation" &&
                     (n.pending ? (
                       <div class="bell-actions">
-                        <form data-action="respondInvitation" data-redirect="/app">
+                        <form data-accept-invitation data-business={n.data.business}>
                           <input type="hidden" name="employeeId" value={n.employeeId} />
                           <input type="hidden" name="accept" value="true" />
                           <button type="submit" class="btn btn-primary">
                             Aceptar
                           </button>
                         </form>
-                        <form data-action="respondInvitation" data-confirm={`¿Rechazar la invitación a ${n.data.business}?`} data-confirm-label="Rechazar" data-danger>
+                        <form data-reject-invitation data-confirm={`¿Rechazar la invitación a ${n.data.business}?`} data-confirm-label="Rechazar" data-danger>
                           <input type="hidden" name="employeeId" value={n.employeeId} />
                           <input type="hidden" name="accept" value="false" />
                           <button type="submit" class="btn btn-secondary">
@@ -132,9 +175,38 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
                     ) : (
                       <p class="bell-detail">Aceptaste esta invitación.</p>
                     ))}
+                  {n.kind === "reopen_request" &&
+                    (n.pending ? (
+                      // Con data-reload: el turno reabierto cambia la barra y la página de Turnos.
+                      <div class="bell-actions">
+                        <form data-action="answerReopen" data-reload data-success={`Turno ${n.data.shift.toLowerCase()} reabierto.`}>
+                          <input type="hidden" name="requestId" value={n.requestId} />
+                          <input type="hidden" name="accept" value="true" />
+                          <button type="submit" class="btn btn-primary" aria-label={`Aceptar: reabrir el turno ${n.data.shift.toLowerCase()} de ${n.data.person}`}>
+                            Aceptar
+                          </button>
+                        </form>
+                        <form
+                          data-action="answerReopen"
+                          data-reload
+                          data-success="Pedido rechazado."
+                          data-confirm={`¿Rechazar el pedido de ${n.data.person}? El turno ${n.data.shift.toLowerCase()} sigue cerrado.`}
+                          data-confirm-label="Rechazar"
+                          data-danger
+                        >
+                          <input type="hidden" name="requestId" value={n.requestId} />
+                          <input type="hidden" name="accept" value="false" />
+                          <button type="submit" class="btn btn-secondary" aria-label={`Rechazar el pedido de ${n.data.person}`}>
+                            Rechazar
+                          </button>
+                        </form>
+                      </div>
+                    ) : (
+                      <p class="bell-detail">Ya respondiste este pedido.</p>
+                    ))}
                 </div>
                 {removable(n) && (
-                  <form class="bell-delete" data-action="deleteNotification">
+                  <form class="bell-delete" data-delete-notification data-confirm={`Se borra «${title}» de tus avisos.`} data-confirm-title="¿Borrar el aviso?" data-confirm-label="Borrar" data-danger>
                     <input type="hidden" name="id" value={n.id} />
                     <button type="submit" class="icon-btn" aria-label={`Borrar aviso: ${title}`} title="Borrar aviso">
                       <X size={16} stroke-width={1.75} />
@@ -147,13 +219,60 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
         </ul>
       )
     }
+    {
+      notifications.length > 0 && (
+        // Paginación en el cliente sobre los avisos cargados (src/data/session.ts); la arma el script.
+        <nav class="bell-pager" aria-label="Páginas de avisos" data-bell-pager hidden>
+          <button type="button" class="icon-btn" data-page-step="-1" aria-label="Avisos más nuevos">
+            <ChevronLeft size={18} stroke-width={1.75} />
+          </button>
+          <span class="bell-page num" data-page-status />
+          <button type="button" class="icon-btn" data-page-step="1" aria-label="Avisos anteriores">
+            <ChevronRight size={18} stroke-width={1.75} />
+          </button>
+        </nav>
+      )
+    }
   </div>
 </div>
 
 <script>
+  import { actions } from "astro:actions";
+  import { announce, confirmDialog, toast } from "@/scripts/dialogs";
+  import { isBusy, setBusy } from "@/scripts/busy";
+
   document.querySelectorAll<HTMLElement>("[data-bell]").forEach((root) => {
     const trigger = root.querySelector<HTMLButtonElement>(".bell-trigger")!;
     const panel = root.querySelector<HTMLElement>(".bell-panel")!;
+
+    // Páginas de PAGE_SIZE avisos. Los de otras páginas quedan ocultos: no cuentan como vistos (IntersectionObserver).
+    const PAGE_SIZE = 6;
+    const pager = root.querySelector<HTMLElement>("[data-bell-pager]");
+    let page = 0;
+    function paginate() {
+      if (!pager) return;
+      const items = [...root.querySelectorAll<HTMLElement>(".bell-list > .bell-item")];
+      const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+      page = Math.min(page, pages - 1);
+      items.forEach((item, i) => (item.hidden = Math.floor(i / PAGE_SIZE) !== page));
+      pager.hidden = pages <= 1;
+      pager.querySelector("[data-page-status]")!.textContent = `${page + 1} de ${pages}`;
+      pager.querySelectorAll<HTMLButtonElement>("[data-page-step]").forEach((b) => {
+        const to = page + Number(b.dataset.pageStep);
+        b.disabled = to < 0 || to >= pages;
+      });
+    }
+    pager?.addEventListener("click", (event) => {
+      const button = (event.target as Element).closest<HTMLButtonElement>("[data-page-step]");
+      if (!button || button.disabled) return;
+      page += Number(button.dataset.pageStep);
+      paginate();
+      panel.scrollTop = 0;
+      announce(`Página ${pager.querySelector("[data-page-status]")!.textContent}.`);
+      // En la primera o la última página, el botón tocado se desactiva: el foco pasa al otro.
+      if (button.disabled) pager.querySelector<HTMLButtonElement>("[data-page-step]:not(:disabled)")?.focus();
+    });
+    paginate();
 
     // Abre bajo la campana sin salirse de la pantalla; en móvil ocupa el ancho con 16px de margen.
     function position() {
@@ -168,7 +287,201 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
       const open = (event as ToggleEvent).newState === "open";
       trigger.setAttribute("aria-expanded", String(open));
       if (open) position();
+      if (open) root.querySelectorAll(".bell-item[data-id]").forEach((item) => observer.observe(item));
+      else {
+        observer.disconnect();
+        showSeenAsRead();
+      }
     });
+
+    // Leído = se vio en la bandeja: se guarda al momento, pero sigue resaltado hasta cerrarla para no moverlo bajo la vista.
+    const seen = new Map<string, HTMLElement>();
+    const pending = new Set<string>();
+    let flushTimer: ReturnType<typeof setTimeout> | undefined;
+    const observer = new IntersectionObserver(
+      (entries) => entries.forEach((entry) => entry.isIntersecting && markSeen(entry.target as HTMLElement)),
+      { root: panel, threshold: 0.6 },
+    );
+
+    function markSeen(item: HTMLElement) {
+      const id = item.dataset.id;
+      if (!id) return;
+      delete item.dataset.id;
+      observer.unobserve(item);
+      seen.set(id, item);
+      pending.add(id);
+      clearTimeout(flushTimer);
+      flushTimer = setTimeout(flush, 800);
+    }
+
+    async function flush() {
+      if (!pending.size) return;
+      const form = new FormData();
+      pending.forEach((id) => form.append("id", id));
+      const ids = [...pending];
+      pending.clear();
+      const { error } = await actions.markNotificationsRead(form).catch(() => ({ error: new Error() }));
+      // Si falla, vuelven a quedar sin leer: se reintentan la próxima vez que se vean.
+      if (error)
+        ids.forEach((id) => {
+          const item = seen.get(id);
+          seen.delete(id);
+          if (item) item.dataset.id = id;
+        });
+    }
+    window.addEventListener("pagehide", flush);
+
+    function showSeenAsRead() {
+      let read = 0;
+      seen.forEach((item) => {
+        // Uno borrado ya descontó su «sin leer» al quitarse.
+        if (!item.isConnected || !item.classList.contains("unread")) return;
+        item.classList.remove("unread");
+        item.querySelector(".bell-dot")?.remove();
+        item.querySelector(".bell-title .sr-only")?.remove();
+        read++;
+      });
+      seen.clear();
+      if (read) syncUnread(-read);
+    }
+
+    // Aceptar una invitación sin recargar: el aviso queda aceptado y el negocio aparece en las listas de la página.
+    root.addEventListener("submit", async (event) => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || !("acceptInvitation" in form.dataset)) return;
+      event.preventDefault();
+      const submit = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
+      if (isBusy(submit)) return;
+      setBusy(submit, true);
+      const { error } = await actions
+        .respondInvitation(new FormData(form))
+        .catch(() => ({ error: new Error("No hay conexión. Revisa tu internet e intenta de nuevo.") }));
+      if (error) {
+        setBusy(submit, false);
+        return toast(error.message || "No se pudo aceptar la invitación. Intenta de nuevo.", "error");
+      }
+      const done = document.createElement("p");
+      done.className = "bell-detail";
+      done.textContent = "Aceptaste esta invitación.";
+      const item = form.closest<HTMLElement>(".bell-item")!;
+      markSeen(item);
+      form.closest(".bell-actions")!.replaceWith(done);
+      panel.focus();
+      toast(`Ya trabajas en ${form.dataset.business}.`, "success");
+      await refreshBusinesses();
+    });
+
+    /** Trae esta misma página otra vez y cambia solo lo que lista los negocios (el selector del panel y, en /app, el contenido). */
+    async function refreshBusinesses() {
+      try {
+        const html = await fetch(location.href, { headers: { accept: "text/html" } }).then((r) => r.text());
+        const fresh = new DOMParser().parseFromString(html, "text/html");
+        for (const selector of ["#business-menu > ul", location.pathname.replace(/\/$/, "") === "/app" ? "#main" : null]) {
+          const now = selector && document.querySelector(selector);
+          const next = selector && fresh.querySelector(selector);
+          if (now && next) now.innerHTML = next.innerHTML;
+        }
+      } catch {
+        // Sin red: el negocio aparece al navegar a otra página.
+      }
+    }
+
+    // Borrar un aviso, rechazar una invitación, «Limpiar» y «Marcar como leído»: cambian al instante y se guardan detrás,
+    // sin recargar; si falla, todo vuelve a como estaba.
+    root.addEventListener("submit", async (event) => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      const kind = (["deleteNotification", "rejectInvitation", "bellClear", "bellRead"] as const).find((k) => k in form.dataset);
+      if (!kind) return;
+      event.preventDefault();
+      const confirmText = form.dataset.confirm;
+      if (confirmText) {
+        const ok = await confirmDialog(confirmText, { title: form.dataset.confirmTitle, confirmLabel: form.dataset.confirmLabel, danger: "danger" in form.dataset });
+        // Abrir el diálogo cierra la bandeja (es un popover): vuelve a abrirse para ver el resultado o seguir.
+        if (!panel.matches(":popover-open")) panel.showPopover();
+        if (!ok) return form.querySelector<HTMLElement>("button")?.focus();
+      }
+      const list = root.querySelector<HTMLElement>(".bell-list");
+      const items = [...(list?.querySelectorAll<HTMLElement>(".bell-item") ?? [])];
+
+      if (kind === "bellRead") {
+        const unread = items.filter((item) => item.classList.contains("unread"));
+        const undo = unread.map((item) => {
+          const dot = item.querySelector(".bell-dot");
+          const label = item.querySelector(".bell-title .sr-only");
+          item.classList.remove("unread");
+          dot?.remove();
+          label?.remove();
+          return () => {
+            item.classList.add("unread");
+            if (dot) item.querySelector(".bell-icon")?.append(dot);
+            if (label) item.querySelector(".bell-title")?.prepend(label);
+          };
+        });
+        const before = Number(root.dataset.unread);
+        syncUnread(-before);
+        panel.focus();
+        announce("Avisos marcados como leídos.");
+        const { error } = await actions.markNotificationsRead(new FormData()).catch(() => ({ error: new Error() }));
+        if (!error) return;
+        undo.forEach((fn) => fn());
+        syncUnread(before);
+        return toast("No se pudieron marcar como leídos. Revisa tu conexión e intenta de nuevo.", "error");
+      }
+
+      // Lo que se quita: un aviso, o con «Limpiar» todos los que se pueden borrar (las invitaciones pendientes se quedan).
+      const removed = kind === "bellClear" ? items.filter((item) => item.querySelector(".bell-delete")) : [form.closest<HTMLElement>(".bell-item")!];
+      const next = removed.length === 1 ? (removed[0].nextElementSibling ?? removed[0].previousElementSibling) : null;
+      const unreadDelta = removed.filter((item) => item.classList.contains("unread")).length;
+      const placeholders = removed.map((item) => {
+        const mark = document.createComment("");
+        item.replaceWith(mark);
+        return [mark, item] as const;
+      });
+      refresh(-unreadDelta);
+      // El foco sigue en la lista: la X del aviso vecino o, si no queda ninguno, el panel.
+      (next?.querySelector<HTMLElement>(".bell-delete button") ?? panel).focus();
+      announce(kind === "bellClear" ? "Avisos borrados." : kind === "rejectInvitation" ? "Invitación rechazada." : "Aviso borrado.");
+
+      const call =
+        kind === "deleteNotification"
+          ? actions.deleteNotification(new FormData(form))
+          : kind === "rejectInvitation"
+            ? actions.respondInvitation(new FormData(form))
+            : actions.clearNotifications(new FormData());
+      const { error } = await call.catch(() => ({ error: new Error() }));
+      if (!error) return placeholders.forEach(([mark]) => mark.remove());
+      placeholders.forEach(([mark, item]) => mark.replaceWith(item));
+      refresh(unreadDelta); // también vuelve a paginar
+      toast("No se pudo guardar el cambio en tus avisos. Revisa tu conexión e intenta de nuevo.", "error");
+
+      // La lista vacía muestra el estado vacío y esconde «Limpiar» y «Marcar como leído» si ya no hacen falta.
+      function refresh(unreadChange: number) {
+        const left = list?.querySelectorAll(".bell-item").length ?? 0;
+        if (list) list.hidden = left === 0;
+        root.querySelector<HTMLElement>("[data-bell-empty]")!.hidden = left > 0;
+        const clear = root.querySelector<HTMLElement>("form[data-bell-clear]");
+        if (clear) clear.hidden = !list?.querySelector(".bell-delete");
+        syncUnread(unreadChange);
+        paginate();
+      }
+    });
+
+    /** Ajusta el número de sin leer (el total de la base: la lista muestra solo los 20 últimos) y la etiqueta. */
+    function syncUnread(change: number) {
+      const unread = Math.max(0, Number(root.dataset.unread) + change);
+      root.dataset.unread = String(unread);
+      const count = trigger.querySelector<HTMLElement>(".bell-count");
+      if (count) {
+        count.textContent = unread > 9 ? "9+" : String(unread);
+        count.hidden = unread === 0;
+      }
+      const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin leer`;
+      trigger.setAttribute("aria-label", label);
+      trigger.title = label;
+      const markRead = root.querySelector<HTMLElement>("form[data-bell-read]");
+      if (markRead) markRead.hidden = unread === 0;
+    }
 
     // En el celular, la barra del navegador que se esconde dispara resize: se reubica en vez de cerrarse.
     window.addEventListener("resize", () => {
@@ -255,6 +568,8 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
     justify-content: space-between;
     gap: 1rem;
     padding: 0.875rem 1rem;
+    /* Encima de los avisos al hacer scroll: .bell-item y .bell-icon son position: relative y si no lo tapan. */
+    z-index: 2;
     border-bottom: 1px solid var(--color-border);
     background: var(--color-surface);
   }
@@ -280,6 +595,7 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
     font: inherit;
     font-size: var(--text-sm);
     font-weight: var(--font-semibold);
+    white-space: nowrap;
     cursor: pointer;
   }
 
@@ -296,6 +612,10 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
     color: var(--color-text-muted);
     font-size: var(--text-sm);
     text-align: center;
+  }
+
+  .bell-empty[hidden] {
+    display: none;
   }
 
   .bell-empty p {
@@ -322,6 +642,35 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
   .bell-list {
     margin: 0;
     padding: 0.25rem 0;
+  }
+
+  .bell-item[hidden] {
+    display: none;
+  }
+
+  /* Abajo y fijo como el encabezado: cambiar de página no obliga a bajar hasta el final. */
+  .bell-pager {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.375rem 1rem;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+
+  .bell-pager[hidden] {
+    display: none;
+  }
+
+  .bell-page {
+    min-width: 4.5rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    text-align: center;
   }
 
   .bell-item {

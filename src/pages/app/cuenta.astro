@@ -1,15 +1,17 @@
 ---
-import { Bell, Clock, KeyRound, ShieldCheck, UserRound } from "@lucide/astro";
+import { Bell, Clock, Download, KeyRound, ShieldCheck, Trash2, UserRound } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import PhotoField from "@/components/app/PhotoField.astro";
 import Layout from "@/layouts/Layout.astro";
-import { accountSettings } from "@/data/queries";
+import { accountSettings, myBusinesses } from "@/data/queries";
 import { shiftHours } from "@/lib/format";
+import { PUBLIC_VAPID_PUBLIC_KEY } from "astro:env/client";
 
 const { user, jobs, totpFactorId, hasPassword } = await accountSettings(Astro.locals);
-const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
+const vapidKey = PUBLIC_VAPID_PUBLIC_KEY ?? "";
+const owned = myBusinesses(Astro.locals).filter((m) => m.role === "dueño").map((m) => m.business.name);
 ---
 
 <Layout title="Tu cuenta">
@@ -18,7 +20,7 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
   <div class="settings">
     <section class="card block" aria-labelledby="profile-title">
       <h2 class="card-title" id="profile-title"><UserRound size={20} stroke-width={1.75} />Perfil</h2>
-      <form id="profile-form" class="stack" data-action="saveProfile" enctype="multipart/form-data" novalidate>
+      <form id="profile-form" class="stack" data-action="saveProfile" data-reload enctype="multipart/form-data" novalidate>
         <PhotoField form="profile-form" label="Foto de perfil" image={user.avatarUrl} round />
         <div class="field-row-2">
           <FormInput form="profile-form" name="firstName" label="Nombre" value={user.firstName} autocomplete="given-name" required maxlength={60} />
@@ -30,10 +32,10 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
       </form>
     </section>
 
-    <section class="card block" aria-labelledby="password-title">
+    <section class="card block" aria-labelledby="password-title" data-region="password">
       <h2 class="card-title" id="password-title"><KeyRound size={20} stroke-width={1.75} />Contraseña</h2>
       {!hasPassword && <p class="field-hint">Entras con Google. Si creas una contraseña, también podrás entrar con tu correo.</p>}
-      <form id="password-form" class="stack" data-action="changePassword" novalidate>
+      <form id="password-form" class="stack" data-action="changePassword" data-success={hasPassword ? "Contraseña cambiada." : "Contraseña creada."} novalidate>
         <div class="field-row-2">
           <FormInput form="password-form" name="password" type="password" label="Contraseña nueva" hint="Al menos 8 caracteres." autocomplete="new-password" required minlength={8} />
           <FormInput form="password-form" name="confirm" type="password" label="Repite la contraseña" autocomplete="new-password" required />
@@ -54,7 +56,7 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
           {jobs.map(({ business, branch, employee, shifts }) => {
             const form = `shift-${employee.id}`;
             return (
-              <form id={form} class="job" data-action="changeMyShift" novalidate>
+              <form id={form} class="job" data-action="changeMyShift" data-refresh="none" data-success="Turno cambiado." novalidate>
                 <input type="hidden" name="employeeId" value={employee.id} />
                 <input type="hidden" name="businessId" value={business.id} />
                 <FormInput
@@ -110,6 +112,24 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
       <p class="field-hint" id="push-status" aria-live="polite" data-push-status>Revisando si este navegador puede recibir avisos…</p>
       <p class="field-hint">Te llegan las invitaciones, sus respuestas, la caja descuadrada y el stock bajo, aunque tengas la app cerrada. Se activa en cada dispositivo.</p>
     </section>
+
+    <section class="card block" aria-labelledby="data-title">
+      <h2 class="card-title" id="data-title"><Download size={20} stroke-width={1.75} />Tus datos</h2>
+      <p class="field-hint">
+        Descarga un archivo JSON con tu perfil y todo lo de tus negocios: sucursales, productos, inventario, ventas, gastos, cierres y equipo.
+      </p>
+      <a href="/app/cuenta/exportar" class="btn btn-secondary start" download>Descargar tus datos</a>
+    </section>
+
+    <section class="card block" aria-labelledby="delete-title">
+      <h2 class="card-title" id="delete-title"><Trash2 size={20} stroke-width={1.75} />Borrar la cuenta</h2>
+      <p class="field-hint">
+        {owned.length > 0
+          ? `Se borran tu cuenta y ${owned.length === 1 ? "tu negocio" : `tus ${owned.length} negocios`} con todo su historial. No se puede deshacer.`
+          : "Se borra tu cuenta y dejas los equipos donde trabajas. Las ventas que registraste se quedan en esos negocios, sin tu nombre."}
+      </p>
+      <button type="button" class="btn btn-danger start" data-open-dialog="delete-account">Borrar la cuenta</button>
+    </section>
   </div>
 
   {
@@ -119,6 +139,7 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
         title="Desactivar la verificación en dos pasos"
         description="Escribe el código que muestra tu app ahora. Después solo te pediremos la contraseña."
         action="disableTotp"
+        reload
         submitLabel="Desactivar"
         danger
         hidden={{ factorId: totpFactorId }}
@@ -131,6 +152,7 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
         title="Activar la verificación en dos pasos"
         description="1. Escanea el código con tu app de autenticación. 2. Escribe los 6 números que te muestra."
         action="verifyTotp"
+        reload
         submitLabel="Activar"
         hidden={{ factorId: "" }}
       >
@@ -142,6 +164,31 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
       </Modal>
     )
   }
+
+  <Modal
+    id="delete-account"
+    title="Borrar tu cuenta"
+    description="Esto no se puede deshacer. Si quieres guardar tu historial, primero descarga tus datos."
+    action="deleteAccount"
+    submitLabel="Borrar para siempre"
+    redirect="/"
+    danger
+  >
+    {
+      owned.length > 0 && (
+        <div class="notice notice-error">
+          <p class="lost-title">También se borran estos negocios, con sus ventas, gastos, cierres y equipo:</p>
+          <ul>
+            {owned.map((name) => (
+              <li>{name}</li>
+            ))}
+          </ul>
+        </div>
+      )
+    }
+    <FormInput form="delete-account-form" name="email" label={`Escribe tu correo (${user.email}) para confirmar`} autocomplete="off" required />
+    {hasPassword && <FormInput form="delete-account-form" name="password" type="password" label="Tu contraseña" autocomplete="current-password" required />}
+  </Modal>
 
   <div hidden data-vapid-key={vapidKey}></div>
 
@@ -303,6 +350,16 @@ const vapidKey = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY ?? "";
     .job .btn {
       justify-self: start;
     }
+  }
+
+  .lost-title {
+    margin: 0;
+    font-weight: var(--font-semibold);
+  }
+
+  .lost-title + ul {
+    margin: 0.25rem 0 0;
+    padding-left: 1.25rem;
   }
 
   .strong {

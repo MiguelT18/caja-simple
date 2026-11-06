@@ -4,9 +4,10 @@ import PageHeader from "@/components/PageHeader.astro";
 import BranchDialogs from "@/components/app/BranchDialogs.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
+import PhotoField from "@/components/app/PhotoField.astro";
 import Layout from "@/layouts/Layout.astro";
 import { businessKinds, catalogLabel, kindOptions } from "@/data/kinds";
-import { businessContext, businessHref, currentUser } from "@/data/queries";
+import { businessContext, businessHref, businessImages, currentUser } from "@/data/queries";
 import { planLimits } from "@/data/plans";
 import { initials, plural } from "@/lib/format";
 
@@ -28,22 +29,22 @@ const usage = [
     value: limits.historyDays === null ? "Completo" : `Últimos ${limits.historyDays} días`,
     ok: limits.historyDays === null,
   },
-  { label: "Aviso de caja descuadrada", value: limits.cashAlerts ? "Sí" : "No incluido", ok: limits.cashAlerts },
 ];
 const user = currentUser(Astro.locals);
+const logo = (await businessImages(Astro.locals, [business])).get(business.id);
 // Lo único que cambia el rubro en la app: cómo se llama el catálogo (ver docs/modelo-de-datos.md › Rubros).
 const catalogLabels = JSON.stringify(Object.fromEntries(businessKinds.map((k) => [k.value, catalogLabel(k.value)])));
 const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleados asignados";
 ---
 
 <Layout title={`Configuración · ${business.name}`} context={{ membership: ctx.membership }}>
-  <PageHeader title="Configuración" description={`Datos, sucursales y plan de ${business.name}. Lo tuyo (foto, contraseña) está en Tu cuenta.`} />
+  <PageHeader {...ctx.backdrop} title="Configuración" description={`Datos, sucursales y plan de ${business.name}. Lo tuyo (foto, contraseña) está en Tu cuenta.`} />
 
   <div class="settings">
     <a href="/app/cuenta" class="account-link">
       {
         user.avatarUrl ? (
-          <img class="account-avatar skeleton" src={user.avatarUrl} alt="" width="48" height="48" />
+          <img class="account-avatar skeleton" src={user.avatarUrl} alt="" width="48" height="48" decoding="async" data-fallback />
         ) : (
           <span class="account-avatar avatar-initials" aria-hidden="true">
             {initials(user.firstName, user.lastName || user.email)}
@@ -68,13 +69,16 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
         id="business-form"
         class="business-form"
         data-action="saveBusiness"
+        data-reload
         data-track-changes
         data-success="Cambios guardados."
         data-kind-from={business.kind}
         data-catalog-labels={catalogLabels}
+        enctype="multipart/form-data"
         novalidate
       >
         <input type="hidden" name="id" value={business.id} />
+        <PhotoField form="business-form" label="Logo o foto del negocio" image={logo} square />
         <FormInput form="business-form" name="name" label="Nombre del negocio" value={business.name} required maxlength={80} />
         <FormInput form="business-form" name="kind" label="Rubro" options={kindOptions(business.kind)} hint="Solo cambia cómo se llaman algunas secciones. Tus productos, precios, stock y ventas no cambian." />
         <p class="notice kind-effect" aria-live="polite" data-kind-effect></p>
@@ -209,6 +213,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
           title={`Eliminar ${branch.name}`}
           description={`Se borran ${lost}. No se puede deshacer.`}
           action="deleteBranch"
+          reload
           submitLabel="Eliminar sucursal"
           danger
           hidden={{ id: branch.id }}

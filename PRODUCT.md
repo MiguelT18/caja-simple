@@ -38,7 +38,7 @@ Caja Simple lleva la caja de negocios pequeños con una o varias sucursales: reg
 - Autenticación con Supabase: correo y contraseña o Google, y verificación en dos pasos (TOTP) opcional desde `/app/cuenta`; con ella activa, se pide el código en `/auth/verificar`.
 - Avisos en la bandeja y por push (invitaciones, caja que no cuadra, stock bajo, cambios de turno). En iPhone, el push solo funciona con la app agregada a la pantalla de inicio.
 - Rubros del negocio: tienda o almacén, ropa americana y restaurante (`src/data/kinds.ts`). Hoy solo cambian cómo se llaman algunas secciones (en un restaurante el catálogo es el «Menú») y, al crear un negocio de ropa americana, los tipos de prenda de ejemplo; nunca los datos ni lo que permite la base. Precio al vender y venta sin stock sirven en cualquier rubro.
-- Sin decidir: recuperación de contraseña.
+- Recuperación de contraseña: «¿Olvidaste tu contraseña?» manda un enlace por correo (`/auth/recuperar`) que lleva a elegir una nueva (`/auth/nueva-contrasena`).
 - Empleados: la dueña invita a una persona que ya tiene cuenta (correo, puesto, sucursal y turno); la persona acepta o rechaza desde su bandeja de notificaciones.
 
 ## Brand Commitments

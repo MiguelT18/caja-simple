@@ -5,10 +5,16 @@ export const prerender = false;
 import { Check } from "@lucide/astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import PlanCalculator from "../components/PlanCalculator.astro";
-import { plans } from "../data/plans";
+import PeriodSwitch from "../components/plans/PeriodSwitch.astro";
+import PlanPrice from "../components/plans/PlanPrice.astro";
+import { currentQuote } from "../data/billing";
+import { plans, type Period } from "../data/plans";
 
 const signupHref = "/auth/crear-cuenta";
 const signedIn = Boolean(Astro.locals.userId);
+const period: Period = Astro.url.searchParams.get("periodo") === "anual" ? "anual" : "mensual";
+// Sin tipo de cambio (la base todavía no lo trajo o falló la consulta), los precios van solo en dólares.
+const quote = await currentQuote(Astro.locals.supabase).catch(() => null);
 ---
 
 <SiteLayout
@@ -24,21 +30,26 @@ const signedIn = Boolean(Astro.locals.userId);
         {signedIn && <p class="plans-signed">El plan es de cada negocio: lo cambias desde la configuración del negocio.</p>}
       </header>
 
+      <PeriodSwitch period={period} quote={quote} />
+
       <div class="plan-grid">
         {
           plans.map((plan, i) => (
             <article class="plan" aria-labelledby={`plan-${i}`}>
               <h2 id={`plan-${i}`}>{plan.name}</h2>
               <p class="plan-audience">{plan.audience}</p>
-              <p class="plan-price">
-                <span class="num">{plan.price}</span>
-                {plan.period && <span class="plan-period">{plan.period}</span>}
-              </p>
+              <PlanPrice plan={plan.name} period={period} quote={quote} />
               <ul role="list">
                 {plan.features.map((feature) => (
                   <li>
                     <Check size={16} stroke-width={2} />
-                    {feature}
+                    {typeof feature === "string" ? (
+                      feature
+                    ) : (
+                      <span>
+                        {feature.text} <span class="chip chip-neutral">Próximamente</span>
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -50,11 +61,11 @@ const signedIn = Boolean(Astro.locals.userId);
         }
       </div>
 
-      <PlanCalculator />
+      <PlanCalculator period={period} quote={quote} />
 
       <p class="plans-note">
-        Precios orientativos en Bolivianos; todavía los estamos ajustando con dueños de negocio. El plan anual trae 2
-        meses gratis y se paga con QR bancario.
+        Pagas en bolivianos con QR bancario, transferencia o tarjeta, el mes o el año. El plan se activa apenas vemos el
+        pago.
       </p>
     </div>
   </section>
@@ -130,26 +141,6 @@ const signedIn = Boolean(Astro.locals.userId);
     color: var(--color-text-muted);
     font-size: var(--text-sm);
     line-height: var(--text-sm-lh);
-  }
-
-  .plan-price {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.375rem;
-    margin: 1.5rem 0 0;
-    font-size: var(--text-3xl);
-    line-height: var(--text-3xl-lh);
-    font-weight: var(--font-bold);
-    letter-spacing: -0.01em;
-  }
-
-  .plan-period {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
-    font-weight: var(--font-medium);
-    letter-spacing: 0;
   }
 
   .plan ul {

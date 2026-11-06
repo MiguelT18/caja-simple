@@ -19,10 +19,16 @@ const { branch } = stats;
 const balance = stats.sales - stats.expenses;
 ---
 
-<article class="card branch" style={`--branch: var(--color-branch-${(index % 6) + 1})`} aria-labelledby={`branch-title-${branch.id}`}>
+<!-- Con foto, la fachada lleva el mismo view-transition-name que el fondo del encabezado de la sucursal: pasa a él al entrar. -->
+<article
+  class="card branch"
+  style={`--branch: var(--color-branch-${(index % 6) + 1})`}
+  aria-labelledby={`branch-title-${branch.id}`}
+  data-morph={stats.image ? "" : undefined}
+>
   <div class="branch-media">
     {stats.image ? (
-      <img class="skeleton" src={stats.image} alt="" loading="lazy" />
+      <img class="skeleton" src={stats.image} alt="" loading="lazy" decoding="async" data-fallback style={`view-transition-name: branch-${branch.id}`} />
     ) : (
       <div class="branch-placeholder">
         <Store size={36} stroke-width={1.5} aria-hidden="true" />

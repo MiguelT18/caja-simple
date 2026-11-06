@@ -6,15 +6,20 @@ import DonutChart from "@/components/app/charts/DonutChart";
 import ExpensesTable from "@/components/app/ExpensesTable";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
+import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
 import { branchColor, branchContext, shiftBarData, branchHref, expensesByCategory, fullName, sum } from "@/data/queries";
 import { formatBs } from "@/lib/format";
-import { longDate } from "@/lib/dates";
+import { addDays, longDate, parseRange, shortDate, today as todayOf } from "@/lib/dates";
 
 const { negocio, sucursal } = Astro.params;
-const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+const range = parseRange(Astro.url.searchParams, todayOf());
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!, range);
 if (!ctx) return Astro.rewrite("/404");
-const { branch, business, currentShift, expenseHistory, expenses, shiftById, shifts, today } = ctx;
+const rangeText = range.days === 7 && range.to === ctx.today ? "los últimos 7 días" : `del ${shortDate(range.from)} al ${shortDate(range.to)}`;
+const { branch, business, canCorrect, currentShift, expenseHistory, expenses, shiftById, shifts, today } = ctx;
+// Nuevo en cada carga (la página recarga al guardar): un doble envío del mismo formulario no duplica el gasto.
+const expenseId = crypto.randomUUID();
 // Categorías ya usadas, como sugerencias del campo.
 const usedCategories = [...new Set(expenseHistory.map((g) => g.category))].sort();
 
@@ -35,13 +40,15 @@ const rows = expenseHistory.map((g) => {
     category: g.category,
     shift: { name: shift.name, tone: shift.tone },
     by: fullName(g.recordedBy),
-    amount: g.amount,
+    amount: g.voided ?? g.amount,
+    voided: g.voided !== null,
+    canEdit: canCorrect(g),
   };
 });
 ---
 
 <Layout title={`Gastos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader tint={branchColor(ctx.membership, branch.id)} eyebrow={longDate(today)} title="Gastos" description={`Lo que salió de la caja en los últimos 7 días en ${branch.name}.`}>
+  <PageHeader {...ctx.backdrop} tint={branchColor(ctx.membership, branch.id)} eyebrow={longDate(today)} title="Gastos" description={`Lo que salió de la caja ${rangeText} en ${branch.name}.`}>
     {
       currentShift ? (
         <button type="button" class="btn btn-primary" data-open-dialog="expense">
@@ -56,6 +63,8 @@ const rows = expenseHistory.map((g) => {
     }
   </PageHeader>
 
+  {/* Región: tras guardar trae un expenseId nuevo, así el siguiente gasto no se toma por repetido. */}
+  <div data-region="expense-form">
   {
     currentShift && (
       <Modal
@@ -64,7 +73,7 @@ const rows = expenseHistory.map((g) => {
         description={`Sale de la caja del turno ${currentShift.name.toLowerCase()}.`}
         action="createExpense"
         submitLabel="Guardar gasto"
-        hidden={{ branchId: branch.id, shiftId: currentShift.id }}
+        hidden={{ expenseId, branchId: branch.id, shiftId: currentShift.id }}
       >
         <FormInput form="expense-form" name="concept" label="Concepto" placeholder="Ej.: Pago al proveedor de leche" required maxlength={120} />
         <div class="field-row-2">
@@ -79,11 +88,12 @@ const rows = expenseHistory.map((g) => {
       </Modal>
     )
   }
+  </div>
 
-  <div class="top">
+  <div class="top" data-region="totals">
     <dl class="card totals">
       <div class="totals-main">
-        <dt>Últimos 7 días</dt>
+        <dt>{rangeText[0].toUpperCase() + rangeText.slice(1)}</dt>
         <dd class="num amount-expense">{formatBs(weekTotal, "−")}</dd>
       </div>
       <div>
@@ -104,12 +114,15 @@ const rows = expenseHistory.map((g) => {
 
     <section class="card chart-card" aria-labelledby="by-category">
       <h2 id="by-category" class="card-title">Por categoría</h2>
-      <DonutChart client:visible items={expensesByCategory(expenseHistory)} totalLabel="en 7 días" />
+      <DonutChart client:visible items={expensesByCategory(expenseHistory)} totalLabel={range.days === 7 && range.to === today ? "en 7 días" : `en ${range.days} días`} />
     </section>
   </div>
 
   <h2 class="section-title">Historial</h2>
-  <ExpensesTable client:visible rows={rows} />
+  <RangeFilter from={range.from} to={range.to} max={today} historyStart={business.plan === "Gratis" ? addDays(today, -60) : undefined} />
+  <div data-region="history">
+    <ExpensesTable client:visible rows={rows} categories={usedCategories} />
+  </div>
 </Layout>
 
 <style>

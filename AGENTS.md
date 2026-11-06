@@ -22,6 +22,7 @@ pnpm install
 astro dev --background   # servidor de dev en segundo plano; también: astro dev stop | status | logs
 pnpm build               # verificación mínima antes de dar algo por terminado
 pnpm astro check         # tipos (usa TypeScript 6: astro check no soporta la 7)
+pnpm test                # vitest: funciones puras (src/**/*.test.ts) y que planLimits coincida con las migraciones
 ```
 
 Supabase (proyecto en la nube; no hay base local). Las variables van en `.env` (ver `.env.example`); `SUPABASE_DB_PASSWORD` es solo para la CLI:
@@ -39,11 +40,14 @@ Notificaciones push (Edge Function `send-push`; necesita `pnpm dlx supabase logi
 ```sh
 pnpm dlx supabase secrets set --project-ref <ref> VAPID_PUBLIC_KEY="$PUBLIC_VAPID_PUBLIC_KEY" VAPID_PRIVATE_KEY="$VAPID_PRIVATE_KEY" PUSH_WEBHOOK_SECRET="$PUSH_WEBHOOK_SECRET" VAPID_SUBJECT="mailto:<contacto>"
 pnpm dlx supabase functions deploy send-push --project-ref <ref>
+pnpm dlx supabase functions deploy send-invite --project-ref <ref>   # correo de invitación a quien no tiene cuenta (mismo secreto)
 ```
 
 La base llama a la función con la URL y el secreto guardados en Vault (`project_url`, `push_webhook_secret`); ver `docs/modelo-de-datos.md` › Tu cuenta.
 
-No hay tests ni linter. Para verificar, compila y revisa la página en el navegador, en tema claro y oscuro y a 390px de ancho.
+No hay linter. Los tests cubren solo funciones puras; para la UI, compila y revisa la página en el navegador, en tema claro y oscuro y a 390px de ancho.
+
+Errores en producción: `check()` (Actions) y el middleware escriben una línea JSON por error (`{"level":"error","source":…}`) en los logs de Vercel. Para guardarlos y recibir alertas, conecta un log drain en Vercel (Project › Settings › Log Drains).
 
 ## Mapa del código
 
@@ -60,18 +64,20 @@ src/
 │   ├── Layout.astro      # app: <body class="app-surface">, Sidebar + <main> en paneles y, en una sucursal, la barra del turno
 │   ├── SiteLayout.astro  # públicas (/ y /planes): encabezado y pie según haya sesión, estilos en styles/site.css
 │   └── AuthLayout.astro  # acceso: <body class="auth-surface">, pizarra + formulario, carga auth-form.ts
-├── components/       # Sidebar (con la biblioteca de sucursales), PageHeader (encabezado con degradado), ContextSwitcher, NotificationBell, UserCard, ThemeToggle, Logo, BaseHead; app/ = ShiftBar, MediaCard, BranchCard, Modal, FormInput…; auth/ = pizarra y campos; landing/
+├── components/       # Sidebar (con la biblioteca de sucursales), PageHeader (encabezado con degradado), ContextSwitcher, NotificationBell, UserCard, ThemeToggle, Logo, BaseHead; app/ = ShiftBar, MediaCard, BranchCard, Modal, FormInput, DateRangePicker (rango de días con hora opcional; RangeFilter lo usa)…; auth/ = pizarra y campos; landing/
 ├── data/
 │   ├── queries.ts    # única entrada a los datos para las páginas: solo re-exporta los módulos de abajo
 │   ├── session.ts    # sesión: perfil, negocios, rol y avisos (la carga el middleware)
 │   ├── branch.ts · business.ts # contexto de una página de sucursal (y la barra del turno) / del negocio
+│   ├── account.ts    # descargar tus datos (/app/cuenta/exportar)
 │   ├── cash.ts       # cuentas puras: esperado en caja, estado de la caja, totales
+│   ├── billing.ts    # cobro de planes: tipo de cambio del día, datos de pago y cobros del negocio
 │   ├── shared.ts · mappers.ts · routes.ts # consultas comunes (movimientos, cierres, fotos firmadas) · filas → tipos · rutas de /app
 │   ├── navigation.ts # enlaces del Sidebar según rol (agrega aquí las rutas nuevas de /app)
 │   ├── types.ts      # tipos de dominio (Business, Branch, Product…)
-│   └── plans.ts      # planes y precios orientativos
-├── lib/              # supabase.ts (cliente de servidor), cache.ts (Redis de Upstash; opcional), database.types.ts (generado), auth.ts, format.ts (dinero y texto), dates.ts (hora de Bolivia)
-├── scripts/          # JS del navegador: auth-form.ts (validación y envío), action-forms.ts (formularios → Actions), nav-skeleton.ts (esqueleto al navegar en /app), auth-board.ts
+│   └── plans.ts      # planes, precios en US$ y la cuenta a Bs (bsTotal)
+├── lib/              # csv.ts (importar productos), supabase.ts (cliente de servidor), cache.ts (Redis de Upstash; opcional), mail.ts (correos para el equipo vía Resend; opcional), database.types.ts (generado), auth.ts, format.ts (dinero y texto), dates.ts (hora de Bolivia)
+├── scripts/          # JS del navegador: auth-form.ts (validación y envío), action-forms.ts (formularios → Actions), sale-queue.ts (ventas sin conexión), nav-skeleton.ts (esqueleto al navegar en /app), auth-board.ts
 └── styles/
     ├── tokens.css    # todos los valores de diseño; colores con light-dark()
     ├── global.css    # base y clases compartidas: .btn, .icon-btn, .input, .field-*, .notice, .num
@@ -79,7 +85,7 @@ src/
     └── auth.css      # redefine los tokens solo bajo body.auth-surface
 ```
 
-Fuera de `src/`: `supabase/migrations/` (esquema), `supabase/functions/send-push/` (Edge Function, Deno; excluida del tsconfig) y `public/sw.js` + `public/manifest.webmanifest` (avisos push).
+Fuera de `src/`: `supabase/migrations/` (esquema), `supabase/functions/` (`send-push` y `send-invite`, Edge Functions en Deno; excluidas del tsconfig) y `public/sw.js` + `public/manifest.webmanifest` + `public/offline.html` (avisos push, PWA y Vender sin conexión).
 
 `/` (landing) y `/planes` (planes y precios) se renderizan con la sesión: sin ella invitan a crear cuenta; con ella llevan a `/app`. La dirección de diseño de la landing está en `.impeccable/surfaces/src-pages-index-astro.md`.
 
@@ -102,6 +108,7 @@ Fuera de `src/`: `supabase/migrations/` (esquema), `supabase/functions/send-push
 - **Datos y permisos:** las páginas leen solo por `src/data/queries.ts` y escriben solo por `src/actions/`. La autorización real es RLS en la base (ver `docs/modelo-de-datos.md`): nunca la reemplaces con chequeos en el cliente. Cambios de esquema, siempre con una migración nueva. Toda tabla nueva lleva RLS y la política restrictiva «Exige la verificación en dos pasos» (`private.mfa_ok()`).
 - **Caché (Redis):** solo lo que cambia poco (sesión, catálogo, turnos, equipo, URLs firmadas), con clave por persona. Caja, stock y avisos nunca van a la caché. El middleware la invalida tras cada Action; si una Action nueva solo toca datos frescos, agrégala a `LIVE_ACTIONS` en `src/middleware.ts`. Ver `docs/modelo-de-datos.md` › Caché.
 - **Formularios de /app:** en páginas Astro, `<form data-action="nombreDeLaAccion">` con `FormInput` y `Modal` (`src/components/app/`); en islas React, `actions.x()` directo.
+- **Después de guardar, sin recargar:** marca con `data-region="nombre"` cada bloque de la página que muestra datos que cambian (totales, tablas, la isla, `PageHeader live`). `action-forms.ts` y las islas llaman a `refreshRegions()` (`src/scripts/refresh.ts`), que vuelve a pedir la página y cambia solo esas regiones; las islas conservan su estado y reciben los props nuevos. Un script que se ata a elementos al cargar usa `onRegions(init)`. `data-reload` (o `reload` en `Modal`) recarga entera: solo cuando cambia el Sidebar o la sesión.
 
 ## Herramientas
 

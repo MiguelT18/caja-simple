@@ -418,3 +418,6 @@ enabled = true
 # La llama el trigger notifications_push con su propio secreto (x-push-secret), no con un JWT.
 [functions.send-push]
 verify_jwt = false
+
+[functions.send-invite]
+verify_jwt = false

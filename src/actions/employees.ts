@@ -24,12 +24,14 @@ export const employees = {
       }),
     handler: async ({ businessId, branchId, shiftId, person, personId, jobTitle }, context) => {
       const sb = db(context);
+      // Invitar a un correo sin cuenta manda un correo: el límite evita usar la app para mandar spam.
+      await limit(context, "invite", 10, 60 * 60);
       const { data: shift } = await sb.from("shifts").select("branch_id").eq("id", shiftId).single();
       if (shift?.branch_id !== branchId)
         throw new ActionError({ code: "BAD_REQUEST", message: "Ese turno es de otra sucursal. Elige uno de la sucursal seleccionada." });
-      // La base exige que la cuenta exista y deja la invitación pendiente hasta que la persona la acepte.
+      // La invitación queda pendiente hasta que la persona la acepte desde su bandeja. Con cuenta, le llega el aviso;
+      // sin cuenta, la base le manda el correo de invitación (send-invite) y el aviso llega al crear la cuenta.
       // Por cuenta, el correo va vacío y lo completa la base (private.link_invited_employee): la dueña no lo conoce.
-      // shortcut: el aviso llega solo a la bandeja de la app, no por correo.
       const { error } = await sb
         .from("employees")
         .insert({
@@ -89,8 +91,12 @@ export const employees = {
 
   markNotificationsRead: defineAction({
     accept: "form",
-    handler: async (_input, context) => {
-      const { error } = await db(context).from("notifications").update({ read_at: new Date().toISOString() }).is("read_at", null);
+    // Sin `id`, marca todos; con `id` repetido, solo esos (los que se vieron en la bandeja).
+    input: z.object({ id: z.array(uuid).max(100).optional() }),
+    handler: async ({ id }, context) => {
+      let query = db(context).from("notifications").update({ read_at: new Date().toISOString() }).is("read_at", null);
+      if (id?.length) query = query.in("id", id);
+      const { error } = await query;
       check(error);
       return { ok: true };
     },
@@ -127,6 +133,8 @@ export const employees = {
     input: z.object({ id: uuid, branchId: uuid, shiftId: z.uuid("Elige un turno") }),
     handler: async ({ id, branchId, shiftId }, context) => {
       const sb = db(context);
+      // Invitar a un correo sin cuenta manda un correo: el límite evita usar la app para mandar spam.
+      await limit(context, "invite", 10, 60 * 60);
       const { data: shift } = await sb.from("shifts").select("branch_id").eq("id", shiftId).single();
       if (shift?.branch_id !== branchId)
         throw new ActionError({ code: "BAD_REQUEST", message: "Ese turno es de otra sucursal. Elige uno de la sucursal seleccionada." });

@@ -2,7 +2,7 @@
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { defaultShifts } from "@/data/session";
-import { check, confirmName, db, freeSlug, imageFile, kind, name, shiftList, shiftsFrom, slugify, storeImage, uuid } from "./shared";
+import { check, confirmName, db, freeSlug, imageFile, kind, name, removeBusinessPhotos, shiftList, shiftsFrom, slugify, storeImage, uuid, uploadLimit } from "./shared";
 
 export const businesses = {
   createBusiness: defineAction({
@@ -48,6 +48,7 @@ export const businesses = {
       ...shiftList,
     }),
     handler: async ({ businessId, id, image, removeImage, shiftName, shiftStart, shiftEnd, shiftTone, ...fields }, context) => {
+      await uploadLimit(context, image);
       const sb = db(context);
       if (id) {
         const { data, error } = await sb.from("branches").update(fields).eq("id", id).select("id, image_path").single();
@@ -78,11 +79,14 @@ export const businesses = {
 
   saveBusiness: defineAction({
     accept: "form",
-    input: z.object({ id: uuid, name: name(80, "Ingresa el nombre del negocio"), kind }),
-    handler: async ({ id, name, kind }, context) => {
+    input: z.object({ id: uuid, name: name(80, "Ingresa el nombre del negocio"), kind, image: imageFile, removeImage: z.coerce.boolean().default(false) }),
+    handler: async ({ id, name, kind, image, removeImage }, context) => {
+      await uploadLimit(context, image);
+      const sb = db(context);
       // El slug no cambia: los enlaces guardados siguen funcionando.
-      const { error } = await db(context).from("businesses").update({ name, kind }).eq("id", id).select("id").single();
+      const { data, error } = await sb.from("businesses").update({ name, kind }).eq("id", id).select("id, image_path").single();
       check(error);
+      await storeImage(sb, "businesses", id, data!, image, removeImage);
       return { id };
     },
   }),
@@ -110,12 +114,7 @@ export const businesses = {
       const { data, error } = await sb.from("businesses").select("name").eq("id", id).single();
       check(error);
       confirmName(confirm, data!.name);
-      // Las fotos viven en <negocio>/… de cada bucket, y Storage solo deja borrarlas mientras el negocio existe.
-      // shortcut: borra hasta 1000 fotos por bucket, si un negocio llega a más, paginar el list().
-      for (const bucket of ["product-images", "branch-images"]) {
-        const { data: files } = await sb.storage.from(bucket).list(id, { limit: 1000 });
-        if (files?.length) await sb.storage.from(bucket).remove(files.map((f) => `${id}/${f.name}`));
-      }
+      await removeBusinessPhotos(sb, id);
       check((await sb.from("businesses").delete().eq("id", id).select("id").single()).error);
       return { ok: true };
     },

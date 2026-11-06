@@ -1,5 +1,5 @@
 ---
-import { LogOut } from "@lucide/astro";
+import { LifeBuoy, LogOut } from "@lucide/astro";
 import type { User } from "../data/types";
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
 const { user } = Astro.props;
 
 const fullName = `${user.firstName} ${user.lastName}`;
+// Ayuda guarda desde qué página se escribe, para entender el contexto del mensaje.
+const helpHref = `/app/ayuda?desde=${encodeURIComponent(Astro.url.pathname)}`;
 const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? user.email[0] ?? ""}`.toUpperCase();
 ---
 
@@ -16,7 +18,7 @@ const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? user.email[0] 
   <a href="/app/cuenta" class="user-link" title="Tu cuenta">
   {
     user.avatarUrl ? (
-      <img class="avatar skeleton" src={user.avatarUrl} alt="" width="36" height="36" />
+      <img class="avatar skeleton" src={user.avatarUrl} alt="" width="36" height="36" decoding="async" data-fallback />
     ) : (
       <span class="avatar avatar-initials" aria-hidden="true">
         {initials}
@@ -29,8 +31,11 @@ const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? user.email[0] 
   </div>
   <span class="sr-only">Tu cuenta</span>
   </a>
+  <a href={helpHref} class="icon-btn user-action" aria-label="Ayuda y comentarios" title="Ayuda y comentarios">
+    <LifeBuoy size={18} stroke-width={1.75} />
+  </a>
   <form method="post" action="/api/auth/logout">
-    <button type="submit" class="icon-btn logout" aria-label="Cerrar sesión" title="Cerrar sesión">
+    <button type="submit" class="icon-btn user-action" aria-label="Cerrar sesión" title="Cerrar sesión">
       <LogOut size={18} stroke-width={1.75} />
     </button>
   </form>
@@ -107,13 +112,14 @@ const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? user.email[0] 
     color: var(--color-text-muted);
   }
 
-  .logout {
+  .user-action {
+    flex-shrink: 0;
     width: 2rem;
     height: 2rem;
   }
 
   @media (pointer: coarse) {
-    .logout {
+    .user-action {
       width: 2.75rem;
       height: 2.75rem;
     }

@@ -1,9 +1,10 @@
 ---
 import { CircleCheck, Clock, Store, TriangleAlert } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
+import SetupChecklist from "@/components/app/SetupChecklist.astro";
 import BarCompareChart from "@/components/app/charts/BarCompareChart";
 import Layout from "@/layouts/Layout.astro";
-import { businessContext, businessHref } from "@/data/queries";
+import { businessContext, businessHref, firstSteps } from "@/data/queries";
 import { formatBs, plural } from "@/lib/format";
 import { longDate, today } from "@/lib/dates";
 
@@ -13,13 +14,23 @@ const { business, branchSummary, salesTotal, expensesTotal } = ctx;
 const balance = salesTotal - expensesTotal;
 const salesCount = branchSummary.reduce((n, b) => n + b.salesCount, 0);
 const rows = branchSummary.map((b) => ({ label: b.branch.name, sales: b.sales, expenses: b.expenses }));
+const steps = await firstSteps(Astro.locals, branchSummary.map((b) => b.branch.id));
 ---
 
 <Layout title={`Resumen · ${business.name}`} context={{ membership: ctx.membership }}>
   <PageHeader
     eyebrow={longDate(today())}
     title={business.name}
+    {...ctx.backdrop}
     description={branchSummary.length === 1 ? "Cómo va la caja hoy." : `Cómo va la caja hoy en tus ${branchSummary.length} sucursales.`}
+  />
+
+  <SetupChecklist
+    business={business}
+    branch={branchSummary[0]?.branch}
+    hasProducts={ctx.catalog.length > 0}
+    hasStock={ctx.catalog.some((p) => p.soldIn.length > 0)}
+    {...steps}
   />
 
   <section class="kpis" aria-label="Totales de hoy en todas las sucursales">

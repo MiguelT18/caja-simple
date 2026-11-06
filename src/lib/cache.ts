@@ -1,5 +1,6 @@
 // Caché en Redis (Upstash) para lo que cambia poco. Ver docs/modelo-de-datos.md › Caché.
 // Sin las variables de Upstash, o si Redis falla, todo va directo a Supabase: la caché nunca rompe la app.
+// El límite de intentos (rateLimit) sí las exige en producción.
 import { Redis } from "@upstash/redis";
 import { UPSTASH_REDIS_REST_TOKEN, UPSTASH_REDIS_REST_URL } from "astro:env/server";
 
@@ -50,9 +51,15 @@ export async function bump(...keys: string[]) {
   }
 }
 
-/** Límite de intentos en ventana fija. Sin Redis, o si falla, deja pasar: mejor sin límite que dejar a todos fuera. */
+/**
+ * Límite de intentos en ventana fija. Si Redis falla, deja pasar: mejor sin límite que dejar a todos fuera.
+ * Sin Upstash: en dev deja pasar; en producción es un error de configuración (la 2FA quedaría sin límite).
+ */
 export async function rateLimit(key: string, max: number, windowSec: number) {
-  if (!redis) return true;
+  if (!redis) {
+    if (import.meta.env.PROD) throw new Error("Falta UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN: sin ellas no hay límite de intentos en el acceso.");
+    return true;
+  }
   try {
     const [count] = await redis.pipeline().incr(`rl:${key}`).expire(`rl:${key}`, windowSec, "NX").exec<[number, number]>();
     // shortcut: la ventana fija deja pasar hasta 2× max en el borde entre ventanas; usar @upstash/ratelimit (ventana deslizante) si hay abuso.

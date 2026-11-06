@@ -1,17 +1,23 @@
 // Formularios de /app que guardan con Astro Actions, sin recargar a ciegas.
 //   <form data-action="openShift">        → llama a actions.openShift(new FormData(form))
-//   data-redirect="/app/{slug}"           → al guardar, va ahí ({campo} sale de la respuesta); si no, recarga
-//   <p class="notice" data-form-notice>   → donde se muestra el error general
+//   data-redirect="/app/{slug}"           → al guardar, va ahí ({campo} sale de la respuesta); si no, cambia solo las
+//                                          regiones [data-region] de la página (scripts/refresh.ts)
+//   data-refresh="totales tabla"         → solo esas regiones («none»: ninguna); data-reload → recarga entera (cuando cambia el Sidebar)
+//   <p class="notice" data-form-notice>   → donde se muestra el error general; sin él, sale en un toast
+//                                          (y si el formulario está en un diálogo, el diálogo se cierra antes)
 //   <p class="field-error" id="<name>-error"> → errores de cada campo
 //   data-confirm="¿…?" data-confirm-label="Quitar" data-danger → pide confirmación en un diálogo (scripts/dialogs.ts)
 //   data-track-changes                  → «Guardar» deshabilitado sin cambios, [data-change-status] con el estado,
 //                                          evento «formchange» ({ dirty }) y aviso al salir con cambios
-//   data-success="Cambios guardados."    → al recargar tras guardar, lo muestra en un toast
+//   data-success="Cambios guardados."    → al guardar, lo muestra en un toast (si la Action devuelve
+//                                          { toast: { message, tone } }, se muestra ese en su lugar)
+//   data-reset                           → al guardar, el formulario queda vacío (p. ej., Ayuda y comentarios)
 // Diálogos: <button data-open-dialog="id"> abre <dialog id="id" class="modal">; [data-close-dialog] lo cierra.
 import { actions, isInputError } from "astro:actions";
 import { isBusy, setBusy } from "./busy";
 import { confirmDialog, flashToast, toast } from "./dialogs";
 import { showPageSkeleton } from "./nav-skeleton";
+import { onRegions, refreshRegions } from "./refresh";
 
 type ActionFn = (input: FormData) => Promise<{ data?: Record<string, unknown>; error?: Error & { code?: string } }>;
 
@@ -41,14 +47,23 @@ document.addEventListener("submit", async (event) => {
   const { data, error } = result;
   if (!error) {
     unsaved.delete(form);
-    if (form.dataset.success) flashToast(form.dataset.success);
     const target = form.dataset.redirect?.replace(/\{(\w+)\}/g, (_, key) => String(data?.[key] ?? ""));
-    if (target) {
+    if (target || "reload" in form.dataset) {
+      if (form.dataset.success) flashToast(form.dataset.success);
+      if (!target) return window.location.reload();
       const url = new URL(target, location.href);
       if (url.pathname.startsWith("/app")) showPageSkeleton(url);
-      window.location.assign(url);
+      return window.location.assign(url);
     }
-    else window.location.reload();
+    // Sin recargar: se cierra el diálogo y se cambian solo las regiones con datos nuevos.
+    form.closest("dialog")?.close();
+    const notice = data?.toast as { message: string; tone: "success" | "warning" } | undefined;
+    if (notice) toast(notice.message, notice.tone);
+    else if (form.dataset.success) toast(form.dataset.success, "success");
+    if (form.dataset.refresh !== "none") await refreshRegions(form.dataset.refresh?.split(" "));
+    setBusy(submit, false);
+    // Un diálogo que no se cambió (fuera de las regiones), o un formulario con data-reset, queda vacío para la próxima vez.
+    if (form.isConnected && (form.closest("dialog") || "reset" in form.dataset)) form.reset();
     return;
   }
 
@@ -70,7 +85,11 @@ document.addEventListener("submit", async (event) => {
     notice.textContent = error.message || "No se pudo guardar. Intenta de nuevo.";
     // El aviso está al final del formulario: que se vea aunque el diálogo tenga scroll.
     notice.scrollIntoView({ block: "nearest" });
-  } else toast(error.message || "No se pudo guardar. Intenta de nuevo.", "error");
+  } else {
+    // Un toast quedaría detrás del diálogo modal (inerte, sin poder leerse ni cerrarse): primero se cierra el diálogo.
+    form.closest("dialog")?.close();
+    toast(error.message || "No se pudo guardar. Intenta de nuevo.", "error");
+  }
 });
 
 // Cambios sin guardar: se compara lo que hay en el formulario con lo que tenía al cargar.
@@ -80,7 +99,12 @@ const unsaved = new Set<HTMLFormElement>();
 const snapshot = (form: HTMLFormElement) =>
   JSON.stringify([...new FormData(form)].map(([key, value]) => [key, value instanceof File ? `${value.name}:${value.size}` : value]));
 
-for (const form of document.querySelectorAll<HTMLFormElement>("form[data-track-changes]")) {
+// También en las regiones que llegan nuevas tras guardar.
+onRegions((root) => {
+  for (const form of root.querySelectorAll<HTMLFormElement>("form[data-track-changes]")) trackChanges(form);
+});
+
+function trackChanges(form: HTMLFormElement) {
   const initial = snapshot(form);
   const submit = form.querySelector<HTMLButtonElement>("button[type=submit]");
   const status = form.querySelector<HTMLElement>("[data-change-status]");

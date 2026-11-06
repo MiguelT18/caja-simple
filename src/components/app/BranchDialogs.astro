@@ -37,6 +37,7 @@ const shiftPresets = [
         title={branch ? `Editar ${branch.name}` : "Agregar sucursal"}
         description={branch ? "Sus turnos se cambian en Turnos de la sucursal." : "Cada sucursal tiene sus propios horarios."}
         action="saveBranch"
+        reload
         submitLabel="Guardar"
         enctype="multipart/form-data"
         trackChanges={!!branch}

@@ -51,7 +51,7 @@ const branchLinks = m
   : [];
 ---
 
-<div class="sidebar">
+<div class="sidebar" style="view-transition-name: sidebar">
   <header class="sidebar-header">
     <a href={m ? entryHref(m) : "/app"} class="brand">
       <Logo class="logo" />
@@ -106,6 +106,7 @@ const branchLinks = m
                   <a
                     href={href}
                     class="nav-link"
+                    data-astro-prefetch
                     aria-current={currentPath === href ? "page" : undefined}
                     aria-describedby={i === 0 ? "nav-reorder-hint" : undefined}
                   >
@@ -128,7 +129,7 @@ const branchLinks = m
                 Sucursales
               </p>
               {branchesHref && (
-                <a href={branchesHref} class="library-all" aria-current={currentPath === branchesHref ? "page" : undefined}>
+                <a href={branchesHref} class="library-all" data-astro-prefetch aria-current={currentPath === branchesHref ? "page" : undefined}>
                   Ver todas<span class="sr-only"> las sucursales</span>
                 </a>
               )}
@@ -136,9 +137,10 @@ const branchLinks = m
             <ul aria-labelledby="nav-section-branches" class="library">
               {branchLinks.map((link) => (
                 <li>
-                  <a href={link.href} class="library-link" aria-current={link.current ? "true" : undefined}>
+                  <a href={link.href} class="library-link" data-astro-prefetch aria-current={link.current ? "true" : undefined}>
                     <span class="library-art" style={`--branch: ${link.color}`} aria-hidden="true">
-                      {link.image ? <img src={link.image} alt="" loading="lazy" /> : <Store size={18} stroke-width={1.75} />}
+                      {link.image && <img src={link.image} alt="" loading="lazy" decoding="async" data-fallback />}
+                      <Store size={18} stroke-width={1.75} />
                     </span>
                     <span class="library-text">
                       <span class="library-name">{link.name}</span>
@@ -517,7 +519,11 @@ const branchLinks = m
     color: var(--branch);
   }
 
-  /* Foto de la fachada recortada al cuadrado; sin foto, queda el color de la sucursal con el ícono. */
+  /* Foto de la fachada recortada al cuadrado; sin foto, o si no carga, queda el color de la sucursal con el ícono. */
+  .library-art:has(> img:not([hidden])) > :global(svg) {
+    display: none;
+  }
+
   .library-art img {
     width: 100%;
     height: 100%;

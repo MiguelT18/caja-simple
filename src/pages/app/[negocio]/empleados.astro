@@ -30,7 +30,7 @@ const rows = employees.map((e) => {
 ---
 
 <Layout title={`Empleados · ${business.name}`} context={{ membership: ctx.membership }}>
-  <PageHeader title="Empleados" description={`${plural(employees.length, "persona", "personas")} en las sucursales de ${business.name}. Entran gratis, siempre.`}>
+  <PageHeader {...ctx.backdrop} title="Empleados" live description={`${plural(employees.length, "persona", "personas")} en las sucursales de ${business.name}. Entran gratis, siempre.`}>
     <button type="button" class="btn btn-primary" data-open-dialog="invite"><UserPlus size={18} stroke-width={2} />Invitar empleado</button>
   </PageHeader>
 
@@ -47,7 +47,7 @@ const rows = employees.map((e) => {
       name="person"
       label="Nombre o correo"
       placeholder="Ej.: Ana Pérez o ana@gmail.com"
-      hint="Busca a la persona por su nombre o su correo: tiene que tener cuenta en Caja Simple."
+      hint="Busca a la persona por su nombre o su correo. Si todavía no tiene cuenta, escribe su correo completo y le llega una invitación para crearla."
       required
       autocapitalize="none"
       spellcheck="false"
@@ -103,12 +103,14 @@ const rows = employees.map((e) => {
     </div>
   </Modal>
 
+  <div data-region="team">
   <EmployeesTable
     client:visible
     rows={rows}
     branches={branches.map((b) => ({ id: b.id, name: b.name }))}
     shifts={shifts.map((s) => ({ id: s.id, branchId: s.branchId, name: s.name, start: s.start, end: s.end, tone: s.tone }))}
   />
+  </div>
 </Layout>
 
 <script>

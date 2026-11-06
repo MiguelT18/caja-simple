@@ -1,6 +1,7 @@
 // La sesión de la persona: perfil, negocios a los que pertenece y bandeja de avisos.
 // La carga el middleware una vez por petición (locals.session); las páginas la leen con estas funciones.
 import { businessVersion, cached, userVersion } from "@/lib/cache";
+import { today } from "@/lib/dates";
 import type { Supabase } from "@/lib/supabase";
 import { EMPLOYEE_COLUMNS, fail, toBranch, toBusiness, toEmployee, toPerson, toShift } from "./mappers";
 import type { Branch, Business, Employee, Notification, Person, Shift } from "./types";
@@ -51,7 +52,7 @@ export async function loadSession(sb: Supabase, userId: string): Promise<Session
     });
   const [{ profile, businesses, employments }, inbox, unread] = await Promise.all([
     cached(`s:${userId}`, 600, rows, (r) => [userVersion(userId), ...r.businesses.map((b) => businessVersion(b.id))]),
-    sb.from("notifications").select("*, employee:employees(status)").order("created_at", { ascending: false }).limit(20),
+    sb.from("notifications").select("*, employee:employees(status), reopen:reopen_requests(status)").order("created_at", { ascending: false }).limit(60),
     sb.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
   ]);
   fail(inbox.error);
@@ -60,8 +61,10 @@ export async function loadSession(sb: Supabase, userId: string): Promise<Session
   const memberships = businesses.map(({ branches, ...b }): Membership => {
     const employee = employments.find((e) => e.business_id === b.id);
     const owner = b.owner_id === userId;
+    // El cron baja el plan a Gratis una vez al día; mientras tanto, vencido ya cuenta como Gratis (como en la base).
+    const expired = b.plan_until !== null && b.plan_until < today();
     return {
-      business: toBusiness(b),
+      business: { ...toBusiness(b), plan: expired ? "Gratis" : b.plan, planUntil: expired ? undefined : (b.plan_until ?? undefined) },
       role: owner ? "dueño" : "empleado",
       branches: branches
         .filter((br) => owner || br.id === employee?.branch_id)
@@ -81,8 +84,9 @@ export async function loadSession(sb: Supabase, userId: string): Promise<Session
         read: n.read_at !== null,
         data: n.data,
         employeeId: n.employee_id ?? undefined,
-        pending: n.employee?.status === "invitado",
-      }) as Notification,
+        requestId: n.reopen_request_id ?? undefined,
+        pending: n.kind === "reopen_request" || n.kind === "reopen_sent" ? n.reopen?.status === "pendiente" : n.employee?.status === "invitado",
+      }) as unknown as Notification,
   );
   return { user: toPerson(profile), memberships, notifications, unread: unread.count ?? 0 };
 }

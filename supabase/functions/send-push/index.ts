@@ -23,10 +23,24 @@ function describe({ kind, data }: Notice) {
         : { title: `${data.person} rechazó tu invitación`, body: data.business };
     case "cash_mismatch":
       return { title: `Caja descuadrada en ${data.branch}`, body: `Turno ${data.shift}: ${money(Number(data.difference))} de diferencia` };
+    case "shift_closed": {
+      const diff = Number(data.difference);
+      const who = data.person ? `${data.person} lo cerró` : "Se cerró";
+      const result = diff === 0 ? "la caja cuadró" : `${diff > 0 ? "sobran" : "faltan"} ${money(Math.abs(diff))}`;
+      return { title: `Turno ${String(data.shift).toLowerCase()} cerrado en ${data.branch}`, body: `${who}: ${result}` };
+    }
+    case "shift_reminder":
+      return { title: `Turno ${String(data.shift).toLowerCase()} en ${data.branch}: abre en ${data.minutes === 60 ? "1 hora" : `${data.minutes} minutos`}`, body: `Hora de abrir: ${data.start}` };
+    case "shift_late":
+      return { title: `Turno ${String(data.shift).toLowerCase()} sin abrir en ${data.branch}`, body: `Debía abrir a las ${data.start}` };
     case "low_stock":
       return { title: `Stock bajo: ${data.product}`, body: `Quedan ${data.stock} en ${data.branch} (mínimo ${data.minStock})` };
     case "shift_change":
       return { title: `${data.person} cambió su turno`, body: `${data.from ? `De ${data.from} a ${data.to}` : `Ahora en ${data.to}`} · ${data.branch}` };
+    case "plan_expiring":
+      return { title: `Tu plan ${data.plan} de ${data.business} vence ${data.days === 1 ? "mañana" : `en ${data.days} días`}`, body: "Renuévalo para no volver al plan Gratis" };
+    case "plan_expired":
+      return { title: `${data.business} volvió al plan Gratis`, body: `Venció el plan ${data.plan}. Tus datos siguen guardados` };
     default:
       return { title: "Caja Simple", body: "Tienes un aviso nuevo" };
   }

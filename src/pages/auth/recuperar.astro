@@ -1,0 +1,40 @@
+---
+import AuthLayout from "../../layouts/AuthLayout.astro";
+import FormField from "../../components/auth/FormField.astro";
+
+// Tras pedir el enlace: el mismo aviso exista o no la cuenta (no revela qué correos están registrados).
+const sent = Astro.url.searchParams.has("enviado");
+---
+
+<AuthLayout
+  title="Recuperar contraseña"
+  heading="Recupera tu contraseña"
+  description="Te enviamos un enlace para crear una nueva"
+  pitch="Pasa a cualquiera. En un minuto vuelves a tu caja."
+>
+  {
+    sent && (
+      <p class="notice" role="status">
+        Si ese correo tiene una cuenta, te enviamos un enlace. Revisa tu bandeja de entrada (y la de spam). Vence en una hora.
+      </p>
+    )
+  }
+
+  <form class="auth-form" method="post" action="/api/auth/recover" novalidate data-auth-form>
+    <FormField
+      id="email"
+      label="Correo electrónico"
+      type="email"
+      autocomplete="email"
+      autocapitalize="none"
+      spellcheck="false"
+      required
+      data-required-message="Ingresa tu correo"
+    />
+    <button type="submit" class="btn btn-primary btn-block" data-busy-label="Enviando…">{sent ? "Enviar de nuevo" : "Enviar enlace"}</button>
+  </form>
+
+  <Fragment slot="switch">
+    ¿Ya la recordaste? <a href="/auth/iniciar-sesion">Iniciar sesión</a>
+  </Fragment>
+</AuthLayout>

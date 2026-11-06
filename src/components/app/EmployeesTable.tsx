@@ -16,6 +16,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Pager, usePage } from "./Pager";
 import { ShiftBadge } from "./ShiftBadge";
 import { Field, safeAction, selectClass, useActionForm } from "./products/form";
+import { refreshRegions } from "@/scripts/refresh";
 import { confirmDialog, toast } from "@/scripts/dialogs";
 
 export interface EmployeeRow {
@@ -65,13 +66,16 @@ export default function EmployeesTable({ rows, branches, shifts, pageSize = 10 }
     const { error } = await safeAction(() => actions.removeEmployee(form));
     // El aviso flotante se ve aunque la tabla tenga scroll (abajo de la tabla quedaba lejos de la fila).
     if (error) toast(error.message, "error");
-    else window.location.reload();
+    else {
+      toast(`${e.name} ya no está en tu equipo.`, "success");
+      await refreshRegions();
+    }
   }
 
   return (
     <div>
       <div className="table-wrap">
-        <Table>
+        <Table label="Empleados">
           <TableCaption className="sr-only">Tu equipo</TableCaption>
           <TableHeader>
             <TableRow>
@@ -161,7 +165,7 @@ export default function EmployeesTable({ rows, branches, shifts, pageSize = 10 }
 
 /** Confirma el cambio de sucursal eligiendo el turno, que es de cada sucursal. También sirve para cambiar solo el turno. */
 function AssignDialog({ employee, branch, shifts, onClose }: { employee: EmployeeRow; branch: BranchOption; shifts: ShiftOption[]; onClose: () => void }) {
-  const save = useActionForm((form) => actions.reassignEmployee(form) as never);
+  const save = useActionForm((form) => actions.reassignEmployee(form) as never, onClose, `Cambios de ${employee.name} guardados.`);
   const same = branch.id === employee.branchId;
   // Propone el turno actual si sigue en la misma sucursal; si cambia, uno del mismo momento del día.
   const suggested = (same && shifts.find((s) => s.id === employee.shiftId)) || shifts.find((s) => s.tone === employee.shift?.tone) || shifts[0];

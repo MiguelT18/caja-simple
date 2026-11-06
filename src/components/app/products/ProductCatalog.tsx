@@ -1,22 +1,43 @@
 import { actions } from "astro:actions";
 import { useEffect, useMemo, useState } from "react";
-import { Package, Plus, Search, TriangleAlert } from "lucide-react";
-import type { Category } from "@/data/types";
+import { flushSync } from "react-dom";
+import { LayoutGrid, List, Package, Plus, Search, TriangleAlert } from "lucide-react";
+import type { Category, Product } from "@/data/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pager, usePage } from "../Pager";
 import { type Item, isLow, colorOf, NONE } from "./catalog";
 import { ProductCard } from "./ProductCard";
+import { DETAIL_TRANSITION, ProductDetail } from "./ProductDetail";
+import { ProductTable } from "./ProductTable";
 import { CategoryManager } from "./CategoryManager";
 import { ProductForm } from "./ProductForm";
+import { ImportProducts } from "./ImportProducts";
 import { InventoryForm } from "./InventoryForm";
 import { AddToBranch } from "./AddToBranch";
 import { safeAction } from "./form";
-import { announce } from "@/scripts/dialogs";
+import { announce, toast } from "@/scripts/dialogs";
 
 const ALL = "all";
 const PAGE_SIZE = 12;
+const VIEW_KEY = "caja-simple-inventory-view";
+
+/**
+ * Cambia la vista con la API de View Transitions: la foto de la tarjeta y la del detalle comparten nombre por un
+ * momento y el navegador la lleva de una a otra. Sin soporte o con movimiento reducido, cambia sin animar.
+ */
+function morph(productId: string, update: () => void, opening: boolean) {
+  const art = document.querySelector<HTMLElement>(`[data-product-art="${CSS.escape(productId)}"]`);
+  if (!art || !document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return update();
+  // Solo un elemento puede tener el nombre a la vez: al abrir lo tiene la tarjeta antes y el detalle después; al cerrar, al revés.
+  if (opening) art.style.viewTransitionName = DETAIL_TRANSITION;
+  const transition = document.startViewTransition(() => {
+    art.style.viewTransitionName = opening ? "" : DETAIL_TRANSITION;
+    flushSync(update);
+  });
+  transition.finished.finally(() => (art.style.viewTransitionName = ""));
+}
 
 
 interface Props {
@@ -35,11 +56,34 @@ export default function ProductCatalog({ products: initialProducts, categories: 
   const mode = branchId ? "branch" : "business";
   const [products, setProducts] = useState(initialProducts);
   const [categories, setCategories] = useState(initialCategories);
+  // Tras guardar, la página trae los datos nuevos como props (scripts/refresh.ts): la búsqueda y el filtro se quedan.
+  useEffect(() => setProducts(initialProducts), [initialProducts]);
+  useEffect(() => setCategories(initialCategories), [initialCategories]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string>(ALL);
   const [lowOnly, setLowOnly] = useState(false);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<Item | "new" | null>(null);
+  // Por id: tras guardar, el detalle muestra los datos nuevos que llegan como props.
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = detailId ? products.find((p) => p.id === detailId) : undefined;
+  const openDetail = (id: string) => morph(id, () => setDetailId(id), true);
+  const closeDetail = () => detailId && morph(detailId, () => setDetailId(null), false);
+  const [view, setView] = useState<"grid" | "table">("grid");
+
+  // La vista elegida se recuerda en este navegador; se lee tras hidratar para no desfasar el HTML del servidor.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(VIEW_KEY) === "table") setView("table");
+    } catch {}
+  }, []);
+  const chooseView = (next: "grid" | "table") => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {}
+  };
+  const asTable = mode === "branch" && view === "table";
 
   // Optimista: el cambio se ve al instante y se deshace si la base lo rechaza.
   async function move(product: Item, categoryId: string | null) {
@@ -48,7 +92,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
     setError("");
     swap({ categoryId: category?.id, category: category?.name });
     const { error } = await safeAction(() => actions.moveProduct({ productId: product.id, categoryId }));
-    if (!error) return announce(`${product.name}: ${category?.name ?? "sin categoría"}.`);
+    if (!error) return toast(`«${product.name}» ahora está en ${category ? `«${category.name}»` : "Sin categoría"}.`, "success");
     swap({ categoryId: product.categoryId, category: product.category });
     setError(error.message);
   }
@@ -126,6 +170,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
                 }
                 counts={counts}
               />
+              <ImportProducts businessId={businessId} />
               <Button className="h-11" onClick={() => setEditing("new")}>
                 <Plus />
                 Agregar producto
@@ -134,6 +179,29 @@ export default function ProductCatalog({ products: initialProducts, categories: 
           )}
           {canEdit && mode === "branch" && addable.length > 0 && (
             <AddToBranch businessId={businessId} branchId={branchId!} addable={addable} />
+          )}
+          {mode === "branch" && products.length > 0 && (
+            <div className="inline-flex rounded-md border bg-card p-0.5" role="group" aria-label="Vista">
+              {([
+                ["grid", "Ver como cuadrícula", LayoutGrid],
+                ["table", "Ver como tabla", List],
+              ] as const).map(([value, label, Icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={view === value}
+                  aria-label={label}
+                  title={label}
+                  onClick={() => chooseView(value)}
+                  className={cn(
+                    "grid size-10 place-items-center rounded-sm transition-colors",
+                    view === value ? "bg-[var(--color-text)] text-[var(--color-bg)]" : "text-muted-foreground hover:bg-[var(--color-surface-hover)]",
+                  )}
+                >
+                  <Icon className="size-4" strokeWidth={1.75} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
           )}
         </div>
         {error && (
@@ -203,10 +271,16 @@ export default function ProductCatalog({ products: initialProducts, categories: 
             Quitar filtros
           </Button>
         </div>
+      ) : asTable ? (
+        <ProductTable
+          items={pager.pageItems as { product: Product; categoryId: string | null }[]}
+          categories={categories}
+          onEdit={canEdit ? setEditing : undefined}
+        />
       ) : (
         // Con espacio, mosaicos con foto; en un contenedor angosto (celular), filas compactas con miniatura cuadrada.
         <div className="@container/list">
-        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4 p-0 @max-lg/list:grid-cols-1 @max-lg/list:gap-2">
+        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4 p-0 @max-lg/list:grid-cols-1 @max-lg/list:gap-2">
           {pager.pageItems.map(({ product, categoryId }) => {
             const index = categories.findIndex((c) => c.id === categoryId);
             return (
@@ -218,6 +292,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
                   categories={categories}
                   onMove={canEdit && mode === "business" ? (id) => move(product, id) : undefined}
                   onEdit={canEdit ? () => setEditing(product) : undefined}
+                  onOpen={() => openDetail(product.id)}
                 />
               </li>
             );
@@ -227,6 +302,27 @@ export default function ProductCatalog({ products: initialProducts, categories: 
       )}
 
       <Pager {...pager} onPage={pager.setPage} noun="productos" />
+      {detail &&
+        (() => {
+          const index = categories.findIndex((c) => c.id === detail.categoryId);
+          return (
+            <ProductDetail
+              product={detail}
+              category={index >= 0 ? categories[index] : null}
+              color={index >= 0 ? colorOf(index) : "var(--color-text-subtle)"}
+              onClose={closeDetail}
+              onEdit={
+                canEdit && (mode === "business" || !("soldIn" in detail))
+                  ? () => {
+                      // El detalle se cierra sin animar y se abre el formulario de edición.
+                      setDetailId(null);
+                      setEditing(detail);
+                    }
+                  : undefined
+              }
+            />
+          );
+        })()}
       {editing && mode === "business" && (
         <ProductForm
           businessId={businessId}

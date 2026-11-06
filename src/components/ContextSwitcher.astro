@@ -66,8 +66,8 @@ const current = options.find((o) => o.current) ?? options[0];
   document.querySelectorAll<HTMLElement>("[data-switcher]").forEach((root) => {
     const trigger = root.querySelector<HTMLButtonElement>(".switch-trigger")!;
     const menu = root.querySelector<HTMLElement>(".switch-menu")!;
-    // Las flechas recorren también el enlace del pie («Ver todas…»).
-    const options = [...root.querySelectorAll<HTMLAnchorElement>(".switch-option, .switch-manage")];
+    // Las flechas recorren también el enlace del pie («Ver todas…»). Se buscan cada vez: la lista se reemplaza al aceptar una invitación.
+    const getOptions = () => [...root.querySelectorAll<HTMLAnchorElement>(".switch-option, .switch-manage")];
 
     function position() {
       const rect = trigger.getBoundingClientRect();
@@ -85,10 +85,12 @@ const current = options.find((o) => o.current) ?? options[0];
 
     menu.addEventListener("toggle", (event) => {
       if ((event as ToggleEvent).newState !== "open") return;
+      const options = getOptions();
       (options.find((option) => option.hasAttribute("aria-current")) ?? options[0]).focus();
     });
 
     menu.addEventListener("keydown", (event) => {
+      const options = getOptions();
       const index = options.indexOf(document.activeElement as HTMLAnchorElement);
       const next =
         event.key === "ArrowDown" ? (index + 1) % options.length

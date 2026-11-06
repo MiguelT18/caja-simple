@@ -26,3 +26,19 @@ export const duration = (min: number) => {
   const m = Math.round(min % 60);
   return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
 };
+
+/** Cómo se pagó una venta. */
+export const paymentLabel = { efectivo: "Efectivo", qr: "QR", transferencia: "Transferencia" } as const;
+
+/**
+ * CSV para Excel en español: BOM (para los acentos), separador «;» y montos con coma decimal.
+ * shortcut: CSV y no .xlsx; si piden un Excel con formato, agregar una librería.
+ */
+export function toCsv(rows: (string | number)[][]) {
+  const cell = (v: string | number) => {
+    // Un texto que empieza con = + - @ Excel lo correría como fórmula: se antepone «'».
+    const text = typeof v === "number" ? v.toFixed(2).replace(".", ",") : /^[=+\-@]/.test(v) ? `'${v}` : v;
+    return /[;"\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  };
+  return "\uFEFF" + rows.map((r) => r.map(cell).join(";")).join("\r\n") + "\r\n";
+}

@@ -1,0 +1,69 @@
+---
+// Política de privacidad. Borrador honesto: describe lo que la app hace hoy. Los [corchetes] los completa quien opera el servicio.
+export const prerender = false;
+
+import SiteLayout from "../layouts/SiteLayout.astro";
+---
+
+<SiteLayout title="Privacidad" description="Qué datos guarda Caja Simple, para qué, con quién los comparte y cómo pedir que los borremos.">
+  <article class="legal wrap" aria-labelledby="legal-title">
+    <header>
+      <h1 id="legal-title">Privacidad</h1>
+      <p class="legal-updated">Última actualización: 3 de noviembre de 2026</p>
+    </header>
+
+    <p>
+      Caja Simple lleva la caja de tu negocio. Para eso guarda los datos que tú y tu equipo registran. Aquí te contamos cuáles son, para qué
+      se usan y qué puedes pedir. Responsable del servicio: <strong>[Responsable]</strong>, contacto: <strong>[correo de contacto]</strong>.
+    </p>
+
+    <h2>Qué datos guardamos</h2>
+    <ul>
+      <li><strong>Tu cuenta:</strong> nombre, apellido, correo, contraseña (cifrada; nadie puede leerla) y la foto de perfil si subes una. Si entras con Google, recibimos tu nombre y tu correo de Google.</li>
+      <li><strong>Tu negocio:</strong> negocios, sucursales, turnos, productos y sus fotos, inventario, ventas, gastos, cierres de caja y quién registró cada cosa.</li>
+      <li><strong>Tu equipo:</strong> el correo, el puesto, la sucursal y el turno de cada persona que invitas.</li>
+      <li><strong>Avisos:</strong> los avisos de la bandeja y, si activas las notificaciones push, la dirección que te da tu navegador para recibirlas.</li>
+      <li><strong>Seguridad:</strong> si activas la verificación en dos pasos, la clave de tu app de autenticación. Para frenar intentos de acceso guardamos por unos minutos un contador por dirección IP y por correo.</li>
+    </ul>
+
+    <h2>Para qué los usamos</h2>
+    <p>
+      Solo para que la app funcione: mostrarte tu caja, calcular si cuadra, avisarte cuando no cuadra o queda poco stock y proteger tu cuenta.
+      No vendemos tus datos, no mostramos publicidad y no los usamos para nada ajeno a llevar tu negocio.
+    </p>
+
+    <h2>Quién más puede verlos</h2>
+    <ul>
+      <li><strong>Dentro de tu negocio:</strong> quien administra el negocio ve todo lo del negocio; quien trabaja en una sucursal ve lo de su sucursal. Las personas que buscas para invitar ven tu nombre y un correo enmascarado.</li>
+      <li>
+        <strong>Los servicios que usamos para funcionar:</strong> Supabase (base de datos, cuentas y fotos), Vercel (donde corre la app), Upstash
+        (memoria temporal para que la app vaya rápido) y, si activas el push, el servicio de notificaciones de tu navegador (Google, Apple o
+        Mozilla). Guardan los datos por nosotros y solo para darnos ese servicio.
+      </li>
+      <li><strong>Autoridades:</strong> solo si una ley nos obliga.</li>
+    </ul>
+
+    <h2>Cookies</h2>
+    <p>
+      Usamos solo las cookies necesarias para mantener tu sesión iniciada. El tema claro u oscuro que eliges se guarda en tu navegador. No hay
+      cookies de publicidad ni de seguimiento.
+    </p>
+
+    <h2>Cuánto tiempo los guardamos</h2>
+    <p>
+      Mientras tengas tu cuenta. En el plan Gratis, la app muestra los últimos 60 días de historial, pero los registros siguen guardados por si
+      cambias de plan. Si una persona borra su cuenta, sus ventas y gastos quedan en el negocio sin su nombre.
+    </p>
+
+    <h2>Qué puedes pedir</h2>
+    <p>
+      Puedes ver y corregir tus datos de cuenta en <a href="/app/cuenta">Tu cuenta</a>. Para pedir una copia de tus datos o borrar tu cuenta
+      y la de tu negocio, escríbenos a <strong>[correo de contacto]</strong>: te respondemos en un máximo de [plazo] días.
+    </p>
+
+    <h2>Cambios</h2>
+    <p>Si cambiamos esta política, te avisamos en la app antes de que el cambio rija.</p>
+
+    <p class="legal-see">Ver también los <a href="/terminos">términos de uso</a>.</p>
+  </article>
+</SiteLayout>

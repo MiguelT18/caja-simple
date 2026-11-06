@@ -11,6 +11,8 @@ export function authMessage(error: AuthError) {
     case "user_already_exists":
     case "email_exists":
       return "Ya existe una cuenta con ese correo. Inicia sesión.";
+    case "same_password":
+      return "Esa ya es tu contraseña. Elige una distinta.";
     case "weak_password":
       return "La contraseña es muy débil. Usa al menos 8 caracteres.";
     case "over_request_rate_limit":

@@ -8,7 +8,15 @@ export function fail(error: { message: string } | null) {
   if (error) throw new Error(`Error al consultar la base de datos: ${error.message}`);
 }
 
-export const toBusiness = (b: Row<"businesses">): Business => ({ id: b.id, slug: b.slug, name: b.name, ownerId: b.owner_id, plan: b.plan, kind: b.kind });
+export const toBusiness = (b: Row<"businesses">): Business => ({
+  id: b.id,
+  slug: b.slug,
+  name: b.name,
+  ownerId: b.owner_id,
+  plan: b.plan,
+  kind: b.kind,
+  imagePath: b.image_path ?? undefined,
+});
 
 export const toBranch = (b: Row<"branches">): Branch => ({
   id: b.id,
@@ -64,5 +72,6 @@ export const toCatalogProduct = (
   categoryId: p.category_id ?? undefined,
   category: p.categories?.name,
   barcode: p.barcode ?? undefined,
+  description: p.description ?? undefined,
   image: p.image_path ? images.get(p.image_path) : undefined,
 });

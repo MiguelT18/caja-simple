@@ -3,15 +3,29 @@ import { Plus } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import MovementsTable from "@/components/app/MovementsTable";
+import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, shiftBarData, branchHref, sum } from "@/data/queries";
-import { longDate, shortDate } from "@/lib/dates";
+import { branchColor, branchContext, shiftBarData, branchHref, orderLabels, receiptUrls, saleLines, sum } from "@/data/queries";
+import { addDays, inRange, longDate, parseRange, shortDate, today as todayOf } from "@/lib/dates";
 import { formatBs, plural } from "@/lib/format";
 
 const { negocio, sucursal } = Astro.params;
-const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+const range = parseRange(Astro.url.searchParams, todayOf());
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!, range);
 if (!ctx) return Astro.rewrite("/404");
-const { branch, business, currentShift, sales, salesHistory, shiftById, shifts, today } = ctx;
+const [lines, orderNames] = await Promise.all([
+  saleLines(Astro.locals.supabase, ctx.branch.id, range.from, range.to),
+  orderLabels(Astro.locals.supabase, ctx.branch.id, range.from, range.to),
+]);
+const at = (day: string, time?: string) => `${shortDate(day)}${time ? `, ${time}` : ""}`;
+const rangeText =
+  range.days === 7 && range.to === ctx.today && !range.fromTime
+    ? "los últimos 7 días"
+    : `del ${at(range.from, range.fromTime)} al ${at(range.to, range.toTime)}`;
+const { branch, business, canCorrect, currentShift, receiptOf, sales, shiftById, shifts, today } = ctx;
+// La base trae días enteros; con hora se recortan las puntas aquí.
+const salesHistory = ctx.salesHistory.filter((s) => inRange(range, s.date, s.time));
+const receipts = await receiptUrls(Astro.locals.supabase, salesHistory);
 
 const weekTotal = sum(salesHistory.map((s) => s.total));
 const todayTotal = sum(sales.map((s) => s.total));
@@ -20,7 +34,7 @@ const byShift = shifts.map((shift) => ({
   total: sum(salesHistory.filter((s) => s.shiftId === shift.id).map((s) => s.total)),
 }));
 
-// Las más recientes primero; el día va junto a la hora porque la lista abarca 7 días.
+// Las más recientes primero; el día va junto a la hora porque la lista abarca varios días.
 const rows = [...salesHistory]
   .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
   .map((s) => {
@@ -28,21 +42,27 @@ const rows = [...salesHistory]
     return {
       id: s.id,
       time: `${s.date === today ? "Hoy" : shortDate(s.date)}, ${s.time}`,
-      label: `Venta · ${plural(s.items, "producto", "productos")}`,
+      // Cobrada como pedido abierto: lleva su nombre (mesa, cliente).
+      label: `${orderNames.has(s.id) ? `Pedido «${orderNames.get(s.id)}»` : "Venta"} · ${plural(s.items, "producto", "productos")}`,
       shift: { name: shift.name, tone: shift.tone },
       by: s.recordedBy.firstName,
-      amount: s.total,
+      amount: s.voided ?? s.total,
       kind: "sale" as const,
+      payment: s.payment,
+      voided: s.voided !== null,
+      canVoid: canCorrect(s),
+      detail: lines.get(s.id),
+      ...receiptOf(s, receipts),
     };
   });
 ---
 
 <Layout title={`Ventas · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader
+  <PageHeader {...ctx.backdrop}
     tint={branchColor(ctx.membership, branch.id)}
     eyebrow={longDate(today)}
     title="Ventas"
-    description={`Lo que entró a la caja en los últimos 7 días en ${branch.name}.`}
+    description={`Lo que se vendió ${rangeText} en ${branch.name}.`}
   >
     {
       currentShift ? (
@@ -58,9 +78,9 @@ const rows = [...salesHistory]
     }
   </PageHeader>
 
-  <dl class="card totals">
+  <dl class="card totals" data-region="totals">
     <div class="totals-main">
-      <dt>Últimos 7 días</dt>
+      <dt>{rangeText[0].toUpperCase() + rangeText.slice(1)}</dt>
       <dd class="num amount-income">{formatBs(weekTotal, "+")}</dd>
       <dd class="totals-note">{plural(salesHistory.length, "venta", "ventas")}</dd>
     </div>
@@ -81,7 +101,18 @@ const rows = [...salesHistory]
   </dl>
 
   <h2 class="section-title">Historial</h2>
-  <MovementsTable client:visible rows={rows} pageSize={10} timeLabel="Cuándo" empty="Todavía no hay ventas en los últimos 7 días." />
+  <RangeFilter
+    from={range.from}
+    to={range.to}
+    max={today}
+    historyStart={business.plan === "Gratis" ? addDays(today, -60) : undefined}
+    withTime
+    fromTime={range.fromTime}
+    toTime={range.toTime}
+  />
+  <div data-region="history">
+    <MovementsTable client:visible rows={rows} pageSize={10} timeLabel="Cuándo" empty={`No hay ventas ${rangeText}.`} />
+  </div>
 </Layout>
 
 <style>

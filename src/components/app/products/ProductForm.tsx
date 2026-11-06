@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { type Item } from "./catalog";
 import { Field, safeAction, selectClass, useActionForm } from "./form";
-import { confirmDialog } from "@/scripts/dialogs";
+import { refreshRegions } from "@/scripts/refresh";
+import { confirmDialog, toast } from "@/scripts/dialogs";
+import { shrinkInput } from "@/scripts/shrink-image";
 
 export function ProductForm({
   businessId,
@@ -19,11 +21,15 @@ export function ProductForm({
   product?: Item;
   onClose: () => void;
 }) {
-  const save = useActionForm((form) => actions.saveProduct(form) as never);
+  const save = useActionForm((form) => actions.saveProduct(form) as never, onClose, (form) =>
+    product ? `Cambios de «${form.get("name")}» guardados.` : `«${form.get("name")}» se agregó al catálogo.`,
+  );
   const [preview, setPreview] = useState(product?.image);
   const [removeImage, setRemoveImage] = useState(false);
   // La foto se revisa al elegirla: así el error llega antes de subir un archivo que el servidor va a rechazar.
   const [fileError, setFileError] = useState("");
+  // Mientras se achica la foto no se envía: se subiría el original.
+  const [shrinking, setShrinking] = useState(false);
   const imageError = fileError || save.errors.image;
 
   async function remove() {
@@ -33,7 +39,9 @@ export function ProductForm({
     const { error } = await safeAction(() => actions.deleteProduct(form));
     // Dentro del diálogo, en línea: un toast quedaría detrás del modal, inerte.
     if (error) return save.setMessage(error.message);
-    window.location.reload();
+    onClose();
+    await refreshRegions();
+    toast(`«${product.name}» se borró del catálogo.`, "success");
   }
 
   return (
@@ -43,7 +51,7 @@ export function ProductForm({
           <DialogTitle>{product ? "Editar producto" : "Agregar producto"}</DialogTitle>
           <DialogDescription>El precio y el stock se ponen en el inventario de cada sucursal.</DialogDescription>
         </DialogHeader>
-        <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
+        <form className="grid min-w-0 gap-4" onSubmit={(e) => (shrinking ? e.preventDefault() : save.onSubmit(e))} noValidate>
           <input type="hidden" name="businessId" value={businessId} />
           {product && <input type="hidden" name="id" value={product.id} />}
           <Field id="product-name" label="Nombre" error={save.errors.name}>
@@ -70,10 +78,21 @@ export function ProductForm({
               maxLength={14}
             />
           </Field>
-          <Field id="product-image" label="Foto" hint="Opcional. JPG, PNG o WebP, hasta 2 MB." error={imageError}>
+          <Field id="product-description" label="Descripción" hint="Opcional. Hasta 500 caracteres: se ve al abrir el producto." error={save.errors.description}>
+            <textarea
+              id="product-description"
+              name="description"
+              className="input min-h-20 py-2"
+              rows={3}
+              maxLength={500}
+              defaultValue={product?.description}
+              placeholder="Ej.: Talla única, 100% algodón. Lavar en frío."
+            />
+          </Field>
+          <Field id="product-image" label="Foto" hint="Opcional. JPG, PNG o WebP. La achicamos al subirla." error={imageError}>
             <div className="flex min-w-0 items-center gap-3">
               <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-lg border bg-muted text-muted-foreground">
-                {preview && !removeImage ? <img src={preview} alt="" className="size-full object-cover" /> : <ImagePlus className="size-6" aria-hidden="true" />}
+                {preview && !removeImage ? <img src={preview} alt="" decoding="async" className="size-full object-cover" /> : <ImagePlus className="size-6" aria-hidden="true" />}
               </span>
               <input
                 id="product-image"
@@ -83,14 +102,17 @@ export function ProductForm({
                 className="w-full min-w-0 text-sm"
                 aria-invalid={imageError ? true : undefined}
                 aria-describedby={imageError ? "product-image-error" : "product-image-hint"}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
+                onChange={async (e) => {
+                  const input = e.target;
+                  setShrinking(true);
+                  const file = await shrinkInput(input, 640);
+                  setShrinking(false);
                   const problem =
                     file && !["image/jpeg", "image/png", "image/webp"].includes(file.type) ? "Elige una foto JPG, PNG o WebP."
                     : file && file.size > 2 * 1024 * 1024 ? "La foto pesa más de 2 MB. Elige una más liviana."
                     : "";
                   setFileError(problem);
-                  if (problem) e.target.value = "";
+                  if (problem) input.value = "";
                   setRemoveImage(false);
                   if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
                   setPreview(file && !problem ? URL.createObjectURL(file) : product?.image);
@@ -126,7 +148,7 @@ export function ProductForm({
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button type="submit" {...save.submitProps}>
+              <Button type="submit" {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
                 {save.busy ? "Guardando…" : "Guardar"}
               </Button>
             </div>

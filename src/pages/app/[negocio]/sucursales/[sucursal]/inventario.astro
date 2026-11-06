@@ -1,10 +1,13 @@
 ---
-import { Package } from "@lucide/astro";
+import { PackagePlus, Package } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
+import FormInput from "@/components/app/FormInput.astro";
+import Modal from "@/components/app/Modal.astro";
 import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
 import { plural } from "@/lib/format";
-import { branchColor, branchContext, shiftBarData, businessHref, isLowStock } from "@/data/queries";
+import { stamp } from "@/lib/dates";
+import { branchColor, branchContext, shiftBarData, businessHref, isLowStock, stockMoves } from "@/data/queries";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
@@ -19,14 +22,37 @@ const { data: catalog } = isOwner
 const addable = (catalog ?? []).filter((p) => !products.some((x) => x.id === p.id));
 
 const lowCount = products.filter(isLowStock).length;
+
+// Entradas, mermas y ajustes: solo de productos con control de stock. La base exige el rol (record_stock_move).
+const tracked = products.filter((p) => p.stock !== null);
+const moves = await stockMoves(Astro.locals.supabase, branch.id);
+const kinds = [
+  { value: "entrada", label: "Entrada de mercadería (suma)" },
+  ...(isOwner
+    ? [
+        { value: "merma", label: "Merma: vencido, roto o perdido (resta)" },
+        { value: "ajuste", label: "Ajuste por conteo (suma o resta)" },
+      ]
+    : []),
+];
+const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
 ---
 
 <Layout title={`Inventario · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader
+  <PageHeader {...ctx.backdrop}
     tint={branchColor(ctx.membership, branch.id)}
     title="Inventario"
+    live
     description={[`${plural(products.length, "producto", "productos")} en ${branch.name}`, lowCount > 0 && `${lowCount} con stock bajo`].filter(Boolean).join(" · ")}
   >
+    {
+      tracked.length > 0 && (
+        <button type="button" class="btn btn-primary" data-open-dialog="stock-move">
+          <PackagePlus size={18} stroke-width={2} />
+          {isOwner ? "Registrar movimiento" : "Registrar entrada"}
+        </button>
+      )
+    }
     {
       isOwner && (
         <a href={`${businessHref(business)}/catalogo`} class="btn btn-secondary">
@@ -37,5 +63,111 @@ const lowCount = products.filter(isLowStock).length;
     }
   </PageHeader>
 
-  <ProductCatalog client:load products={products} categories={categories} businessId={business.id} branchId={branch.id} canEdit={isOwner} addable={addable} />
+  <div data-region="catalog">
+    <ProductCatalog client:load products={products} categories={categories} businessId={business.id} branchId={branch.id} canEdit={isOwner} addable={addable} />
+  </div>
+
+  <section class="moves" aria-labelledby="moves-title" data-region="moves">
+    <h2 class="section-title" id="moves-title">Movimientos de stock</h2>
+    {
+      moves.length === 0 ? (
+        <p class="card empty-state">Todavía no hay entradas, mermas ni ajustes. Las ventas descuentan el stock solas.</p>
+      ) : (
+        <div class="table-wrap card" role="region" aria-label="Tabla de movimientos" tabindex="0">
+          <table class="moves-table">
+            <caption class="sr-only">Últimos movimientos de stock</caption>
+            <thead>
+              <tr>
+                <th scope="col">Cuándo</th>
+                <th scope="col">Producto</th>
+                <th scope="col">Tipo</th>
+                <th scope="col" class="right">Cantidad</th>
+                <th scope="col">Motivo</th>
+                <th scope="col">Registró</th>
+              </tr>
+            </thead>
+            <tbody>
+              {moves.map((m) => (
+                <tr>
+                  <td class="muted num">{stamp(m.at)}</td>
+                  <td>{m.product}</td>
+                  <td>{kindLabel[m.kind]}</td>
+                  <td class:list={["right num", m.qty > 0 ? "amount-income" : "amount-expense"]}>{m.qty > 0 ? `+${m.qty}` : `−${Math.abs(m.qty)}`}</td>
+                  <td class="muted">{m.reason ?? "—"}</td>
+                  <td class="muted">{m.by}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+  </section>
+
+  <div data-region="stock-move-form">
+  {
+    tracked.length > 0 && (
+      <Modal
+        id="stock-move"
+        title={isOwner ? "Registrar movimiento de stock" : "Registrar entrada de mercadería"}
+        description="Cambia el stock de la sucursal y queda en el registro con tu nombre."
+        action="recordStockMove"
+        submitLabel="Guardar"
+        hidden={{ branchId: branch.id }}
+        success="Stock actualizado"
+      >
+        <FormInput form="stock-move-form" name="productId" label="Producto" options={tracked.map((p) => ({ value: p.id, label: `${p.name} (hay ${p.stock})` }))} required />
+        {isOwner ? <FormInput form="stock-move-form" name="kind" label="Tipo" options={kinds} required /> : <input type="hidden" name="kind" value="entrada" />}
+        <FormInput
+          form="stock-move-form"
+          name="qty"
+          type="number"
+          inputmode="numeric"
+          step="1"
+          label="Cantidad"
+          hint={isOwner ? "En un ajuste, usa un número negativo para restar (ej. −2)." : undefined}
+          required
+        />
+        <FormInput form="stock-move-form" name="reason" label={isOwner ? "Motivo" : "Motivo (opcional)"} hint={isOwner ? "Obligatorio en mermas y ajustes." : "Ej.: pedido del proveedor."} maxlength={120} />
+      </Modal>
+    )
+  }
+  </div>
 </Layout>
+
+<style>
+  .moves {
+    margin-top: 2rem;
+  }
+
+  .moves-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+
+  .moves-table th,
+  .moves-table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .moves-table th {
+    color: var(--color-text-muted);
+    font-weight: var(--font-medium);
+  }
+
+  .moves-table tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .moves-table .right {
+    text-align: right;
+  }
+
+  .muted {
+    color: var(--color-text-muted);
+  }
+</style>

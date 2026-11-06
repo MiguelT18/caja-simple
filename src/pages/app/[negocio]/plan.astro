@@ -2,23 +2,48 @@
 import { ArrowLeft, Check, CreditCard, Landmark, QrCode } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import PlanCalculator from "@/components/PlanCalculator.astro";
+import FormInput from "@/components/app/FormInput.astro";
+import PeriodSwitch from "@/components/plans/PeriodSwitch.astro";
+import PlanPrice from "@/components/plans/PlanPrice.astro";
 import Layout from "@/layouts/Layout.astro";
-import { businessContext, businessHref } from "@/data/queries";
-import { plans, upgradeUrl } from "@/data/plans";
+import { businessContext, businessHref, currentQuote, paymentDetails, planCharges } from "@/data/queries";
+import { plans, upgradeUrl, usdLabel, type Period } from "@/data/plans";
+import { longDate, shortDate, stamp } from "@/lib/dates";
+import { plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
 const { business } = ctx;
-const payments = [
-  { icon: QrCode, label: "QR bancario", detail: "Desde la app de tu banco, el mes o el año." },
-  { icon: Landmark, label: "Transferencia bancaria", detail: "A la cuenta que te pasamos al pedir el cambio." },
-  { icon: CreditCard, label: "Tarjeta de crédito", detail: "Con un enlace de pago que te mandamos." },
-];
+const sb = Astro.locals.supabase;
+const period: Period = Astro.url.searchParams.get("periodo") === "anual" ? "anual" : "mensual";
+const [quote, payment, charges] = await Promise.all([currentQuote(sb), paymentDetails(sb), planCharges(sb, business.id)]);
+const branches = ctx.membership.branches.length;
+const extra = Math.max(branches - 1, 0);
+
+const methods = [
+  { value: "qr", icon: QrCode, label: "QR bancario", detail: "Desde la app de tu banco." },
+  { value: "transferencia", icon: Landmark, label: "Transferencia bancaria", detail: "A nuestra cuenta, por el monto exacto." },
+  { value: "tarjeta", icon: CreditCard, label: "Tarjeta de crédito", detail: "Con un enlace de pago que te enviamos." },
+] as const;
+const methodLabel = Object.fromEntries(methods.map((m) => [m.value, m.label])) as Record<string, string>;
+
+// El cobro por pagar más reciente: con su monto fijo en Bs e instrucciones. Los demás van al historial.
+const pending = charges.find((c) => c.status === "pendiente");
+const history = charges.filter((c) => c !== pending);
+const code = (id: string) => id.slice(0, 8).toUpperCase();
+const statusLabel = { pendiente: "Por pagar", vencido: "Vencido", pagado: "Pagado" } as const;
+const chargeName = (c: (typeof charges)[number]) =>
+  `${c.plan}${c.extraBranches ? ` + ${plural(c.extraBranches, "sucursal extra", "sucursales extra")}` : ""} · ${c.period}`;
+const rateText = (c: (typeof charges)[number]) =>
+  `${usdLabel(c.usd)} × Bs ${c.rate.toLocaleString("es-BO", { maximumFractionDigits: 4 })} (BCB, ${shortDate(c.rateDate)}) + ${Math.round(c.taxRate * 100)}% de IVA e IT`;
 ---
 
 <Layout title={`Plan · ${business.name}`} context={{ membership: ctx.membership }}>
-  <a class="back" href={`${businessHref(business)}/configuracion`}><ArrowLeft size={16} stroke-width={1.75} />Configuración</a>
-  <PageHeader title="Planes" description={`${business.name} está en el plan ${business.plan}. Tus empleados entran siempre gratis; pagas por negocio y por sucursal.`} />
+  <PageHeader {...ctx.backdrop} title="Planes" description={`${business.name} está en el plan ${business.plan}${business.planUntil ? `, pagado hasta el ${longDate(business.planUntil).replace(/^\S+ /, "")}` : ""}. Tus empleados entran siempre gratis; pagas por negocio y por sucursal.`} >
+    <a slot="back" class="back" href={`${businessHref(business)}/configuracion`}><ArrowLeft size={16} stroke-width={1.75} />Configuración</a>
+  </PageHeader>
+
+  <PeriodSwitch period={period} quote={quote} />
 
   <div class="plan-grid">
     {
@@ -31,15 +56,18 @@ const payments = [
               {current && <span class="chip chip-income">Tu plan</span>}
             </header>
             <p class="audience">{plan.audience}</p>
-            <p class="price">
-              <span class="num">{plan.price}</span>
-              {plan.period && <span class="period">{plan.period}</span>}
-            </p>
+            <PlanPrice plan={plan.name} period={period} quote={quote} />
             <ul role="list">
               {plan.features.map((feature) => (
                 <li>
                   <Check size={16} stroke-width={1.75} />
-                  {feature}
+                  {typeof feature === "string" ? (
+                      feature
+                    ) : (
+                      <span>
+                        {feature.text} <span class="chip chip-neutral">Próximamente</span>
+                      </span>
+                    )}
                 </li>
               ))}
             </ul>
@@ -49,39 +77,150 @@ const payments = [
     }
   </div>
 
-  <PlanCalculator branches={ctx.membership.branches.length} />
+  <PlanCalculator branches={branches} current={branches} period={period} quote={quote} />
 
-  <section class="payments" aria-labelledby="payments-title">
-    <h2 class="section-title" id="payments-title">Métodos de pago</h2>
-    <ul role="list">
-      {
-        payments.map(({ icon: Icon, label, detail }) => (
-          <li class="card">
-            <Icon size={22} stroke-width={1.75} />
-            <div>
-              <p class="payment-label">{label}</p>
-              <p class="payment-detail">{detail}</p>
-            </div>
-          </li>
-        ))
-      }
-    </ul>
+  {
+    pending && (
+      <section class="card charge" aria-labelledby="charge-title">
+        <header class="charge-head">
+          <h2 class="card-title" id="charge-title">
+            Tu cobro · {chargeName(pending)}
+          </h2>
+          <span class="chip chip-warning">{statusLabel.pendiente}</span>
+        </header>
+        <p class="charge-amount num">Bs {pending.amountBs.toLocaleString("es-BO")}</p>
+        <p class="charge-meta">
+          {methodLabel[pending.method]} · el monto vale hasta el {stamp(pending.expiresAt)}; después se recalcula con el tipo de cambio de ese día.
+        </p>
+        <p class="charge-meta num">{rateText(pending)}</p>
+
+        <div class="charge-how">
+          {pending.method === "qr" &&
+            (payment.qrImageUrl ? (
+              <>
+                <img class="charge-qr" src={payment.qrImageUrl} alt="QR bancario de Caja Simple" width="220" height="220" decoding="async" />
+                <p>Escanéalo desde la app de tu banco y paga exactamente Bs {pending.amountBs.toLocaleString("es-BO")}.</p>
+              </>
+            ) : (
+              <p>Avísanos y te enviamos el QR por el monto de este cobro.</p>
+            ))}
+          {pending.method === "transferencia" &&
+            (payment.bankDetails ? (
+              <>
+                <p class="charge-bank">{payment.bankDetails}</p>
+                <p>Transfiere exactamente Bs {pending.amountBs.toLocaleString("es-BO")} y pon el código {code(pending.id)} en la glosa.</p>
+              </>
+            ) : (
+              <p>Avísanos y te pasamos la cuenta para transferir.</p>
+            ))}
+          {pending.method === "tarjeta" && <p>{payment.cardNote}</p>}
+        </div>
+
+        <p class="charge-code">
+          Código del cobro: <strong class="num">{code(pending.id)}</strong>. Cuando pagues, avísanos con este código y activamos tu plan apenas
+          vemos el pago.
+        </p>
+        {upgradeUrl && (
+          <a href={upgradeUrl} class="btn btn-primary" target="_blank" rel="noopener">
+            Ya pagué: avisar<span class="sr-only"> (se abre en otra pestaña)</span>
+          </a>
+        )}
+      </section>
+    )
+  }
+
+  <section class="card pay" aria-labelledby="pay-title">
+    <h2 class="card-title" id="pay-title">{pending ? "Generar otro cobro" : "Pagar tu plan"}</h2>
+    <p class="pay-intro">
+      Eliges el plan y cómo pagas; te mostramos el monto en bolivianos con impuestos, fijo por unos días. Activamos tu plan apenas vemos el pago. No pierdes nada de lo que ya registraste.
+    </p>
+    {
+      quote ? (
+        <form id="pay" class="pay-form" data-action="createPlanCharge" data-success="Cobro generado." novalidate>
+          <input type="hidden" name="businessId" value={business.id} />
+          <div class="pay-fields">
+            <FormInput
+              form="pay"
+              name="plan"
+              label="Plan"
+              options={[
+                { value: "Negocio", label: "Negocio", selected: branches <= 1 },
+                { value: "Sucursales", label: `Sucursales (${plural(branches, "local", "locales")}${extra ? `: ${plural(extra, "extra", "extras")}` : ""})`, selected: branches > 1 },
+              ]}
+            />
+            <FormInput
+              form="pay"
+              name="period"
+              label="Período"
+              options={[
+                { value: "mensual", label: "Mensual", selected: period === "mensual" },
+                { value: "anual", label: "Anual (2 meses gratis)", selected: period === "anual" },
+              ]}
+            />
+          </div>
+          <fieldset class="methods">
+            <legend class="field-label">Cómo pagas</legend>
+            {methods.map((m, i) => (
+              <label class="method">
+                <input type="radio" name="method" value={m.value} checked={i === 0} />
+                <m.icon size={20} stroke-width={1.75} />
+                <span>
+                  <span class="method-label">{m.label}</span>
+                  <span class="method-detail">{m.detail}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <p class="notice notice-error" role="alert" data-form-notice />
+          <button type="submit" class="btn btn-primary">Generar cobro</button>
+        </form>
+      ) : (
+        <p class="notice" role="status">
+          Todavía no tenemos el tipo de cambio del BCB de hoy, así que no podemos calcular el monto en bolivianos. Intenta en unos minutos
+          {upgradeUrl && (
+            <>
+              {" "}o <a href={upgradeUrl} target="_blank" rel="noopener">escríbenos<span class="sr-only"> (se abre en otra pestaña)</span></a>
+            </>
+          )}
+          .
+        </p>
+      )
+    }
   </section>
 
-  <section class="card upgrade" aria-labelledby="upgrade-title">
-    <h2 class="card-title" id="upgrade-title">Mejorar plan</h2>
-    <ol>
-      <li>Escríbenos con el nombre de tu negocio y el plan que quieres.</li>
-      <li>Pagas el mes o el año con el método que prefieras (el anual trae 2 meses gratis).</li>
-      <li>Activamos tu plan apenas vemos el pago. No pierdes nada de lo que ya registraste.</li>
-    </ol>
-    {upgradeUrl && (
-      <a href={upgradeUrl} class="btn btn-primary" target="_blank" rel="noopener">
-        Mejorar plan<span class="sr-only"> (se abre en otra pestaña)</span>
-      </a>
-    )}
-  </section>
+  {
+    history.length > 0 && (
+      <section class="history" aria-labelledby="history-title">
+        <h2 class="section-title" id="history-title">Cobros anteriores</h2>
+        <ul role="list">
+          {history.map((c) => (
+            <li class="card">
+              <div>
+                <p class="history-name">{chargeName(c)}</p>
+                <p class="history-meta">
+                  {stamp(c.createdAt)} · {methodLabel[c.method]} · código {code(c.id)}
+                </p>
+              </div>
+              <p class="history-amount num">Bs {c.amountBs.toLocaleString("es-BO")}</p>
+              <span class:list={["chip", c.status === "pagado" ? "chip-income" : "chip-neutral"]}>
+                {statusLabel[c.status]}
+                {c.paidAt && ` el ${shortDate(c.paidAt.slice(0, 10))}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
 </Layout>
+
+<script>
+  // El selector «Período» del cobro sigue al de arriba (mensual/anual sin recargar, PeriodSwitch).
+  document.addEventListener("period:change", (event) => {
+    const select = document.querySelector<HTMLSelectElement>("#pay-period");
+    if (select) select.value = (event as CustomEvent<string>).detail;
+  });
+</script>
 
 <style>
   .back {
@@ -89,58 +228,15 @@ const payments = [
     align-items: center;
     gap: 0.375rem;
     margin-bottom: 0.75rem;
-    color: var(--color-text-muted);
+    /* Sobre el degradado: el atenuado no llega a AA (como el texto del PageHeader). */
+    color: var(--color-text);
     font-size: var(--text-sm);
+    font-weight: var(--font-medium);
     text-decoration: none;
   }
 
   .back:hover {
     color: var(--color-text);
-  }
-
-  .upgrade {
-    display: grid;
-    gap: 1rem;
-    padding: 1.25rem;
-  }
-
-  .payments {
-    margin-block: 2.5rem;
-  }
-
-  .payments ul {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-    gap: 1rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .payments li {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 1rem 1.25rem;
-  }
-
-  .payments li :global(svg) {
-    flex-shrink: 0;
-    color: var(--color-primary);
-  }
-
-  .payment-label,
-  .payment-detail {
-    margin: 0;
-  }
-
-  .payment-label {
-    font-weight: var(--font-semibold);
-  }
-
-  .payment-detail {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
   }
 
   .plan-grid {
@@ -173,21 +269,10 @@ const payments = [
     line-height: var(--text-lg-lh);
   }
 
-  .audience,
-  .period {
+  .audience {
     margin: 0;
     color: var(--color-text-muted);
     font-size: var(--text-sm);
-  }
-
-  .price {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.375rem;
-    margin: 0.25rem 0;
-    font-size: var(--text-xl);
-    font-weight: var(--font-bold);
   }
 
   .plan ul {
@@ -210,14 +295,167 @@ const payments = [
     color: var(--color-income);
   }
 
-  .upgrade ol {
+  .charge,
+  .pay {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+  }
+
+  .charge {
+    border: 2px solid var(--color-primary);
+  }
+
+  .charge-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+  }
+
+  .charge-amount {
+    margin: 0;
+    font-size: var(--text-4xl);
+    line-height: var(--text-4xl-lh);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.02em;
+  }
+
+  .charge-meta,
+  .pay-intro,
+  .history-meta {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .charge-how {
+    display: grid;
+    gap: 0.5rem;
+    justify-items: start;
+    padding: 1rem;
+    border-radius: var(--radius-panel);
+    background: var(--color-surface);
+  }
+
+  .charge-how p,
+  .charge-code {
+    margin: 0;
+  }
+
+  .charge-qr {
+    width: min(220px, 100%);
+    height: auto;
+    border-radius: 0.5rem;
+    background: white;
+  }
+
+  .charge-bank {
+    white-space: pre-line;
+    font-weight: var(--font-semibold);
+  }
+
+  .charge .btn,
+  .pay-form .btn {
+    justify-self: start;
+  }
+
+  .pay-form {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .pay-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 1rem;
+  }
+
+  /* Cómo paga: tarjetas con radio; la elegida con borde y fondo (no solo color). */
+  .methods {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  .methods legend {
+    margin-bottom: 0.5rem;
+    padding: 0;
+  }
+
+  .method {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    background: var(--color-surface);
+    cursor: pointer;
+  }
+
+  .method:has(:checked) {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+  }
+
+  .method input {
+    margin-top: 0.2rem;
+    accent-color: var(--color-primary);
+  }
+
+  .method :global(svg) {
+    flex-shrink: 0;
+    color: var(--color-primary);
+  }
+
+  .method > span {
+    display: grid;
+  }
+
+  .method-label {
+    font-weight: var(--font-semibold);
+  }
+
+  .method-detail {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .history {
+    margin-top: 2rem;
+  }
+
+  .history ul {
     display: grid;
     gap: 0.5rem;
     margin: 0;
-    padding-left: 1.25rem;
+    padding: 0;
+    list-style: none;
   }
 
-  .upgrade .btn {
-    justify-self: start;
+  .history li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    padding: 0.875rem 1.25rem;
+  }
+
+  .history li > div {
+    flex: 1 1 14rem;
+  }
+
+  .history-name,
+  .history-amount {
+    margin: 0;
+    font-weight: var(--font-semibold);
   }
 </style>

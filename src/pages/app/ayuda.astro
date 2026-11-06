@@ -1,0 +1,540 @@
+---
+// Ayuda y comentarios: dudas, problemas y sugerencias, con hasta 5 capturas. Se guardan en la tabla feedback
+// (capturas en el bucket feedback-images) y nos llegan por correo (Action sendFeedback).
+import { Bug, CircleHelp, ImagePlus, Lightbulb, Mail } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import Layout from "@/layouts/Layout.astro";
+import { currentUser } from "@/data/queries";
+
+const user = currentUser(Astro.locals);
+// Desde qué página vino (lo pone el botón del panel). Solo rutas de la app: nada de URLs externas.
+const from = Astro.url.searchParams.get("desde");
+const page = from?.startsWith("/app") ? from.slice(0, 300) : "";
+const kinds = [
+  {
+    value: "duda",
+    label: "Una duda",
+    hint: "Cómo se hace algo",
+    Icon: CircleHelp,
+    placeholder: "Ej.: ¿Cómo cambio el precio de un producto solo en una sucursal?",
+    help: "Cuéntanos qué quieres hacer y en qué pantalla estás.",
+  },
+  {
+    value: "problema",
+    label: "Un problema",
+    hint: "Algo no funciona",
+    Icon: Bug,
+    placeholder: "Ej.: Al cerrar el turno de la tarde, la diferencia no me cuadra con lo que conté.",
+    help: "Cuéntanos qué hacías, qué esperabas y qué pasó. Una captura nos ayuda mucho.",
+  },
+  {
+    value: "sugerencia",
+    label: "Una idea",
+    hint: "Algo que mejorarías",
+    Icon: Lightbulb,
+    placeholder: "Ej.: Me serviría ver las ventas de la semana comparadas con la anterior.",
+    help: "Cuéntanos qué te gustaría y para qué lo usarías en tu negocio.",
+  },
+];
+const MAX_IMAGES = 5;
+---
+
+<Layout title="Ayuda y comentarios">
+  <PageHeader title="Ayuda y comentarios" description="¿Tienes una duda, algo no funciona o se te ocurre una mejora? Escríbenos y te respondemos a tu correo." />
+
+  <div class="help-layout">
+    <form
+      id="feedback-form"
+      class="card feedback"
+      data-action="sendFeedback"
+      data-refresh="none"
+      data-reset
+      data-success="¡Gracias! Lo leemos y te respondemos a tu correo."
+      novalidate
+    >
+      <input type="hidden" name="page" value={page} />
+
+      <fieldset class="kinds" aria-describedby="feedback-form-kind-error">
+        <legend class="field-label">¿De qué se trata?</legend>
+        <div class="kind-grid">
+          {
+            kinds.map(({ value, label, hint, Icon, placeholder, help }, i) => (
+              <label class="kind">
+                <input type="radio" name="kind" value={value} checked={i === 0} required data-placeholder={placeholder} data-help={help} />
+                <Icon class="kind-icon" size={22} stroke-width={1.75} aria-hidden="true" />
+                <span class="kind-label">{label}</span>
+                <span class="kind-hint">{hint}</span>
+              </label>
+            ))
+          }
+        </div>
+        <p class="field-error" id="feedback-form-kind-error"></p>
+      </fieldset>
+
+      <div class="field">
+        <div class="label-row">
+          <label class="field-label" for="feedback-form-message">Tu mensaje</label>
+          <span class="count num" data-count aria-hidden="true">0 / 2000</span>
+        </div>
+        <textarea
+          class="input message"
+          id="feedback-form-message"
+          name="message"
+          rows="6"
+          minlength="10"
+          maxlength="2000"
+          required
+          aria-describedby="feedback-form-message-hint feedback-form-message-error"
+          placeholder={kinds[0].placeholder}></textarea>
+        <p class="field-hint" id="feedback-form-message-hint" data-help>{kinds[0].help}</p>
+        <p class="field-error" id="feedback-form-message-error"></p>
+      </div>
+
+      <div class="field" data-shots>
+        <div class="label-row">
+          <span class="field-label" id="feedback-form-images-label">Capturas o imágenes <span class="optional">(opcional)</span></span>
+          <span class="count num" data-shot-count>0 de {MAX_IMAGES}</span>
+        </div>
+        <div class="drop" data-drop>
+          <ul class="shots" data-shot-list aria-labelledby="feedback-form-images-label"></ul>
+          <label class="btn btn-secondary shot-pick" data-shot-pick>
+            <ImagePlus size={18} stroke-width={1.75} />
+            Agregar imágenes
+            <input
+              class="sr-only"
+              id="feedback-form-images"
+              type="file"
+              name="images"
+              multiple
+              accept="image/jpeg,image/png,image/webp,image/heic"
+              aria-labelledby="feedback-form-images-label"
+              aria-describedby="feedback-form-images-hint feedback-form-images-error"
+              data-shot-input
+            />
+          </label>
+          <p class="field-hint" id="feedback-form-images-hint" data-shot-hint>
+            Hasta {MAX_IMAGES}. También puedes arrastrarlas aquí o pegar una captura con Ctrl+V.
+          </p>
+        </div>
+        <p class="field-error" id="feedback-form-images-error" role="alert"></p>
+      </div>
+
+      <p class="notice notice-error" role="alert" data-form-notice></p>
+      <button type="submit" class="btn btn-primary">Enviar</button>
+    </form>
+
+    <aside class="card tips" aria-labelledby="tips-title">
+      <h2 class="tips-title" id="tips-title">Para responderte rápido</h2>
+      <ol class="tips-list">
+        <li>Qué estabas haciendo y en qué pantalla.</li>
+        <li>Qué esperabas que pasara y qué pasó.</li>
+        <li>Una captura de lo que ves, si es un problema.</li>
+      </ol>
+      <p class="reply">
+        <Mail size={18} stroke-width={1.75} aria-hidden="true" />
+        <span>Te respondemos a <span class="strong">{user.email}</span>.</span>
+      </p>
+    </aside>
+  </div>
+</Layout>
+
+<script>
+  import { setBusy } from "@/scripts/busy";
+  import { shrinkImage } from "@/scripts/shrink-image";
+
+  const MAX = 5;
+  // Vercel corta el cuerpo en 4,5 MB y Astro en 4 MB: dejamos aire para el texto.
+  const MAX_TOTAL = 3.5 * 1024 * 1024;
+  const TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+  const form = document.querySelector<HTMLFormElement>("#feedback-form")!;
+  const message = form.querySelector<HTMLTextAreaElement>("textarea")!;
+  const count = form.querySelector<HTMLElement>("[data-count]")!;
+  const help = form.querySelector<HTMLElement>("[data-help]")!;
+  const submit = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
+  const drop = form.querySelector<HTMLElement>("[data-drop]")!;
+  const list = form.querySelector<HTMLUListElement>("[data-shot-list]")!;
+  const input = form.querySelector<HTMLInputElement>("[data-shot-input]")!;
+  const pick = form.querySelector<HTMLElement>("[data-shot-pick]")!;
+  const shotCount = form.querySelector<HTMLElement>("[data-shot-count]")!;
+  const hint = form.querySelector<HTMLElement>("[data-shot-hint]")!;
+  const error = form.querySelector<HTMLElement>("#feedback-form-images-error")!;
+  const defaultHint = hint.textContent!;
+
+  // Tipo: cambia el ejemplo y la pista del mensaje.
+  form.addEventListener("change", (e) => {
+    const radio = e.target as HTMLInputElement;
+    if (radio.name !== "kind") return;
+    message.placeholder = radio.dataset.placeholder ?? "";
+    help.textContent = radio.dataset.help ?? "";
+  });
+
+  const updateCount = () => (count.textContent = `${message.value.length} / 2000`);
+  message.addEventListener("input", updateCount);
+
+  // Capturas: la lista vive aquí y se copia al input, así el formulario envía exactamente estas.
+  let files: { file: File; url: string }[] = [];
+
+  function render() {
+    list.replaceChildren(
+      ...files.map(({ file, url }, i) => {
+        const li = document.createElement("li");
+        li.className = "shot";
+        const img = Object.assign(document.createElement("img"), { src: url, alt: `Imagen ${i + 1}: ${file.name}`, decoding: "async" });
+        const remove = Object.assign(document.createElement("button"), { type: "button", className: "shot-remove", textContent: "Quitar" });
+        remove.setAttribute("aria-label", `Quitar imagen ${i + 1}`);
+        remove.addEventListener("click", () => {
+          URL.revokeObjectURL(files[i].url);
+          files.splice(i, 1);
+          sync();
+          (list.querySelectorAll<HTMLButtonElement>(".shot-remove")[Math.min(i, files.length - 1)] ?? input).focus();
+        });
+        li.append(img, remove);
+        return li;
+      }),
+    );
+    list.hidden = files.length === 0;
+    shotCount.textContent = `${files.length} de ${MAX}`;
+    const full = files.length >= MAX;
+    // Sin `disabled` en el input: un input deshabilitado no se envía con el formulario.
+    pick.toggleAttribute("aria-disabled", full);
+    hint.textContent = full ? `Llegaste al máximo de ${MAX}.` : defaultHint;
+  }
+
+  function sync() {
+    const transfer = new DataTransfer();
+    for (const { file } of files) transfer.items.add(file);
+    input.files = transfer.files;
+    const total = files.reduce((sum, { file }) => sum + file.size, 0);
+    error.textContent = total > MAX_TOTAL ? "Las imágenes pesan demasiado juntas. Quita alguna." : "";
+    render();
+  }
+
+  async function add(incoming: File[]) {
+    const images = incoming.filter((f) => f.type.startsWith("image/"));
+    const room = MAX - files.length;
+    error.textContent = "";
+    if (images.length === 0 || room <= 0) {
+      sync();
+      if (incoming.length > 0) error.textContent = room <= 0 ? `Ya tienes ${MAX} imágenes. Quita alguna para agregar otra.` : "Solo se pueden adjuntar imágenes.";
+      return;
+    }
+    setBusy(submit, true, "Preparando imágenes…");
+    const small = await Promise.all(images.slice(0, room).map((f) => shrinkImage(f, 1600)));
+    setBusy(submit, false);
+    const valid = small.filter((f) => TYPES.includes(f.type));
+    files.push(...valid.map((file) => ({ file, url: URL.createObjectURL(file) })));
+    sync();
+    if (valid.length < small.length) error.textContent = "Alguna imagen no se pudo leer. Usa JPG, PNG o WebP.";
+    else if (images.length > room) error.textContent = `Solo se agregaron ${room}: el máximo es ${MAX}.`;
+  }
+
+  pick.addEventListener("click", (e) => {
+    if (files.length >= MAX) e.preventDefault();
+  });
+
+  input.addEventListener("change", () => {
+    // El input refleja la lista: lo recién elegido se suma a lo que ya había.
+    const picked = [...(input.files ?? [])].filter((f) => !files.some((x) => x.file === f));
+    add(picked);
+  });
+
+  drop.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    drop.classList.add("dragging");
+  });
+  drop.addEventListener("dragleave", () => drop.classList.remove("dragging"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("dragging");
+    add([...(e.dataTransfer?.files ?? [])]);
+  });
+  // Pegar una captura en cualquier parte del formulario (el texto se pega normal).
+  form.addEventListener("paste", (e) => {
+    const pasted = [...(e.clipboardData?.files ?? [])];
+    if (pasted.length === 0) return;
+    e.preventDefault();
+    add(pasted);
+  });
+
+  form.addEventListener("submit", (e) => {
+    // Si pesan demasiado, ni se intenta: action-forms ignora el envío ya cancelado.
+    if (files.reduce((s, { file }) => s + file.size, 0) > MAX_TOTAL) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      input.focus();
+    }
+  }, { capture: true });
+
+  // Al guardar, data-reset vacía el formulario: también las capturas y el contador.
+  form.addEventListener("reset", () => {
+    for (const { url } of files) URL.revokeObjectURL(url);
+    files = [];
+    setTimeout(() => {
+      sync();
+      updateCount();
+      form.querySelector<HTMLInputElement>("input[name=kind]:checked")?.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  });
+
+  render();
+</script>
+
+<style>
+  .help-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 40rem) minmax(14rem, 20rem);
+    align-items: start;
+    gap: 1.25rem;
+  }
+
+  .feedback {
+    display: grid;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+
+  .kinds {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .kind-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.375rem;
+  }
+
+  /* Tarjeta elegible: el radio real queda visible (no solo el color dice cuál está elegida). */
+  .kind {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "radio icon"
+      "radio label"
+      "radio hint";
+    align-items: center;
+    gap: 0.125rem 0.625rem;
+    padding: 0.875rem;
+    border: 1px solid var(--color-input-border);
+    border-radius: 0.625rem;
+    background: var(--color-surface);
+    cursor: pointer;
+    transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out);
+  }
+
+  .kind:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  .kind:has(input:checked) {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+
+  .kind:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .kind input {
+    grid-area: radio;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0;
+    accent-color: var(--color-primary);
+  }
+
+  .kind :global(.kind-icon) {
+    grid-area: icon;
+    margin-bottom: 0.25rem;
+    color: var(--color-text-muted);
+  }
+
+  .kind:has(input:checked) :global(.kind-icon) {
+    color: var(--color-primary);
+  }
+
+  .kind-label {
+    grid-area: label;
+    font-weight: var(--font-semibold);
+  }
+
+  .kind-hint {
+    grid-area: hint;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .count {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .optional {
+    color: var(--color-text-muted);
+    font-weight: normal;
+  }
+
+  .message {
+    min-height: 9rem;
+    padding-block: 0.625rem;
+    resize: vertical;
+  }
+
+  .drop {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    margin-top: 0.375rem;
+    padding: 1rem;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: 0.75rem;
+    background: var(--color-surface-muted);
+  }
+
+  .drop.dragging {
+    border-style: solid;
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+
+  .shots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .shots[hidden] {
+    display: none;
+  }
+
+  .shots :global(.shot) {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background: var(--color-surface);
+  }
+
+  .shots :global(.shot img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .shots :global(.shot-remove) {
+    position: absolute;
+    inset: auto 0.25rem 0.25rem;
+    min-height: 2rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    cursor: pointer;
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 20%, transparent);
+  }
+
+  .shots :global(.shot-remove:hover) {
+    background: var(--color-surface-muted);
+  }
+
+  .shot-pick:focus-within {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .shot-pick[aria-disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .drop .field-hint {
+    margin: 0;
+  }
+
+  .feedback > .btn {
+    justify-self: start;
+    min-width: 8rem;
+  }
+
+  .tips {
+    display: grid;
+    gap: 0.875rem;
+    padding: 1.25rem;
+  }
+
+  .tips-title {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: var(--font-semibold);
+  }
+
+  .tips-list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding-left: 1.25rem;
+    color: var(--color-text-muted);
+  }
+
+  .reply {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+    padding-top: 0.875rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .reply :global(svg) {
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+  }
+
+  .strong {
+    color: var(--color-text);
+    font-weight: var(--font-semibold);
+  }
+
+  @media (max-width: 960px) {
+    .help-layout {
+      grid-template-columns: minmax(0, 40rem);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .feedback {
+      padding: 1rem;
+    }
+
+    .feedback > .btn {
+      justify-self: stretch;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kind {
+      transition: none;
+    }
+  }
+</style>

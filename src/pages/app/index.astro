@@ -6,11 +6,12 @@ import MediaCard from "@/components/app/MediaCard.astro";
 import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
 import { kindOptions } from "@/data/kinds";
-import { businessHref, currentUser, entryHref, myBusinesses } from "@/data/queries";
+import { businessHref, businessImages, currentUser, entryHref, myBusinesses } from "@/data/queries";
 import { boliviaNow } from "@/lib/dates";
 import { plural } from "@/lib/format";
 
 const memberships = myBusinesses(Astro.locals);
+const logos = await businessImages(Astro.locals, memberships.map((m) => m.business));
 const hour = boliviaNow().minutes / 60;
 const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
 const firstName = currentUser(Astro.locals).firstName;
@@ -89,11 +90,13 @@ const freeBusiness = memberships.find((m) => m.role === "dueño" && m.business.p
                   href={entryHref(m)}
                   title={m.business.name}
                   monogram={monogram(m.business.name)}
+                  image={logos.get(m.business.id)}
                   subtitle={
                     m.role === "dueño"
                       ? `Tu negocio · plan ${m.business.plan} · ${plural(m.branches.length, "sucursal", "sucursales")}`
                       : ["Trabajas aquí", m.employee?.jobTitle, ...m.branches.map((b) => b.name)].filter(Boolean).join(" · ")
                   }
+                  transition={owner && logos.has(m.business.id) ? `biz-${m.business.id}` : undefined}
                   label={owner ? `Entrar a ${m.business.name}` : `Ir a la caja de ${m.branches[0].name}, en ${m.business.name}`}
                 />
               </li>
@@ -108,8 +111,11 @@ const freeBusiness = memberships.find((m) => m.role === "dueño" && m.business.p
 <script>
   import { toast } from "@/scripts/dialogs";
 
-  document.querySelector<HTMLElement>("[data-upgrade-notice]")?.addEventListener("click", (event) => {
-    const { upgradeNotice, upgradeHref } = (event.currentTarget as HTMLElement).dataset;
+  // Delegado: el contenido se reemplaza al aceptar una invitación (NotificationBell).
+  document.addEventListener("click", (event) => {
+    const button = (event.target as Element).closest<HTMLElement>("[data-upgrade-notice]");
+    if (!button) return;
+    const { upgradeNotice, upgradeHref } = button.dataset;
     toast(upgradeNotice!, "info", upgradeHref ? { href: upgradeHref, label: "Ver planes →" } : undefined);
   });
 </script>

@@ -1,131 +1,382 @@
 ---
-// Calculadora del precio mensual según la cantidad de locales. La usan /planes y /app/[negocio]/plan.
-import { Minus, Plus } from "@lucide/astro";
-import { extraBranchPrice, negocioPrice } from "../data/plans";
+// Calculadora del precio según la cantidad de locales: stepper y, debajo, la cuenta a la vista (base + extras = total),
+// en US$ sin impuestos y, con tipo de cambio, «hoy Bs …». La usan /planes y /app/[negocio]/plan.
+// La cuenta es la misma del cobro (usdFor y bsTotal, src/data/plans.ts).
+import { Minus, Plus, RotateCcw } from "@lucide/astro";
+import type { Period, Quote } from "../data/plans";
 
 interface Props {
   // Locales con los que arranca (en la app, las sucursales que ya tiene el negocio).
   branches?: number;
+  /** En la app: las sucursales que tiene hoy el negocio. Si se cambia el número, ofrece volver a él. */
+  current?: number;
+  period: Period;
+  quote: Quote | null;
 }
 
 const MAX = 20;
+const { period, quote, current } = Astro.props;
 const branches = Math.min(MAX, Math.max(1, Astro.props.branches ?? 1));
+const per = period === "mensual" ? "al mes" : "al año";
 ---
 
-<div class="calc" data-negocio={negocioPrice.join(",")} data-extra={extraBranchPrice.join(",")} data-branches={branches} data-max={MAX}>
+<section class="calc" aria-labelledby="calc-title" data-branches={branches} data-current={current} data-max={MAX} data-period={period} data-quote={quote ? JSON.stringify(quote) : ""}>
   <div class="calc-input">
-    <span id="calc-label" class="calc-label">¿Cuántos locales tienes?</span>
-    <div class="stepper" role="group" aria-labelledby="calc-label">
-      <button type="button" class="icon-btn" data-step="-1" aria-label="Un local menos">
-        <Minus size={18} stroke-width={1.75} />
+    <div class="calc-head">
+      <h2 id="calc-title" class="calc-title"><label for="calc-branches">¿Cuántos locales tienes?</label></h2>
+      <p class="calc-hint">El primero va en el plan Negocio; cada local más se suma como sucursal extra.</p>
+    </div>
+    <div class="stepper">
+      <button type="button" class="stepper-btn" data-step="-1" aria-label="Un local menos" aria-controls="calc-branches">
+        <Minus size={20} stroke-width={1.75} />
       </button>
-      <output class="num stepper-value" aria-live="polite">{branches}</output>
-      <button type="button" class="icon-btn" data-step="1" aria-label="Un local más">
-        <Plus size={18} stroke-width={1.75} />
+      <input
+        id="calc-branches"
+        class="stepper-value num"
+        type="number"
+        inputmode="numeric"
+        min="1"
+        max={MAX}
+        step="1"
+        value={branches}
+        aria-describedby="calc-range"
+      />
+      <button type="button" class="stepper-btn" data-step="1" aria-label="Un local más" aria-controls="calc-branches">
+        <Plus size={20} stroke-width={1.75} />
       </button>
     </div>
+    <p class="calc-range" id="calc-range">De 1 a {MAX} locales</p>
+    {
+      current !== undefined && (
+        <p class="calc-current" data-current-note hidden>
+          Tu negocio tiene {current} {current === 1 ? "local" : "locales"}.
+          <button type="button" class="calc-reset" data-reset>
+            <RotateCcw size={14} stroke-width={1.75} />
+            Volver a {current}
+          </button>
+        </p>
+      )
+    }
   </div>
-  <p class="calc-result" aria-live="polite">
-    <span class="calc-price num">Bs 0</span>
-    <span class="calc-detail">Plan Gratis, o Negocio por Bs {negocioPrice[0]}–{negocioPrice[1]} al mes</span>
-  </p>
-</div>
+
+  <div class="calc-bill">
+    <dl class="bill">
+      <div class="bill-row">
+        <dt>Plan Negocio · 1 local</dt>
+        <dd class="num" data-base></dd>
+      </div>
+      <div class="bill-row" data-extra-row>
+        <dt data-extra-label></dt>
+        <dd class="num" data-extra></dd>
+      </div>
+      <div class="bill-total">
+        <dt data-per>Total {per}</dt>
+        <dd aria-live="polite" aria-atomic="true">
+          <span class="calc-price num"></span>
+          <span class="calc-bs num"></span>
+        </dd>
+      </div>
+    </dl>
+    <p class="calc-detail"></p>
+  </div>
+</section>
 
 <script>
-  const fmt = (n: number) => n.toLocaleString("es-BO");
+  import { bsTotal, planUsd, usdFor, usdLabel, type Period, type Quote } from "../data/plans";
 
   for (const calc of document.querySelectorAll<HTMLElement>(".calc")) {
-    const [negMin, negMax] = calc.dataset.negocio!.split(",").map(Number);
-    const [extMin, extMax] = calc.dataset.extra!.split(",").map(Number);
     const max = Number(calc.dataset.max);
-    const value = calc.querySelector("output")!;
+    let period = calc.dataset.period as Period;
+    const quote: Quote | null = calc.dataset.quote ? JSON.parse(calc.dataset.quote) : null;
+    const current = calc.dataset.current ? Number(calc.dataset.current) : undefined;
+    const input = calc.querySelector<HTMLInputElement>("input")!;
     const price = calc.querySelector<HTMLElement>(".calc-price")!;
+    const bs = calc.querySelector<HTMLElement>(".calc-bs")!;
     const detail = calc.querySelector(".calc-detail")!;
+    const base = calc.querySelector("[data-base]")!;
+    const extraRow = calc.querySelector<HTMLElement>("[data-extra-row]")!;
+    const extraLabel = calc.querySelector("[data-extra-label]")!;
+    const extraAmount = calc.querySelector("[data-extra]")!;
+    const currentNote = calc.querySelector<HTMLElement>("[data-current-note]");
     const [less, more] = calc.querySelectorAll<HTMLButtonElement>("[data-step]");
+    const clamp = (n: number) => Math.min(max, Math.max(1, Math.round(n)));
     let branches = Number(calc.dataset.branches);
 
     const render = () => {
-      value.textContent = String(branches);
+      input.value = String(branches);
       // aria-disabled y no disabled: en el tope el botón conserva el foco (el clic ya no cambia nada).
       less.setAttribute("aria-disabled", String(branches === 1));
       more.setAttribute("aria-disabled", String(branches === max));
-      if (branches === 1) {
-        price.textContent = "Bs 0";
-        detail.textContent = `Plan Gratis, o Negocio por Bs ${negMin}–${negMax} al mes`;
-        return;
-      }
+      // Un local: Negocio (o Gratis). Más: Sucursales, con cada local extra aparte.
       const extra = branches - 1;
-      price.textContent = `Bs ${fmt(negMin + extra * extMin)}–${fmt(negMax + extra * extMax)} al mes`;
-      detail.textContent = `Plan Negocio + ${extra} ${extra === 1 ? "sucursal extra" : "sucursales extra"}`;
+      const usd = usdFor(extra === 0 ? "Negocio" : "Sucursales", period, extra);
+      base.textContent = usdLabel(planUsd.base[period]);
+      extraRow.hidden = extra === 0;
+      extraLabel.textContent = `${extra} ${extra === 1 ? "sucursal extra" : "sucursales extra"} × ${usdLabel(planUsd.extraBranch[period])}`;
+      extraAmount.textContent = usdLabel(Math.round(extra * planUsd.extraBranch[period] * 100) / 100);
+      price.textContent = usdLabel(usd);
+      bs.textContent = quote ? `+ impuestos · hoy Bs ${bsTotal(usd, quote.rate, quote.tax).toLocaleString("es-BO")}` : "+ impuestos";
+      detail.textContent = extra === 0 ? "Plan Negocio (o Gratis, sin pagar)." : `Plan Sucursales: ${branches} locales en total.`;
+      if (currentNote) currentNote.hidden = current === undefined || branches === current;
     };
 
+    const set = (next: number) => {
+      const value = clamp(next);
+      if (value === branches) return render();
+      branches = value;
+      render();
+      // Reinicia la animación del precio en cada cambio.
+      price.classList.remove("tick");
+      void price.offsetWidth;
+      price.classList.add("tick");
+    };
+
+    // Mantener presionado − o + repite: tras una pausa, un paso cada 90 ms.
     for (const button of [less, more]) {
-      button.addEventListener("click", () => {
-        branches = Math.min(max, Math.max(1, branches + Number(button.dataset.step)));
-        render();
-        // Reinicia la animación del precio en cada cambio.
-        price.classList.remove("tick");
-        void price.offsetWidth;
-        price.classList.add("tick");
+      const step = Number(button.dataset.step);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const stop = () => clearTimeout(timer);
+      const repeat = (delay: number) => {
+        timer = setTimeout(() => {
+          set(branches + step);
+          repeat(90);
+        }, delay);
+      };
+      button.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        set(branches + step);
+        repeat(400);
+      });
+      for (const type of ["pointerup", "pointerleave", "pointercancel"]) button.addEventListener(type, stop);
+      // Teclado (Enter o Espacio): un paso por pulsación. Los clics del puntero ya se contaron en pointerdown.
+      button.addEventListener("click", (event) => {
+        if (event.detail === 0) set(branches + step);
       });
     }
+
+    // Escribir el número: se acota a 1–20 al salir del campo; lo que no es número vuelve al valor de antes.
+    input.addEventListener("input", () => {
+      const typed = Number(input.value);
+      if (input.value !== "" && Number.isFinite(typed) && typed >= 1 && typed <= max) set(typed);
+    });
+    input.addEventListener("change", () => set(input.value === "" || !Number.isFinite(Number(input.value)) ? branches : Number(input.value)));
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "PageUp" || event.key === "PageDown") {
+        event.preventDefault();
+        set(branches + (event.key === "PageUp" ? 5 : -5));
+      }
+    });
+
+    // Mensual/anual sin recargar (PeriodSwitch): mismos locales, precios del período nuevo.
+    document.addEventListener("period:change", (event) => {
+      period = (event as CustomEvent<Period>).detail;
+      calc.querySelector("[data-per]")!.textContent = `Total ${period === "mensual" ? "al mes" : "al año"}`;
+      render();
+    });
+
+    calc.querySelector("[data-reset]")?.addEventListener("click", () => {
+      if (current !== undefined) set(current);
+      input.focus();
+    });
     render();
   }
 </script>
 
 <style>
   .calc {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1.5rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 1.5rem 2.5rem;
+    align-items: start;
     margin-top: 1.5rem;
-    padding: 1.25rem 1.5rem;
+    padding: 1.5rem;
     border: 1px solid var(--color-border);
     border-radius: 1rem;
     background: var(--color-surface);
   }
 
   .calc-input {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1rem;
+    display: grid;
+    gap: 0.75rem;
+    justify-items: start;
   }
 
-  .calc-label {
+  .calc-head {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .calc-title {
+    margin: 0;
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-lh);
     font-weight: var(--font-semibold);
   }
 
+  .calc-hint,
+  .calc-range {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  /* Un solo bloque: − | número | +. El borde marca el foco del campo. */
   .stepper {
-    display: inline-flex;
-    align-items: center;
+    display: inline-grid;
+    grid-template-columns: 3rem 4.5rem 3rem;
+    align-items: stretch;
+    height: 3rem;
     border: 1px solid var(--color-border-strong);
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
+    background: var(--color-surface-muted);
+    overflow: hidden;
   }
 
-  .stepper .icon-btn {
-    width: 2.75rem;
-    height: 2.75rem;
+  .stepper:focus-within {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 3px var(--color-primary-soft);
   }
 
-  .stepper .icon-btn[aria-disabled="true"] {
-    opacity: 0.4;
+  .stepper-btn {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-text);
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    transition: background-color 150ms;
+  }
+
+  .stepper-btn:hover:not([aria-disabled="true"]) {
+    background: var(--color-surface);
+  }
+
+  .stepper-btn:active:not([aria-disabled="true"]) {
+    background: var(--color-primary-soft);
+  }
+
+  /* El anillo global queda recortado por el overflow del bloque: aquí va hacia adentro. */
+  .stepper-btn:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .stepper-btn[aria-disabled="true"] {
+    color: var(--color-text-subtle);
     cursor: not-allowed;
   }
 
   .stepper-value {
-    min-width: 2.5rem;
-    font-size: var(--text-lg);
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    border-inline: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-xl);
     font-weight: var(--font-bold);
     text-align: center;
+    appearance: textfield;
+    -moz-appearance: textfield;
   }
 
-  .calc-result {
+  .stepper-value::-webkit-inner-spin-button,
+  .stepper-value::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+  }
+
+  .stepper-value:focus {
+    outline: none;
+  }
+
+  .calc-current {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .calc-current[hidden] {
+    display: none;
+  }
+
+  .calc-reset {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 1.5rem;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-primary);
+    font: inherit;
+    font-weight: var(--font-semibold);
+    cursor: pointer;
+  }
+
+  .calc-reset:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  /* La cuenta: conceptos a la izquierda, importes alineados a la derecha. */
+  .calc-bill {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .bill {
+    display: grid;
+    margin: 0;
+  }
+
+  .bill-row,
+  .bill-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+  }
+
+  .bill-row {
+    padding: 0.375rem 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .bill-row[hidden] {
+    display: none;
+  }
+
+  .bill-row dd {
+    margin: 0;
+    color: var(--color-text);
+    font-weight: var(--font-medium);
+  }
+
+  .bill-total {
+    margin-top: 0.375rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .bill-total dt {
+    font-weight: var(--font-semibold);
+  }
+
+  .bill-total dd {
+    display: grid;
+    justify-items: end;
     margin: 0;
     text-align: right;
   }
@@ -136,7 +387,14 @@ const branches = Math.min(MAX, Math.max(1, Astro.props.branches ?? 1));
     font-weight: var(--font-bold);
   }
 
+  .calc-bs {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
   .calc-detail {
+    margin: 0;
     color: var(--color-text-muted);
     font-size: var(--text-sm);
     line-height: var(--text-sm-lh);
@@ -155,19 +413,20 @@ const branches = Math.min(MAX, Math.max(1, Astro.props.branches ?? 1));
     }
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 720px) {
     .calc {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 1rem;
+      grid-template-columns: minmax(0, 1fr);
       padding: 1.25rem;
     }
+
     .calc-input {
-      justify-content: space-between;
+      justify-items: stretch;
     }
-    .calc-result {
-      align-items: flex-start;
-      text-align: left;
+
+    /* En el celular el stepper ocupa el ancho: botones grandes en las puntas. */
+    .stepper {
+      display: grid;
+      grid-template-columns: 3.5rem minmax(0, 1fr) 3.5rem;
     }
   }
 </style>

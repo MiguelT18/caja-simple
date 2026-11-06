@@ -52,7 +52,14 @@ export function Pager({ page, pageCount, from, to, total, onPage, noun = "result
     if (!list) return;
     list.tabIndex = -1;
     list.focus({ preventScroll: true });
-    list.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    // En escritorio solo se desplaza <main>: scrollIntoView también movía el viewport (el overflow del body pasa a él) y subía toda la app.
+    const main = list.closest("main");
+    if (main && getComputedStyle(main).overflowY !== "visible") {
+      main.scrollTo({ top: main.scrollTop + list.getBoundingClientRect().top - main.getBoundingClientRect().top, behavior });
+    } else {
+      list.scrollIntoView({ block: "start", behavior });
+    }
   };
 
   return (

@@ -1,0 +1,123 @@
+---
+// Quién trabaja en la sucursal (vista de la empleada; la dueña administra en Empleados). Solo lectura.
+import PageHeader from "@/components/PageHeader.astro";
+import ShiftChip from "@/components/ShiftChip.astro";
+import Layout from "@/layouts/Layout.astro";
+import { branchColor, branchContext, branchTeam, fullName, shiftBarData } from "@/data/queries";
+import { initials, plural } from "@/lib/format";
+
+const { negocio, sucursal } = Astro.params;
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+if (!ctx) return Astro.rewrite("/404");
+const { branch, business, shiftById } = ctx;
+const team = await branchTeam(Astro.locals, ctx.membership, branch.id);
+const staff = team.filter((p) => !p.isOwner).length;
+---
+
+<Layout title={`Equipo · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
+  <PageHeader {...ctx.backdrop}
+    tint={branchColor(ctx.membership, branch.id)}
+    title="Equipo"
+    description={`La dueña de ${business.name} y ${plural(staff, "persona trabaja", "personas trabajan")} en ${branch.name}.`}
+  />
+
+  <ul class="card team" role="list">
+    {
+      team.map((p) => {
+        const shift = p.shiftId ? shiftById(p.shiftId) : undefined;
+        const me = p.personId === Astro.locals.userId;
+        return (
+          <li class="member">
+            {p.avatarUrl ? (
+              <img class="avatar" src={p.avatarUrl} alt="" width="44" height="44" loading="lazy" />
+            ) : (
+              <span class="avatar avatar-initials" aria-hidden="true">
+                {initials(p.firstName, p.lastName)}
+              </span>
+            )}
+            <span class="who">
+              <span class="name">
+                {fullName(p) || "Sin nombre"}
+                {me && <span class="me"> (tú)</span>}
+              </span>
+              <span class="role">{p.isOwner ? `Dueña de ${business.name}` : p.jobTitle || "Empleada"}</span>
+            </span>
+            <span class="tags">
+              {p.isOwner && <span class="chip chip-info">Dueña</span>}
+              {shift && <ShiftChip shift={shift} withTime />}
+            </span>
+          </li>
+        );
+      })
+    }
+  </ul>
+  {staff === 0 && <p class="empty-state">Todavía no hay más personas en esta sucursal.</p>}
+</Layout>
+
+<style>
+  .team {
+    display: grid;
+    margin: 0;
+    padding: 0.5rem;
+    list-style: none;
+  }
+
+  .member {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.5rem;
+  }
+
+  .member + .member {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .avatar {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .who {
+    display: grid;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .name {
+    font-weight: var(--font-semibold);
+    overflow-wrap: anywhere;
+  }
+
+  .me {
+    color: var(--color-text-muted);
+    font-weight: var(--font-medium);
+  }
+
+  .role {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.375rem;
+  }
+
+  /* En el celular, los chips bajan debajo del nombre. */
+  @media (max-width: 30rem) {
+    .member {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .tags {
+      grid-column: 2;
+      justify-content: flex-start;
+    }
+  }
+</style>

@@ -70,6 +70,8 @@ const plansCurrent = active === "planes" ? "page" : undefined;
         </div>
         <nav class="footer-nav" aria-label="Pie de página">
           <a href="/planes" aria-current={plansCurrent}>Planes</a>
+          <a href="/privacidad" aria-current={Astro.url.pathname === "/privacidad" ? "page" : undefined}>Privacidad</a>
+          <a href="/terminos" aria-current={Astro.url.pathname === "/terminos" ? "page" : undefined}>Términos</a>
           {
             signedIn ? (
               <a href="/app">Ir a tus negocios</a>
