@@ -11,7 +11,7 @@ const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - 2 ** (-10 * t));
 // un turno se enciende al cruzarla, y el cielo usa la misma línea para saber en qué turno está.
 const LIT_TOP = 0.25;
 const LIT_LINE = 0.65;
-const shifts = [...document.querySelectorAll<HTMLElement>(".shift")];
+const shifts = [...document.querySelectorAll<HTMLElement>(".day .shift")];
 if ("IntersectionObserver" in window) {
   const observer = new IntersectionObserver(
     (entries) => {

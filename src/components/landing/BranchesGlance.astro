@@ -35,7 +35,7 @@ const short = branches.find((b) => b.state === "short")!;
                 <span class="name">{b.name}</span>
                 <span class="where">{b.where}</span>
               </span>
-              <span class:list={["chip", b.chip, "shift"]}>{b.shift}</span>
+              <span class:list={["chip", b.chip, "branch-shift"]}>{b.shift}</span>
               <span class="num amount-income sales">{formatBs(b.sales, "+")}</span>
               {b.state === "live" && (
                 <span class="chip chip-live state"><span class="live-dot" aria-hidden="true" />En curso</span>
@@ -204,7 +204,7 @@ const short = branches.find((b) => b.state === "short")!;
       grid-template-columns: 2.75rem minmax(0, 1fr) auto;
       row-gap: 0.375rem;
     }
-    .shift {
+    .branch-shift {
       display: none;
     }
     .sales {
