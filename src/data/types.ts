@@ -25,6 +25,10 @@ export interface Business {
   kind: BusinessKind;
   /** Logo o foto del negocio, en branch-images (<negocio>/<negocio>.<ext>). */
   imagePath?: string;
+  /** A qué se dedica. Obligatoria al crear; los negocios de antes pueden no tenerla todavía. */
+  description?: string;
+  /** Aparece en Buscar (/app/buscar) y recibe pedidos para unirse. */
+  listed: boolean;
 }
 
 export type BusinessKind = "tienda" | "ropa" | "restaurante";
@@ -208,6 +212,15 @@ export type Notification = {
       data: { person: string; branch: string; shift: string; date: string; reason: string | null };
     }
   | { kind: "reopen_answer"; data: { accepted: boolean; person: string; branch: string; shift: string; date: string } }
+  | { kind: "ownership"; data: { business: string; person: string } }
+  | {
+      kind: "join_request";
+      requestId: string;
+      /** El pedido para unirse sigue esperando respuesta de la dueña. */
+      pending: boolean;
+      data: { person: string; business: string; slug: string; branch: string | null; message: string | null };
+    }
+  | { kind: "join_answer"; data: { accepted: boolean; business: string; person: string } }
   | {
       /** Copia del pedido en la bandeja de quien lo hizo. */
       kind: "reopen_sent";

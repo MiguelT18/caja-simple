@@ -30,13 +30,14 @@ erDiagram
 | Entidad | Pertenece a | Campos clave |
 |---|---|---|
 | Persona | — | nombre, correo, foto. Es la cuenta: un solo acceso para todos sus negocios. Se edita en `/app/cuenta`. |
-| Negocio | su dueña (Persona) | nombre, slug, plan (Gratis / Negocio / Sucursales). |
+| Negocio | su dueña (Persona) | nombre, slug, plan (Gratis / Negocio / Sucursales), descripción (obligatoria al crear; los de antes la agregan al volver a guardar), en Buscar (`listed`, apagado por defecto). |
 | Sucursal | Negocio | nombre, slug, dirección. |
 | Turno | Sucursal | nombre, inicio, fin, tono (mañana / tarde / noche), archivado. Cada sucursal define los suyos. Si el fin es menor que el inicio, termina al día siguiente. |
 | Producto | Negocio | nombre, categoría, código de barras, imagen. Es el **catálogo del negocio**: se define una sola vez. |
 | Categoría | Negocio | nombre. Agrupa los productos del catálogo. |
 | Inventario | Sucursal × Producto | precio, stock, stock mínimo. Si no existe la fila, esa sucursal no vende el producto. |
 | Empleado | Negocio | correo, persona (vacía hasta que la invitada tenga cuenta), sucursal, turno, puesto, estado (invitado / activo). El nombre se lee del perfil de la persona. |
+| Pedido para unirse | Negocio × Persona | sucursal sugerida, mensaje, nombre y correo de quien pide (copiados), estado (pendiente / aceptada / rechazada). Ver abajo › Buscar negocios. |
 | Notificación | Persona | tipo, negocio, invitación (si aplica), datos del aviso, leída. |
 | Suscripción push | Persona | endpoint y claves de un navegador donde activó los avisos. |
 | Venta | Sucursal | turno, empleado, hora, líneas (producto, cantidad). El precio sale del inventario de esa sucursal. |
@@ -76,6 +77,7 @@ erDiagram
 | `/app` | todos: lista de negocios con el rol en cada uno |
 | `/app/cuenta` | todas: perfil, contraseña, verificación en dos pasos, push, descargar tus datos y borrar la cuenta |
 | `/app/cuenta/exportar` | todas: descarga en JSON (`exportMyData`, `src/data/account.ts`) |
+| `/app/buscar` | todas (menú de Tus negocios): buscar negocios en Buscar, filtrar por rubro y pedir unirse. Ver abajo › Buscar negocios |
 | `/app/ayuda` | todas: Ayuda y comentarios (botón del salvavidas en la tarjeta de usuario). Ver abajo › Ayuda y comentarios |
 | `/app/[negocio]` | dueña: resumen consolidado |
 | `/app/[negocio]/sucursales` | dueña |
@@ -155,6 +157,14 @@ Es opcional: sin `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, o si Redis
 ## Subir imágenes
 
 Todas las fotos (productos, fachadas, logo, avatar, comprobantes y capturas de ayuda) pasan por `imageFile` (`src/actions/shared.ts`): se mira el contenido del archivo, no el tipo que manda el navegador (`src/lib/image.ts`). Solo se aceptan JPEG, PNG y WebP de hasta 2 MB y 8000 px por lado (40 MP); un HTML, un SVG o un ejecutable con nombre de foto se rechaza. Cada persona sube como mucho 60 por hora (`uploadLimit`), el cuerpo de una Action llega hasta 4 MB (`security.actionBodySizeLimit`) y los buckets repiten tipo y tamaño. Las rutas las arma el servidor, nunca con el nombre del archivo.
+
+## Buscar negocios (`/app/buscar`)
+
+- Aparecen solo los negocios que la dueña activó («Aparecer en Buscar», en Configuración o al crearlo) y que tienen descripción (`check` en la base). Se ve el nombre, el rubro, la descripción, el logo y las sucursales con su dirección; nunca ventas, caja ni equipo.
+- `public.search_businesses(q, rubro, página)` (security definer) busca en nombre, descripción y nombre o dirección de las sucursales, 12 por página, y dice qué es la persona en cada uno (`dueño`, `equipo`, `invitado`, `pendiente`). El logo se firma con la sesión de quien busca gracias a la política «Ver logos de negocios en Buscar» de `branch-images`.
+- Pedir unirse: `request_join` (Action `requestJoin`, 10 por hora). No se puede pedir al negocio propio, donde ya trabajas, si ya te invitaron ni con otro pedido pendiente. La dueña recibe el aviso `join_request` con «Revisar pedido», que lleva a Empleados › Pedidos para unirse.
+- Responder: `answer_join` (Action `answerJoin`), solo la dueña. Al aceptar elige sucursal, turno y puesto, y la persona entra **activa** (sin invitación que aceptar): `link_invited_employee` deja `activo` cuando hay un pedido aceptado en la misma transacción. Quien pidió recibe `join_answer`, aceptado o no.
+- `join_requests` se escribe solo con esas funciones; la leen quien pidió y la dueña.
 
 ## Ayuda y comentarios
 

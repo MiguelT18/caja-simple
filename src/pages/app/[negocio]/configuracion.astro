@@ -1,14 +1,16 @@
 ---
-import { ArrowRight, CircleCheck, CircleMinus, MapPin, Pencil, Plus, Trash } from "@lucide/astro";
+import { ArrowRight, ChevronRight, CircleCheck, CircleMinus, Gem, MapPin, Pencil, Plus, Store, Trash, TriangleAlert, Users, Clock } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import BranchDialogs from "@/components/app/BranchDialogs.astro";
+import BusinessProfileFields from "@/components/app/BusinessProfileFields.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import PhotoField from "@/components/app/PhotoField.astro";
 import Layout from "@/layouts/Layout.astro";
 import { businessKinds, catalogLabel, kindOptions } from "@/data/kinds";
-import { businessContext, businessHref, businessImages, currentUser } from "@/data/queries";
+import { branchColor, businessContext, businessHref, businessImages, currentUser } from "@/data/queries";
 import { planLimits } from "@/data/plans";
+import { longDate } from "@/lib/dates";
 import { initials, plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
@@ -18,17 +20,19 @@ const base = businessHref(business);
 const limits = planLimits[business.plan];
 const canAddBranch = limits.branches === null || branchSummary.length < limits.branches;
 
-const usage = [
-  {
-    label: "Sucursales",
-    value: limits.branches === null ? `${branchSummary.length} · sin tope` : `${branchSummary.length} de ${limits.branches}${canAddBranch ? "" : " · al tope"}`,
-    ok: canAddBranch,
-  },
-  {
-    label: "Historial a la vista",
-    value: limits.historyDays === null ? "Completo" : `Últimos ${limits.historyDays} días`,
-    ok: limits.historyDays === null,
-  },
+// Uso del plan: el texto lo dice todo; la barra solo acompaña (nada solo con color).
+const branchUse = {
+  label: "Sucursales",
+  value: limits.branches === null ? `${branchSummary.length} · sin tope` : `${branchSummary.length} de ${limits.branches}${canAddBranch ? "" : " · al tope"}`,
+  fill: limits.branches === null ? null : Math.min(100, (branchSummary.length / limits.branches) * 100),
+  ok: canAddBranch,
+};
+const history = { label: "Historial a la vista", value: limits.historyDays === null ? "Completo" : `Últimos ${limits.historyDays} días`, ok: limits.historyDays === null };
+const sections = [
+  { id: "negocio", label: "Negocio", icon: Store },
+  { id: "sucursales", label: "Sucursales", icon: MapPin },
+  { id: "plan", label: "Plan", icon: Gem },
+  { id: "eliminar", label: "Eliminar", icon: TriangleAlert },
 ];
 const user = currentUser(Astro.locals);
 const logo = (await businessImages(Astro.locals, [business])).get(business.id);
@@ -40,167 +44,264 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
 <Layout title={`Configuración · ${business.name}`} context={{ membership: ctx.membership }}>
   <PageHeader {...ctx.backdrop} title="Configuración" description={`Datos, sucursales y plan de ${business.name}. Lo tuyo (foto, contraseña) está en Tu cuenta.`} />
 
+  <div class="settings-shell">
   <div class="settings">
-    <a href="/app/cuenta" class="account-link">
-      {
-        user.avatarUrl ? (
-          <img class="account-avatar skeleton" src={user.avatarUrl} alt="" width="48" height="48" decoding="async" data-fallback />
-        ) : (
-          <span class="account-avatar avatar-initials" aria-hidden="true">
-            {initials(user.firstName, user.lastName || user.email)}
-          </span>
-        )
-      }
-      <span class="account-text">
-        <span class="account-title">Tu cuenta</span>
-        <span class="row-meta">Tu foto, tu contraseña, la verificación en dos pasos y los avisos en este teléfono. Valen para todos tus negocios.</span>
-      </span>
-      <span class="btn btn-secondary account-btn" aria-hidden="true">
-        Ir a tu cuenta
-        <ArrowRight size={18} stroke-width={2} />
-      </span>
-    </a>
-
-    <section class="card block" aria-labelledby="business-title">
-      <div class="block-head">
-        <h2 class="card-title" id="business-title">Negocio</h2>
-      </div>
-      <form
-        id="business-form"
-        class="business-form"
-        data-action="saveBusiness"
-        data-reload
-        data-track-changes
-        data-success="Cambios guardados."
-        data-kind-from={business.kind}
-        data-catalog-labels={catalogLabels}
-        enctype="multipart/form-data"
-        novalidate
-      >
-        <input type="hidden" name="id" value={business.id} />
-        <PhotoField form="business-form" label="Logo o foto del negocio" image={logo} square />
-        <FormInput form="business-form" name="name" label="Nombre del negocio" value={business.name} required maxlength={80} />
-        <FormInput form="business-form" name="kind" label="Rubro" options={kindOptions(business.kind)} hint="Solo cambia cómo se llaman algunas secciones. Tus productos, precios, stock y ventas no cambian." />
-        <p class="notice kind-effect" aria-live="polite" data-kind-effect></p>
-        <p class="field-hint">
-          Dirección en la app: <span class="slug">{base}</span>. No cambia al renombrar, así tus enlaces siguen funcionando.
-        </p>
-        <p class="notice notice-error" role="alert" data-form-notice></p>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Guardar cambios</button>
-          <span class="change-status" data-change-status>Sin cambios</span>
-        </div>
-      </form>
-    </section>
-
-    <section class="card block" aria-labelledby="branches-title">
-      <div class="block-head">
-        <h2 class="card-title" id="branches-title">Sucursales</h2>
-        {
-          canAddBranch && (
-            <button type="button" class="btn btn-secondary" data-open-dialog="branch-new">
-              <Plus size={18} stroke-width={2} />
-              Agregar sucursal
-            </button>
-          )
-        }
-      </div>
-      <ul class="rows" role="list">
-        {
-          branchSummary.map(({ branch, shifts, employees }) => (
-            <li>
-              <div class="row-text">
-                <p class="row-title">{branch.name}</p>
-                <p class="row-meta">
-                  {branch.address && (
-                    <span>
-                      <MapPin size={14} stroke-width={1.75} />
-                      {branch.address}
-                    </span>
-                  )}
-                  <span>
-                    {plural(shifts.length, "turno", "turnos")} · {plural(employees, "empleado", "empleados")}
-                  </span>
-                </p>
-              </div>
-              <button type="button" class="btn btn-secondary" data-open-dialog={`branch-${branch.id}`}>
-                <Pencil size={16} stroke-width={1.75} />
-                Editar<span class="sr-only"> {branch.name}</span>
-              </button>
-            </li>
-          ))
-        }
-      </ul>
-      {
-        !canAddBranch && (
-          <p class="notice">
-            Tu plan {business.plan} incluye {plural(limits.branches!, "sucursal", "sucursales")}. <a href={`${base}/plan`}>Ver planes →</a>
-          </p>
-        )
-      }
-    </section>
-
-    <section class="card block" aria-labelledby="plan-title">
-      <div class="block-head">
-        <h2 class="card-title" id="plan-title">Plan {business.plan}</h2>
-        <a href={`${base}/plan`} class="btn btn-secondary">
-          Ver planes y precios
-          <ArrowRight size={18} stroke-width={2} />
-        </a>
-      </div>
-      <dl class="usage">
-        {
-          usage.map((row) => (
-            <div>
-              <dt>{row.label}</dt>
-              <dd>
-                {row.ok ? <CircleCheck size={16} stroke-width={1.75} /> : <CircleMinus size={16} stroke-width={1.75} />}
-                <span class="num">{row.value}</span>
-              </dd>
-            </div>
-          ))
-        }
-      </dl>
-      {limits.historyDays !== null && <p class="field-hint">Lo anterior no se borra: vuelve a aparecer cuando pasas a un plan pago.</p>}
-    </section>
-
-
-    <section class="card block danger" aria-labelledby="danger-title">
-      <div class="block-head">
-        <h2 class="card-title" id="danger-title">Eliminar sucursal o negocio</h2>
-      </div>
-      <p class="field-hint">Eliminar es definitivo: no hay papelera ni forma de recuperarlo.</p>
-      <ul class="rows" role="list">
-        {
-          branchSummary.length > 1 &&
-            branchSummary.map(({ branch }) => (
+    <aside class="index">
+      <nav aria-label="Secciones de configuración">
+        <ul role="list" class="index-list">
+          {
+            sections.map(({ id, label, icon: Icon }) => (
               <li>
-                <div class="row-text">
-                  <p class="row-title">{branch.name}</p>
-                  <p class="row-meta">Sucursal · se borran {lost}.</p>
-                </div>
-                <button type="button" class="btn btn-secondary danger-btn" data-open-dialog={`delete-branch-${branch.id}`}>
-                  <Trash size={16} stroke-width={1.75} />
-                  Eliminar<span class="sr-only"> {branch.name}</span>
-                </button>
+                <a href={`#${id}`} class:list={["index-link", { danger: id === "eliminar" }]} data-index-link={id}>
+                  <Icon size={18} stroke-width={1.75} />
+                  {label}
+                </a>
               </li>
             ))
+          }
+        </ul>
+      </nav>
+      <a href="/app/cuenta" class="account">
+        {
+          user.avatarUrl ? (
+            <img class="account-avatar skeleton" src={user.avatarUrl} alt="" width="40" height="40" decoding="async" data-fallback />
+          ) : (
+            <span class="account-avatar avatar-initials" aria-hidden="true">
+              {initials(user.firstName, user.lastName || user.email)}
+            </span>
+          )
         }
-        <li>
-          <div class="row-text">
-            <p class="row-title">{business.name}</p>
-            <p class="row-meta">
-              Negocio · se borran sus {plural(branchSummary.length, "sucursal", "sucursales")}, el catálogo y todo su historial. Tus empleados pierden el acceso.
-            </p>
+        <span class="account-text">
+          <span class="account-title">Tu cuenta</span>
+          <span class="account-meta">Foto, contraseña y verificación en dos pasos</span>
+        </span>
+        <ChevronRight size={18} stroke-width={1.75} />
+      </a>
+    </aside>
+
+    <div class="sections">
+      <a href="/app/cuenta" class="account account-narrow">
+        {
+          user.avatarUrl ? (
+            <img class="account-avatar skeleton" src={user.avatarUrl} alt="" width="40" height="40" decoding="async" data-fallback />
+          ) : (
+            <span class="account-avatar avatar-initials" aria-hidden="true">
+              {initials(user.firstName, user.lastName || user.email)}
+            </span>
+          )
+        }
+        <span class="account-text">
+          <span class="account-title">Tu cuenta</span>
+          <span class="account-meta">Foto, contraseña y verificación en dos pasos</span>
+        </span>
+        <ChevronRight size={18} stroke-width={1.75} />
+      </a>
+      <section id="negocio" class="section" aria-labelledby="business-title">
+        <header class="section-head">
+          <h2 id="business-title">Negocio</h2>
+          <p>Cómo se llama, a qué se dedica y su logo.</p>
+        </header>
+        {!business.description && (
+          <p class="notice">
+            Agrega una descripción de tu negocio: desde ahora es obligatoria. Sin ella no aparece en Buscar.
+          </p>
+        )}
+        <form
+          id="business-form"
+          class="surface business-form"
+          data-action="saveBusiness"
+          data-reload
+          data-track-changes
+          data-success="Cambios guardados."
+          data-kind-from={business.kind}
+          data-catalog-labels={catalogLabels}
+          enctype="multipart/form-data"
+          novalidate
+        >
+          <input type="hidden" name="id" value={business.id} />
+          <div class="business-grid">
+            <div class="cover">
+              <PhotoField form="business-form" label="Logo o foto" image={logo} square cover />
+            </div>
+            <div class="business-fields">
+              <FormInput form="business-form" name="name" label="Nombre del negocio" value={business.name} required maxlength={80} />
+              <FormInput form="business-form" name="kind" label="Rubro" options={kindOptions(business.kind)} hint="Solo cambia cómo se llaman algunas secciones. Tus productos, precios, stock y ventas no cambian." />
+              <p class="notice kind-effect" aria-live="polite" data-kind-effect></p>
+            </div>
           </div>
-          <button type="button" class="btn btn-secondary danger-btn" data-open-dialog="delete-business">
-            <Trash size={16} stroke-width={1.75} />
-            Eliminar negocio
-          </button>
-        </li>
-      </ul>
-      {branchSummary.length === 1 && <p class="field-hint">Un negocio necesita al menos una sucursal: para cerrar la única, elimina el negocio.</p>}
-    </section>
+          <BusinessProfileFields form="business-form" description={business.description} listed={business.listed} />
+          <div class="slug-row">
+            <span class="slug-label">Dirección en la app</span>
+            <span class="slug">{base}</span>
+            <span class="field-hint">No cambia al renombrar, así tus enlaces siguen funcionando.</span>
+          </div>
+          <p class="notice notice-error" role="alert" data-form-notice></p>
+          <div class="form-actions">
+            <span class="change-status" data-change-status>Sin cambios</span>
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="sucursales" class="section" aria-labelledby="branches-title">
+        <header class="section-head">
+          <h2 id="branches-title">Sucursales</h2>
+          <p>{plural(branchSummary.length, "sucursal", "sucursales")} · cada una con su caja, sus turnos y su inventario.</p>
+        </header>
+        <div class="surface">
+          <ul class="branches" role="list">
+            {
+              branchSummary.map(({ branch, image, shifts, employees, href }) => (
+                <li class="branch" style={`--branch: ${branchColor(ctx.membership, branch.id)}`}>
+                  <span class="art">
+                    {image ? <img src={image} alt="" loading="lazy" decoding="async" data-fallback /> : null}
+                    <Store size={24} stroke-width={1.75} aria-hidden="true" />
+                  </span>
+                  <span class="branch-text">
+                    <span class="branch-name">{branch.name}</span>
+                    {branch.address && (
+                      <span class="branch-address">
+                        <MapPin size={14} stroke-width={1.75} />
+                        {branch.address}
+                      </span>
+                    )}
+                    <span class="facts">
+                      <span class="fact">
+                        <Clock size={14} stroke-width={1.75} />
+                        {plural(shifts.length, "turno", "turnos")}
+                      </span>
+                      <span class="fact">
+                        <Users size={14} stroke-width={1.75} />
+                        {plural(employees, "empleado", "empleados")}
+                      </span>
+                    </span>
+                  </span>
+                  <span class="branch-actions">
+                    <button type="button" class="icon-btn" data-open-dialog={`branch-${branch.id}`} aria-label={`Editar ${branch.name}`} title="Editar">
+                      <Pencil size={18} stroke-width={1.75} />
+                    </button>
+                    <a href={href} class="btn btn-secondary btn-sm">
+                      Entrar<span class="sr-only"> a {branch.name}</span>
+                      <ArrowRight size={16} stroke-width={2} />
+                    </a>
+                  </span>
+                </li>
+              ))
+            }
+            {
+              canAddBranch && (
+                <li>
+                  <button type="button" class="branch branch-add" data-open-dialog="branch-new">
+                    <span class="art art-add">
+                      <Plus size={24} stroke-width={1.75} />
+                    </span>
+                    <span class="branch-text">
+                      <span class="branch-name">Agregar sucursal</span>
+                      <span class="branch-address">Con su dirección, foto y turnos</span>
+                    </span>
+                  </button>
+                </li>
+              )
+            }
+          </ul>
+          {
+            !canAddBranch && (
+              <p class="notice">
+                Tu plan {business.plan} incluye {plural(limits.branches!, "sucursal", "sucursales")}. <a href={`${base}/plan`}>Ver planes →</a>
+              </p>
+            )
+          }
+        </div>
+      </section>
+
+      <section id="plan" class="section" aria-labelledby="plan-title">
+        <header class="section-head">
+          <h2 id="plan-title">Plan</h2>
+          <p>Lo que incluye el plan de {business.name} y cuánto usas.</p>
+        </header>
+        <div class="surface plan">
+          <div class="plan-head">
+            <div class="plan-name">
+              <span class="plan-value">Plan {business.plan}</span>
+              {business.planUntil && <span class="chip">Pagado hasta el {longDate(business.planUntil).replace(/^\S+ /, "")}</span>}
+            </div>
+            <a href={`${base}/plan`} class="btn btn-secondary">
+              Ver planes y precios
+              <ArrowRight size={18} stroke-width={2} />
+            </a>
+          </div>
+          <dl class="usage">
+            <div class:list={["use", { full: !branchUse.ok }]}>
+              <dt>{branchUse.label}</dt>
+              <dd>
+                {branchUse.ok ? <CircleCheck size={16} stroke-width={1.75} /> : <CircleMinus size={16} stroke-width={1.75} />}
+                <span class="num">{branchUse.value}</span>
+              </dd>
+              {branchUse.fill !== null && <span class="gauge" style={`--fill: ${branchUse.fill}%`} aria-hidden="true" />}
+            </div>
+            <div class="use">
+              <dt>{history.label}</dt>
+              <dd>
+                {history.ok ? <CircleCheck size={16} stroke-width={1.75} /> : <CircleMinus size={16} stroke-width={1.75} />}
+                <span class="num">{history.value}</span>
+              </dd>
+            </div>
+          </dl>
+          {limits.historyDays !== null && <p class="field-hint">Lo anterior no se borra: vuelve a aparecer cuando pasas a un plan pago.</p>}
+        </div>
+      </section>
+
+      <section id="eliminar" class="section" aria-labelledby="danger-title">
+        <header class="section-head">
+          <h2 id="danger-title" class="danger-title">
+            <TriangleAlert size={22} stroke-width={2} />
+            Eliminar
+          </h2>
+          <p>Es definitivo: no hay papelera ni forma de recuperarlo.</p>
+        </header>
+        <div class="surface danger-zone">
+          <ul class="rows" role="list">
+            {
+              branchSummary.length > 1 &&
+                branchSummary.map(({ branch, image }) => (
+                  <li style={`--branch: ${branchColor(ctx.membership, branch.id)}`}>
+                    <span class="art art-sm">
+                      {image ? <img src={image} alt="" loading="lazy" decoding="async" data-fallback /> : null}
+                      <Store size={18} stroke-width={1.75} aria-hidden="true" />
+                    </span>
+                    <div class="row-text">
+                      <p class="row-title">{branch.name}</p>
+                      <p class="row-meta">Sucursal · se borran {lost}.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary danger-btn" data-open-dialog={`delete-branch-${branch.id}`}>
+                      <Trash size={16} stroke-width={1.75} />
+                      Eliminar<span class="sr-only"> {branch.name}</span>
+                    </button>
+                  </li>
+                ))
+            }
+            <li>
+              <span class="art art-sm art-business">
+                {logo ? <img src={logo} alt="" loading="lazy" decoding="async" data-fallback /> : null}
+                <Store size={18} stroke-width={1.75} aria-hidden="true" />
+              </span>
+              <div class="row-text">
+                <p class="row-title">{business.name}</p>
+                <p class="row-meta">
+                  Negocio · se borran sus {plural(branchSummary.length, "sucursal", "sucursales")}, el catálogo y todo su historial. Tus empleados pierden el acceso.
+                </p>
+              </div>
+              <button type="button" class="btn btn-secondary danger-btn" data-open-dialog="delete-business">
+                <Trash size={16} stroke-width={1.75} />
+                Eliminar<span class="sr-only"> {business.name}</span>
+              </button>
+            </li>
+          </ul>
+          {branchSummary.length === 1 && <p class="field-hint">Un negocio necesita al menos una sucursal: para cerrar la única, elimina el negocio.</p>}
+        </div>
+      </section>
+    </div>
+  </div>
   </div>
 
   <BranchDialogs business={business} branchSummary={branchSummary} canAddBranch={canAddBranch} />
@@ -261,142 +362,226 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     form.addEventListener("formchange", show);
     show();
   }
+
+  // Índice: marca la sección que se está leyendo (la que ocupa la franja alta del panel).
+  const links = new Map([...document.querySelectorAll<HTMLAnchorElement>("[data-index-link]")].map((a) => [a.dataset.indexLink!, a]));
+  const mark = (id: string) => {
+    links.forEach((a, key) => (key === id ? a.setAttribute("aria-current", "true") : a.removeAttribute("aria-current")));
+    // En el celular el índice es una fila de píldoras: la activa queda a la vista (solo scroll horizontal de la fila).
+    const link = links.get(id);
+    const list = link?.closest("ul");
+    if (link && list && list.scrollWidth > list.clientWidth) list.scrollTo({ left: link.offsetLeft - 16, behavior: "smooth" });
+  };
+  const visible = new Set<string>();
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) e.isIntersecting ? visible.add(e.target.id) : visible.delete(e.target.id);
+      const first = [...links.keys()].find((id) => visible.has(id));
+      if (first) mark(first);
+    },
+    { rootMargin: "-10% 0px -60% 0px" },
+  );
+  links.forEach((_, id) => {
+    const section = document.getElementById(id);
+    if (section) observer.observe(section);
+  });
+  mark("negocio");
 </script>
 
 <style>
+  /* Índice a la izquierda y secciones a la derecha; con el panel angosto, el índice pasa a una fila de píldoras. */
+  /* El contenedor es el panel: el índice cambia según el ancho del panel, no de la ventana. */
+  .settings-shell {
+    container-type: inline-size;
+  }
+
   .settings {
     display: grid;
-    gap: 1.25rem;
-    max-width: 48rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
   }
 
-  .block {
+  .sections {
+    display: grid;
+    gap: 3rem;
+    min-width: 0;
+    max-width: 52rem;
+  }
+
+  .section {
     display: grid;
     gap: 1rem;
-    padding: 1.25rem;
+    scroll-margin-top: 5rem;
   }
 
-  .block-head {
+  .section-head h2 {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-
-  .business-form {
-    display: grid;
-    gap: 0.75rem;
-  }
-
-  .business-form .btn {
-    justify-self: start;
-  }
-
-  .slug {
-    color: var(--color-text);
-    font-weight: var(--font-medium);
-    overflow-wrap: anywhere;
-  }
-
-  .rows {
-    display: grid;
+    gap: 0.5rem;
     margin: 0;
-    padding: 0;
-    list-style: none;
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl-lh);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.02em;
   }
 
-  .rows li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem 1rem;
-    padding: 0.875rem 0;
-    border-top: 1px solid var(--color-border);
-  }
-
-  .row-text {
-    flex: 1 1 16rem;
-    min-width: 0;
-  }
-
-  .row-title,
-  .row-meta {
-    margin: 0;
-  }
-
-  .row-title {
-    font-weight: var(--font-semibold);
-    overflow-wrap: anywhere;
-  }
-
-  .row-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1rem;
+  .section-head p {
+    margin: 0.25rem 0 0;
     color: var(--color-text-muted);
     font-size: var(--text-sm);
   }
 
-  .row-meta span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-  }
-
-  .notice a {
-    color: inherit;
-    font-weight: var(--font-semibold);
-  }
-
-  .usage {
+  .surface {
     display: grid;
-    margin: 0;
+    gap: 1.25rem;
+    padding: clamp(1rem, 2.5vw, 1.5rem);
+    border-radius: var(--radius-panel);
+    background: var(--color-surface-muted);
   }
 
-  .usage div {
+  /* --- Índice --- */
+  .index {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    margin: 0 calc(-1 * var(--main-pad));
+    padding: 0.5rem var(--main-pad);
+    background: var(--color-surface);
+  }
+
+  .index-list {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 0.25rem 1rem;
-    padding: 0.75rem 0;
-    border-top: 1px solid var(--color-border);
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+    list-style: none;
+    scrollbar-width: none;
   }
 
-  .usage dt {
-    color: var(--color-text-muted);
-  }
-
-  .usage dd {
+  .index-link {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    margin: 0;
+    min-height: 2.5rem;
+    padding: 0 1rem;
+    border-radius: 999px;
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+    font-size: var(--text-sm);
     font-weight: var(--font-semibold);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 150ms, color 150ms;
   }
 
-  /* Tu cuenta: arriba y con identidad, para que no se pierda entre los ajustes del negocio. Toda la fila es el enlace. */
-  .account-link {
+  .index-link:hover {
+    background: var(--color-surface-hover);
+  }
+
+  /* Píldora activa invertida, como los filtros de Vender. */
+  .index-link[aria-current] {
+    background: var(--color-text);
+    color: var(--color-surface);
+  }
+
+  .account {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
+    gap: 0.75rem;
+    padding: 0.75rem;
     border-radius: var(--radius-panel);
     background: var(--color-surface-muted);
-    color: inherit;
+    color: var(--color-text);
     text-decoration: none;
     transition: background-color 150ms;
   }
 
-  .account-link:hover {
+  .account:hover {
     background: var(--color-surface-hover);
   }
 
+  /* Angosto: «Tu cuenta» va primera en el contenido; el índice sticky queda solo con las píldoras. */
+  .index .account {
+    display: none;
+  }
+
+  /* En el celular la página entera hace scroll bajo la barra fija de 4rem. */
+  @media (max-width: 768px) {
+    .index {
+      top: 4rem;
+    }
+
+    .section {
+      scroll-margin-top: 8rem;
+    }
+  }
+
+  @container (min-width: 50rem) {
+    .settings {
+      grid-template-columns: 13rem minmax(0, 1fr);
+      gap: 2.5rem;
+      align-items: start;
+    }
+
+    .index {
+      top: 1.5rem;
+      align-content: start;
+      margin: 0;
+      padding: 0;
+      background: none;
+    }
+
+    .index-list {
+      flex-direction: column;
+      gap: 0.125rem;
+      overflow: visible;
+    }
+
+    /* Como los enlaces de la biblioteca del lateral: activo con fondo elevado, 700 y el ícono en ámbar. */
+    .index-link {
+      display: flex;
+      padding: 0 0.75rem;
+      border-radius: 0.375rem;
+      background: none;
+      color: var(--color-text-muted);
+    }
+
+    .index-link:hover {
+      background: var(--color-surface-hover);
+      color: var(--color-text);
+    }
+
+    .index-link[aria-current] {
+      background: var(--color-surface-muted);
+      color: var(--color-text);
+      font-weight: var(--font-bold);
+    }
+
+    .index-link[aria-current] :global(svg) {
+      color: var(--color-primary);
+    }
+
+    .index-link.danger[aria-current] :global(svg) {
+      color: var(--color-expense);
+    }
+
+    .index .account {
+      display: grid;
+    }
+
+    .account-narrow {
+      display: none;
+    }
+  }
+
   .account-avatar {
-    width: 3rem;
-    height: 3rem;
+    width: 2.5rem;
+    height: 2.5rem;
     border-radius: 50%;
     object-fit: cover;
   }
@@ -406,31 +591,82 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     place-items: center;
     background: var(--color-primary-soft);
     color: var(--color-text);
+    font-size: var(--text-sm);
     font-weight: var(--font-extrabold);
   }
 
   .account-text {
     display: grid;
-    gap: 0.125rem;
+    min-width: 0;
   }
 
   .account-title {
+    font-size: var(--text-sm);
     font-weight: var(--font-bold);
   }
 
-  .account-link:hover .account-btn {
-    border-color: var(--color-text);
+  .account-meta {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  /* --- Negocio: el logo como portada de álbum, los datos al lado --- */
+  .business-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+
+  .business-fields {
+    display: grid;
+    align-content: start;
+    gap: 0.875rem;
+    min-width: 0;
+  }
+
+  @container (min-width: 36rem) {
+    .business-grid {
+      grid-template-columns: 10rem minmax(0, 1fr);
+      gap: 1.5rem;
+    }
+  }
+
+  .slug-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .slug-label {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  .slug {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    background: var(--color-surface-hover);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    overflow-wrap: anywhere;
+  }
+
+  .slug-row .field-hint {
+    flex-basis: 100%;
+    margin: 0;
   }
 
   .form-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: 0.5rem 1rem;
-  }
-
-  .business-form .form-actions .btn {
-    justify-self: auto;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
   }
 
   .change-status {
@@ -460,27 +696,319 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     gap: 0.25rem;
   }
 
-  @media (max-width: 560px) {
-    .account-link {
+  /* --- Sucursales: filas de biblioteca con la foto de la fachada --- */
+  .branches {
+    display: grid;
+    gap: 0.25rem;
+    margin: -0.5rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .branch {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 0.5rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    transition: background-color 150ms;
+  }
+
+  .branch:hover {
+    background: var(--color-surface-hover);
+  }
+
+  /* Arte cuadrado: la foto o, sin foto, el ícono en el color de la sucursal sobre ese color al 22 % (como en el lateral). */
+  .art {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    overflow: hidden;
+    border-radius: 0.375rem;
+    background: color-mix(in oklab, var(--branch, var(--color-primary)) 22%, var(--color-surface-muted));
+    color: var(--branch, var(--color-primary));
+    box-shadow: 0 8px 18px -10px rgb(0 0 0 / 0.5);
+  }
+
+  .art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .art-add {
+    border: 2px dashed var(--color-border-strong);
+    background: none;
+    color: var(--color-text-muted);
+    box-shadow: none;
+  }
+
+  .branch-add:hover .art-add {
+    border-color: var(--color-text);
+    color: var(--color-text);
+  }
+
+  .branch-text {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .branch-name {
+    font-weight: var(--font-bold);
+    overflow-wrap: anywhere;
+  }
+
+  .branch-address {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.125rem;
+  }
+
+  .fact {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--color-surface-hover);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+  }
+
+  .branch:hover .fact {
+    background: var(--color-surface-muted);
+  }
+
+  .branch-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-sm {
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    font-size: var(--text-sm);
+  }
+
+  @container (max-width: 34rem) {
+    .branch {
       grid-template-columns: auto minmax(0, 1fr);
     }
 
-    .account-btn {
-      grid-column: 1 / -1;
-      justify-self: start;
+    .art {
+      width: 4rem;
+      height: 4rem;
+    }
+
+    .branch-actions {
+      grid-column: 2;
     }
   }
 
-  .danger {
-    border-color: color-mix(in srgb, var(--color-expense) 45%, var(--color-border));
+  .notice a {
+    color: inherit;
+    font-weight: var(--font-semibold);
   }
 
-  .danger .card-title,
+  /* --- Plan --- */
+  .plan-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .plan-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 0.875rem;
+  }
+
+  .plan-value {
+    font-size: var(--text-4xl);
+    line-height: var(--text-4xl-lh);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.03em;
+  }
+
+  .chip {
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    background: var(--color-income-soft);
+    color: var(--color-income);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+  }
+
+  .usage {
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+  }
+
+  @container (min-width: 36rem) {
+    .usage {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .use {
+    display: grid;
+    align-content: start;
+    gap: 0.375rem;
+    padding: 1rem;
+    border-radius: 0.375rem;
+    background: var(--color-surface-hover);
+  }
+
+  .use dt {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  .use dd {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+  }
+
+  .use :global(svg) {
+    color: var(--color-income);
+  }
+
+  .use.full :global(svg) {
+    color: var(--color-warning);
+  }
+
+  /* La barra solo acompaña al texto «1 de 1 · al tope». */
+  .gauge {
+    height: 0.375rem;
+    margin-top: 0.25rem;
+    border-radius: 999px;
+    background: linear-gradient(var(--color-income), var(--color-income)) 0 0 / var(--fill) 100% no-repeat, var(--color-border);
+  }
+
+  .use.full .gauge {
+    background: linear-gradient(var(--color-warning), var(--color-warning)) 0 0 / var(--fill) 100% no-repeat, var(--color-border);
+  }
+
+  .plan .field-hint {
+    margin: 0;
+  }
+
+  /* --- Eliminar --- */
+  .danger-title {
+    color: var(--color-expense);
+  }
+
+  .danger-zone {
+    background: color-mix(in oklab, var(--color-expense-soft) 45%, var(--color-surface-muted));
+  }
+
+  .rows {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rows li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    padding: 0.875rem 0;
+  }
+
+  .rows li:first-child {
+    padding-top: 0;
+  }
+
+  .rows li:last-child {
+    padding-bottom: 0;
+  }
+
+  .rows li + li {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .art-sm {
+    width: 2.75rem;
+    height: 2.75rem;
+    box-shadow: none;
+  }
+
+  .art-business {
+    --branch: var(--color-primary);
+  }
+
+  .row-text {
+    min-width: 0;
+  }
+
+  .row-title,
+  .row-meta {
+    margin: 0;
+  }
+
+  .row-title {
+    font-weight: var(--font-semibold);
+    overflow-wrap: anywhere;
+  }
+
+  .row-meta {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
   .danger-btn {
     color: var(--color-expense);
   }
 
   .danger-btn:hover:not(:disabled) {
     background: var(--color-expense-soft);
+  }
+
+  @container (max-width: 34rem) {
+    .rows li {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .danger-btn {
+      grid-column: 2;
+      justify-self: start;
+    }
+  }
+
+  .danger-zone .field-hint {
+    margin: 0;
   }
 </style>

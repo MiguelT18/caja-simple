@@ -1,0 +1,49 @@
+---
+import FormInput from "./FormInput.astro";
+
+interface Props {
+  form: string;
+  description?: string;
+  listed?: boolean;
+}
+
+const { form, description = "", listed = false } = Astro.props;
+---
+
+<FormInput
+  form={form}
+  name="description"
+  label="Descripción"
+  rows={3}
+  value={description}
+  placeholder="Ej.: Almacén de barrio con abarrotes, bebidas y productos de limpieza."
+  hint="En una o dos frases, a qué se dedica. Se muestra en Buscar si lo activas."
+  required
+  minlength={10}
+  maxlength={400}
+/>
+<div class="field">
+  <label class="listed">
+    <input type="checkbox" name="listed" value="true" form={form} checked={listed} aria-describedby={`${form}-listed-hint`} />
+    <span>Aparecer en Buscar</span>
+  </label>
+  <p class="field-hint" id={`${form}-listed-hint`}>
+    Otras personas podrán ver el nombre, la descripción y las sucursales, y pedirte unirse. Nunca ven tus ventas ni tu caja.
+  </p>
+</div>
+
+<style>
+  .listed {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    font-weight: var(--font-medium);
+  }
+
+  .listed input {
+    width: 1.25rem;
+    height: 1.25rem;
+    accent-color: var(--color-primary);
+  }
+</style>

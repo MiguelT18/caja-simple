@@ -12,15 +12,17 @@ interface Props {
   round?: boolean;
   /** Logo: cuadrado chico y la imagen entera (contain), sin recortar. */
   square?: boolean;
+  /** Con `square`: portada grande (10rem) con los botones debajo, como en Configuración. */
+  cover?: boolean;
 }
 
-const { form, label, image, round = false, square = false } = Astro.props;
+const { form, label, image, round = false, square = false, cover = false } = Astro.props;
 const Placeholder = round ? UserRound : Store;
 // Lado mayor al subirla: perfil y logo se ven chicos; la fachada, a lo ancho de una tarjeta (pantallas 2x).
 const max = round || square ? 512 : 1280;
 ---
 
-<div class:list={["field", { round, square }]} data-photo-field data-form={form} data-max={max}>
+<div class:list={["field", { round, square, cover }]} data-photo-field data-form={form} data-max={max}>
   <span class="field-label" id={`${form}-image-label`}>{label}</span>
   <div class="photo-row">
     <div class="photo-preview">
@@ -141,6 +143,23 @@ const max = round || square ? 512 : 1280;
 
   .square .photo-preview img {
     object-fit: contain;
+  }
+
+  /* Portada: el logo grande como arte de álbum, los botones debajo. */
+  .cover .photo-row {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .cover .photo-preview {
+    width: 100%;
+    max-width: 10rem;
+    border-radius: 0.375rem;
+  }
+
+  .cover .photo-preview:has(img:not([hidden])) {
+    border-color: transparent;
+    box-shadow: 0 10px 24px -10px rgb(0 0 0 / 0.45);
   }
 
   .photo-actions {

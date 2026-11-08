@@ -1,5 +1,5 @@
 ---
-import { AlarmClock, ArrowLeftRight, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Hourglass, PackageMinus, RotateCcw, TriangleAlert, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
+import { AlarmClock, ArrowLeftRight, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Crown, Hourglass, PackageMinus, RotateCcw, TriangleAlert, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
 import type { HTMLAttributes } from "astro/types";
 import { inbox } from "@/data/queries";
 import type { Notification } from "@/data/types";
@@ -11,7 +11,7 @@ type Props = HTMLAttributes<"div">;
 const { class: className, ...rest } = Astro.props;
 const { notifications, unread } = inbox(Astro.locals);
 // Una invitación o un pedido sin responder no se borra: es donde se acepta o se rechaza.
-const removable = (n: Notification) => !((n.kind === "invitation" || n.kind === "reopen_request") && n.pending);
+const removable = (n: Notification) => !((n.kind === "invitation" || n.kind === "reopen_request" || n.kind === "join_request") && n.pending);
 // «de hoy», «de ayer» o la fecha del turno.
 const dayOf = (date: string) => (date === today() ? "de hoy" : `del ${shortDate(date)}`);
 const canClear = notifications.some(removable);
@@ -82,12 +82,25 @@ function describe(n: Notification) {
         detail: [n.data.branch, n.data.reason && `«${n.data.reason}»`].filter(Boolean).join(" · "),
         tone: n.pending ? "warning" : undefined,
       };
+    case "ownership":
+      return { icon: Crown, title: `Ahora eres la dueña de ${n.data.business}`, detail: `${n.data.person} te pasó la propiedad del negocio` };
     case "reopen_sent":
       return {
         icon: n.pending ? Hourglass : RotateCcw,
         title: `Pediste reabrir el turno ${n.data.shift.toLowerCase()} ${dayOf(n.data.date)}`,
         detail: `${n.data.branch} · ${n.pending ? `Esperando respuesta de ${n.data.owner}` : "Ya respondieron tu pedido"}`,
       };
+    case "join_request":
+      return {
+        icon: UserPlus,
+        title: `${n.data.person} pide unirse a ${n.data.business}`,
+        detail: [n.data.branch, n.data.message && `«${n.data.message}»`].filter(Boolean).join(" · "),
+        tone: n.pending ? "warning" : undefined,
+      };
+    case "join_answer":
+      return n.data.accepted
+        ? { icon: UserCheck, title: `Ya eres parte de ${n.data.business}`, detail: `${n.data.person} aceptó tu pedido para unirte` }
+        : { icon: UserX, title: `${n.data.business} no aceptó tu pedido`, detail: `${n.data.person} rechazó tu pedido para unirte` };
     case "reopen_answer":
       return n.data.accepted
         ? { icon: RotateCcw, title: `${n.data.person} reabrió tu turno ${n.data.shift.toLowerCase()}`, detail: `${n.data.branch}: ya puedes seguir vendiendo y ciérralo de nuevo al terminar` }
@@ -204,6 +217,23 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
                     ) : (
                       <p class="bell-detail">Ya respondiste este pedido.</p>
                     ))}
+                  {n.kind === "join_request" &&
+                    (n.pending ? (
+                      <div class="bell-actions">
+                        <a class="btn btn-primary" href={`/app/${n.data.slug}/empleados#pedidos`}>
+                          Revisar pedido
+                        </a>
+                      </div>
+                    ) : (
+                      <p class="bell-detail">Ya respondiste este pedido.</p>
+                    ))}
+                  {n.kind === "join_answer" && n.data.accepted && (
+                    <div class="bell-actions">
+                      <a class="btn btn-secondary" href="/app">
+                        Ir a tus negocios
+                      </a>
+                    </div>
+                  )}
                 </div>
                 {removable(n) && (
                   <form class="bell-delete" data-delete-notification data-confirm={`Se borra «${title}» de tus avisos.`} data-confirm-title="¿Borrar el aviso?" data-confirm-label="Borrar" data-danger>

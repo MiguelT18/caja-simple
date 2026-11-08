@@ -176,6 +176,12 @@ El mundo de la app es el de un reproductor de música con la marca de Caja Simpl
   - Arriba, la foto de la fachada en 16:9 con margen y radio 0.375rem. Sin foto, el degradado del color de la sucursal con el ícono `Store` y «Agregar foto». Las fotos están en el bucket privado `branch-images`.
   - Sobre la foto, el estado de la caja (chip con ícono), el lápiz para editar y el `.play-btn` «Entrar», que aparece al pasar el mouse (fijo en táctil).
   - Debajo, el nombre con su punto de color, la dirección y los empleados (con elipsis si no caben), los turnos como `ShiftChip` con horario y las cifras de hoy en tres columnas.
+- **Configuración del negocio** (`configuracion.astro`), índice lateral + secciones:
+  - **Índice:** con el panel de 50rem o más, una columna de 13rem, sticky, con enlaces como los de la biblioteca: activo con `--color-surface-muted`, 700 e ícono ámbar; lo marca un `IntersectionObserver` con `aria-current`. Debajo, «Tu cuenta» como fila de persona. Más angosto, una fila de píldoras con scroll horizontal, la activa invertida, y «Tu cuenta» pasa a ser la primera fila del contenido.
+  - **Secciones:** h2 en `--text-2xl` 800, descripción atenuada y el cuerpo en una superficie `--color-surface-muted` sin borde. «Negocio» pone el logo como portada (`PhotoField cover`) junto a los campos.
+  - **Sucursales:** filas con arte cuadrado de 4.5rem (la foto de la fachada o `Store` sobre su color), chips de turnos y empleados, lápiz y «Entrar». La última fila, «Agregar sucursal», lleva el arte con borde punteado.
+  - **Plan:** «Plan X» en `--text-4xl` 800, chip «Pagado hasta…» y el uso en cajas con ícono y texto. La barra se pone en `--color-warning` al tope.
+  - **Eliminar:** título en `--color-expense` y la superficie mezclada con `--color-expense-soft`.
 - **Cifras del día** (`.kpis`): tres columnas sin tarjetas, separadas por una línea `--color-border`; etiqueta en `--text-sm` 600 atenuada, valor en `--text-4xl` 800 y nota. A ≤900px quedan una debajo de otra.
 - **Estante** (`.shelf-head`): título de sección con «Mostrar todo» (`.shelf-link`, `--text-sm` 700, atenuado) a la derecha.
 - **Listas y tablas:** como una lista de canciones. El encabezado va sin fondo, en 600 atenuado y con una línea fina `--color-border` debajo; las filas no tienen borde y al pasar el mouse toman `--color-surface-hover` con las puntas redondeadas (0.375rem). Vale para `.table` y para `Table` de shadcn.

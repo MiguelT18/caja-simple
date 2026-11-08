@@ -79,9 +79,11 @@ export type Database = {
       businesses: {
         Row: {
           created_at: string;
+          description: string | null;
           id: string;
           image_path: string | null;
           kind: Database["public"]["Enums"]["business_kind"];
+          listed: boolean;
           name: string;
           owner_id: string;
           plan: Database["public"]["Enums"]["plan"];
@@ -91,9 +93,11 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           created_at?: string;
+          description?: string | null;
           id?: string;
           image_path?: string | null;
           kind?: Database["public"]["Enums"]["business_kind"];
+          listed?: boolean;
           name: string;
           owner_id?: string;
           plan?: Database["public"]["Enums"]["plan"];
@@ -102,9 +106,11 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          description?: string | null;
           id?: string;
           image_path?: string | null;
           kind?: Database["public"]["Enums"]["business_kind"];
+          listed?: boolean;
           name?: string;
           owner_id?: string;
           plan?: Database["public"]["Enums"]["plan"];
@@ -393,6 +399,78 @@ export type Database = {
           },
         ];
       };
+      join_requests: {
+        Row: {
+          branch_id: string | null;
+          business_id: string;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          id: string;
+          message: string | null;
+          person_email: string;
+          person_id: string;
+          person_name: string;
+          status: Database["public"]["Enums"]["join_status"];
+        };
+        ComputedFields: never;
+        Insert: {
+          branch_id?: string | null;
+          business_id: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          message?: string | null;
+          person_email: string;
+          person_id?: string;
+          person_name: string;
+          status?: Database["public"]["Enums"]["join_status"];
+        };
+        Update: {
+          branch_id?: string | null;
+          business_id?: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          message?: string | null;
+          person_email?: string;
+          person_id?: string;
+          person_name?: string;
+          status?: Database["public"]["Enums"]["join_status"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "join_requests_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "join_requests_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "join_requests_decided_by_fkey";
+            columns: ["decided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "join_requests_person_id_fkey";
+            columns: ["person_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       notifications: {
         Row: {
           business_id: string | null;
@@ -400,6 +478,7 @@ export type Database = {
           data: NonNullable<Json>;
           employee_id: string | null;
           id: string;
+          join_request_id: string | null;
           kind: Database["public"]["Enums"]["notification_kind"];
           read_at: string | null;
           reopen_request_id: string | null;
@@ -412,6 +491,7 @@ export type Database = {
           data?: NonNullable<Json>;
           employee_id?: string | null;
           id?: string;
+          join_request_id?: string | null;
           kind: Database["public"]["Enums"]["notification_kind"];
           read_at?: string | null;
           reopen_request_id?: string | null;
@@ -423,6 +503,7 @@ export type Database = {
           data?: NonNullable<Json>;
           employee_id?: string | null;
           id?: string;
+          join_request_id?: string | null;
           kind?: Database["public"]["Enums"]["notification_kind"];
           read_at?: string | null;
           reopen_request_id?: string | null;
@@ -441,6 +522,13 @@ export type Database = {
             columns: ["employee_id"];
             isOneToOne: false;
             referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_join_request_id_fkey";
+            columns: ["join_request_id"];
+            isOneToOne: false;
+            referencedRelation: "join_requests";
             referencedColumns: ["id"];
           },
           {
@@ -515,58 +603,6 @@ export type Database = {
             columns: ["sale_id"];
             isOneToOne: true;
             referencedRelation: "sales";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      reopen_requests: {
-        Row: {
-          branch_id: string;
-          close_id: string;
-          created_at: string;
-          decided_at: string | null;
-          decided_by: string | null;
-          id: string;
-          reason: string | null;
-          requested_by: string | null;
-          status: Database["public"]["Enums"]["reopen_status"];
-        };
-        ComputedFields: never;
-        Insert: {
-          branch_id: string;
-          close_id: string;
-          created_at?: string;
-          decided_at?: string | null;
-          decided_by?: string | null;
-          id?: string;
-          reason?: string | null;
-          requested_by?: string | null;
-          status?: Database["public"]["Enums"]["reopen_status"];
-        };
-        Update: {
-          branch_id?: string;
-          close_id?: string;
-          created_at?: string;
-          decided_at?: string | null;
-          decided_by?: string | null;
-          id?: string;
-          reason?: string | null;
-          requested_by?: string | null;
-          status?: Database["public"]["Enums"]["reopen_status"];
-        };
-        Relationships: [
-          {
-            foreignKeyName: "reopen_requests_branch_id_fkey";
-            columns: ["branch_id"];
-            isOneToOne: false;
-            referencedRelation: "branches";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "reopen_requests_close_id_fkey";
-            columns: ["close_id"];
-            isOneToOne: false;
-            referencedRelation: "shift_closes";
             referencedColumns: ["id"];
           },
         ];
@@ -748,6 +784,72 @@ export type Database = {
           {
             foreignKeyName: "push_subscriptions_user_id_fkey";
             columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reopen_requests: {
+        Row: {
+          branch_id: string;
+          close_id: string;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          id: string;
+          reason: string | null;
+          requested_by: string | null;
+          status: Database["public"]["Enums"]["reopen_status"];
+        };
+        ComputedFields: never;
+        Insert: {
+          branch_id: string;
+          close_id: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          reason?: string | null;
+          requested_by?: string | null;
+          status?: Database["public"]["Enums"]["reopen_status"];
+        };
+        Update: {
+          branch_id?: string;
+          close_id?: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          reason?: string | null;
+          requested_by?: string | null;
+          status?: Database["public"]["Enums"]["reopen_status"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reopen_requests_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reopen_requests_close_id_fkey";
+            columns: ["close_id"];
+            isOneToOne: false;
+            referencedRelation: "shift_closes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reopen_requests_decided_by_fkey";
+            columns: ["decided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reopen_requests_requested_by_fkey";
+            columns: ["requested_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -1102,10 +1204,12 @@ export type Database = {
       };
     };
     Functions: {
-      attach_sale_receipt: {
-        Args: { p_path: string; p_sale: string };
+      answer_join: {
+        Args: { p_accept: boolean; p_branch?: string; p_job_title?: string; p_request: string; p_shift?: string };
         Returns: undefined;
       };
+      answer_reopen: { Args: { p_accept: boolean; p_request: string }; Returns: undefined };
+      attach_sale_receipt: { Args: { p_path: string; p_sale: string }; Returns: undefined };
       branch_team: {
         Args: { p_branch: string };
         Returns: {
@@ -1118,18 +1222,9 @@ export type Database = {
           shift_id: string;
         }[];
       };
-      change_my_shift: {
-        Args: { p_employee: string; p_shift: string };
-        Returns: undefined;
-      };
+      change_my_shift: { Args: { p_employee: string; p_shift: string }; Returns: undefined };
       charge_order: {
-        Args: {
-          p_items: Json;
-          p_order: string;
-          p_payment: Database["public"]["Enums"]["payment_method"];
-          p_sale: string;
-          p_shift: string;
-        };
+        Args: { p_items: Json; p_order: string; p_payment: Database["public"]["Enums"]["payment_method"]; p_sale: string; p_shift: string };
         Returns: string;
       };
       create_business: {
@@ -1137,7 +1232,9 @@ export type Database = {
           p_branch_address: string;
           p_branch_name: string;
           p_branch_slug: string;
+          p_description?: string;
           p_kind?: Database["public"]["Enums"]["business_kind"];
+          p_listed?: boolean;
           p_name: string;
           p_shifts: Json;
           p_slug: string;
@@ -1153,10 +1250,7 @@ export type Database = {
         };
         Returns: string;
       };
-      delete_my_account: {
-        Args: Record<PropertyKey, never>;
-        Returns: undefined;
-      };
+      delete_my_account: { Args: Record<PropertyKey, never>; Returns: undefined };
       record_stock_move: {
         Args: {
           p_branch: string;
@@ -1177,12 +1271,22 @@ export type Database = {
         };
         Returns: string;
       };
-      answer_reopen: { Args: { p_accept: boolean; p_request: string }; Returns: undefined };
       reopen_shift: { Args: { p_close: string }; Returns: undefined };
+      request_join: { Args: { p_branch?: string; p_business: string; p_message?: string }; Returns: string };
       request_reopen: { Args: { p_close: string; p_reason?: string }; Returns: string };
-      respond_invitation: {
-        Args: { p_accept: boolean; p_employee: string };
-        Returns: undefined;
+      respond_invitation: { Args: { p_accept: boolean; p_employee: string }; Returns: undefined };
+      search_businesses: {
+        Args: { p_kind?: Database["public"]["Enums"]["business_kind"]; p_page?: number; p_query?: string };
+        Returns: {
+          branches: Json;
+          description: string;
+          id: string;
+          image_path: string;
+          kind: Database["public"]["Enums"]["business_kind"];
+          name: string;
+          relation: string;
+          total: number;
+        }[];
       };
       search_people: {
         Args: { p_business: string; p_page?: number; p_query: string };
@@ -1196,10 +1300,8 @@ export type Database = {
           total: number;
         }[];
       };
-      set_close_note: {
-        Args: { p_close: string; p_note: string };
-        Returns: undefined;
-      };
+      set_close_note: { Args: { p_close: string; p_note: string }; Returns: undefined };
+      transfer_ownership: { Args: { p_employee: string }; Returns: undefined };
       void_sale: { Args: { p_sale: string }; Returns: undefined };
     };
     Enums: {
@@ -1207,6 +1309,7 @@ export type Database = {
       charge_method: "qr" | "transferencia" | "tarjeta";
       close_status: "en-curso" | "cerrado";
       employee_status: "activo" | "invitado";
+      join_status: "pendiente" | "aceptada" | "rechazada";
       notification_kind:
         | "invitation"
         | "invitation_answer"
@@ -1220,7 +1323,10 @@ export type Database = {
         | "shift_late"
         | "reopen_request"
         | "reopen_answer"
-        | "reopen_sent";
+        | "reopen_sent"
+        | "ownership"
+        | "join_request"
+        | "join_answer";
       payment_method: "efectivo" | "qr" | "transferencia";
       plan: "Gratis" | "Negocio" | "Sucursales";
       plan_period: "mensual" | "anual";
@@ -1236,34 +1342,26 @@ export type Database = {
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<
-  keyof Database,
-  "public"
->];
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof (DefaultSchema["Tables"] & DefaultSchema["Views"]) | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R;
       }
       ? R
@@ -1271,16 +1369,13 @@ export type Tables<
     : never;
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I;
     }
@@ -1295,16 +1390,13 @@ export type TablesInsert<
     : never;
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U;
     }
@@ -1319,33 +1411,26 @@ export type TablesUpdate<
     : never;
 
 export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never) = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never;
 
 export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+  PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never) = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
@@ -1358,6 +1443,7 @@ export const Constants = {
       charge_method: ["qr", "transferencia", "tarjeta"],
       close_status: ["en-curso", "cerrado"],
       employee_status: ["activo", "invitado"],
+      join_status: ["pendiente", "aceptada", "rechazada"],
       notification_kind: [
         "invitation",
         "invitation_answer",
@@ -1372,6 +1458,9 @@ export const Constants = {
         "reopen_request",
         "reopen_answer",
         "reopen_sent",
+        "ownership",
+        "join_request",
+        "join_answer",
       ],
       payment_method: ["efectivo", "qr", "transferencia"],
       plan: ["Gratis", "Negocio", "Sucursales"],

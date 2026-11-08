@@ -1,6 +1,7 @@
 ---
 import { Plus, Store } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
+import BusinessProfileFields from "@/components/app/BusinessProfileFields.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import MediaCard from "@/components/app/MediaCard.astro";
 import Modal from "@/components/app/Modal.astro";
@@ -44,6 +45,7 @@ const freeBusiness = memberships.find((m) => m.role === "dueño" && m.business.p
         <form id="onboarding" class="onboarding-form" data-action="createBusiness" data-redirect="/app/{slug}" novalidate>
           <FormInput form="onboarding" name="name" label="Nombre del negocio" placeholder="Ej.: Almacén López" required maxlength={80} />
           <FormInput form="onboarding" name="kind" label="Rubro" options={kindOptions()} hint="Cambia los textos y las secciones. Lo puedes cambiar después." />
+          <BusinessProfileFields form="onboarding" />
           <div class="field-row-2">
             <FormInput form="onboarding" name="branchName" label="Primera sucursal" value="Principal" hint="La zona o la calle; por ejemplo: Centro o Mercado Rodríguez." required maxlength={80} />
             <FormInput form="onboarding" name="branchAddress" label="Dirección" hint="Opcional" maxlength={160} />
@@ -72,6 +74,7 @@ const freeBusiness = memberships.find((m) => m.role === "dueño" && m.business.p
   <Modal id="new-business" title="Crear negocio" description="Con su primera sucursal, que arranca con los turnos de mañana, tarde y noche." action="createBusiness" submitLabel="Crear negocio" redirect="/app/{slug}">
     <FormInput form="new-business-form" name="name" label="Nombre del negocio" required maxlength={80} />
     <FormInput form="new-business-form" name="kind" label="Rubro" options={kindOptions()} />
+    <BusinessProfileFields form="new-business-form" />
     <FormInput form="new-business-form" name="branchName" label="Primera sucursal" value="Principal" hint="La zona o la calle; por ejemplo: Centro o Mercado Rodríguez." required maxlength={80} />
     <FormInput form="new-business-form" name="branchAddress" label="Dirección" hint="Opcional" maxlength={160} />
   </Modal>

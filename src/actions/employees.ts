@@ -1,7 +1,7 @@
 // Empleados y avisos.
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
-import { bump, businessVersion } from "@/lib/cache";
+import { bump, businessVersion, userVersion } from "@/lib/cache";
 import { check, db, limit, name, uuid } from "./shared";
 
 export const employees = {
@@ -89,6 +89,57 @@ export const employees = {
     },
   }),
 
+  /** Pedir unirse a un negocio de Buscar. La base revisa que esté en la lista y que la persona no esté ya. */
+  requestJoin: defineAction({
+    accept: "form",
+    input: z.object({
+      businessId: uuid,
+      branchId: z.union([uuid, z.literal("")]).optional().transform((v) => v || undefined),
+      message: z.string().trim().max(300, "Usa 300 caracteres o menos").nullish().transform((v) => v || undefined),
+    }),
+    handler: async ({ businessId, branchId, message }, context) => {
+      // Cada pedido le llega a la dueña como aviso y push: el límite evita usarlo para molestar.
+      await limit(context, "join", 10, 60 * 60);
+      const { error } = await db(context).rpc("request_join", { p_business: businessId, p_branch: branchId, p_message: message });
+      check(error);
+      return { ok: true };
+    },
+  }),
+
+  /** La dueña responde: al aceptar elige sucursal, turno y puesto, y la persona entra activa al equipo. */
+  answerJoin: defineAction({
+    accept: "form",
+    input: z
+      .object({
+        requestId: uuid,
+        accept: z.enum(["true", "false"]).transform((v) => v === "true"),
+        branchId: z.union([uuid, z.literal("")]).optional(),
+        shiftId: z.union([uuid, z.literal("")]).optional(),
+        jobTitle: z.string().trim().max(60).nullish(),
+      })
+      .superRefine((v, ctx) => {
+        if (!v.accept) return;
+        if (!v.branchId) ctx.addIssue({ code: "custom", path: ["branchId"], message: "Elige una sucursal" });
+        if (!v.shiftId) ctx.addIssue({ code: "custom", path: ["shiftId"], message: "Elige un turno" });
+        if (!v.jobTitle) ctx.addIssue({ code: "custom", path: ["jobTitle"], message: "Escribe el puesto" });
+      }),
+    handler: async ({ requestId, accept, branchId, shiftId, jobTitle }, context) => {
+      const sb = db(context);
+      const { data: request } = await sb.from("join_requests").select("business_id, person_id").eq("id", requestId).maybeSingle();
+      const { error } = await sb.rpc("answer_join", {
+        p_request: requestId,
+        p_accept: accept,
+        p_branch: branchId || undefined,
+        p_shift: shiftId || undefined,
+        p_job_title: jobTitle ?? undefined,
+      });
+      check(error);
+      // A la persona le aparece el negocio sin esperar a que venza su sesión en caché.
+      if (request && accept) await Promise.all([bump(businessVersion(request.business_id)), bump(userVersion(request.person_id))]);
+      return { ok: true };
+    },
+  }),
+
   markNotificationsRead: defineAction({
     accept: "form",
     // Sin `id`, marca todos; con `id` repetido, solo esos (los que se vieron en la bandeja).
@@ -117,9 +168,13 @@ export const employees = {
     handler: async (_input, context) => {
       const sb = db(context);
       // Las invitaciones sin responder se quedan: borrarlas dejaría a la persona sin forma de aceptar.
-      const { data: pending, error } = await sb.from("notifications").select("id, employee:employees!inner(status)").eq("employee.status", "invitado");
-      check(error);
-      const keep = (pending ?? []).map((n) => n.id);
+      // Los pedidos para unirse sin responder, también: el aviso es lo que lleva a la dueña a responderlos.
+      const [invites, joins] = await Promise.all([
+        sb.from("notifications").select("id, employee:employees!inner(status)").eq("employee.status", "invitado"),
+        sb.from("notifications").select("id, join:join_requests!inner(status)").eq("join.status", "pendiente"),
+      ]);
+      check(invites.error ?? joins.error);
+      const keep = [...(invites.data ?? []), ...(joins.data ?? [])].map((n) => n.id);
       let query = sb.from("notifications").delete().not("id", "is", null);
       if (keep.length) query = query.not("id", "in", `(${keep.join(",")})`);
       check((await query).error);
@@ -140,6 +195,16 @@ export const employees = {
         throw new ActionError({ code: "BAD_REQUEST", message: "Ese turno es de otra sucursal. Elige uno de la sucursal seleccionada." });
       const { error } = await sb.from("employees").update({ branch_id: branchId, shift_id: shiftId }).eq("id", id).select("id").single();
       check(error);
+      return { ok: true };
+    },
+  }),
+
+  /** La dueña pasa el negocio a alguien del equipo; ella queda en su lugar (private.transfer_ownership). */
+  transferOwnership: defineAction({
+    accept: "form",
+    input: z.object({ id: uuid }),
+    handler: async ({ id }, context) => {
+      check((await db(context).rpc("transfer_ownership", { p_employee: id })).error);
       return { ok: true };
     },
   }),

@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
+import { BriefcaseBusiness, Search, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
 import { catalogLabel } from "./kinds";
 import type { Branch } from "./types";
 import { branchHref, businessHref, type Membership } from "./queries";
@@ -12,6 +12,7 @@ export function appNav(m?: Membership, branch?: Branch) {
         title: "Cuenta",
         items: [
           { id: "negocios", label: "Tus negocios", href: "/app", icon: BriefcaseBusiness },
+          { id: "buscar", label: "Buscar", href: "/app/buscar", icon: Search },
           { id: "cuenta", label: "Tu cuenta", href: "/app/cuenta", icon: UserRound },
           { id: "ayuda", label: "Ayuda y comentarios", href: "/app/ayuda", icon: LifeBuoy },
         ],

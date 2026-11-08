@@ -16,6 +16,8 @@ export const toBusiness = (b: Row<"businesses">): Business => ({
   plan: b.plan,
   kind: b.kind,
   imagePath: b.image_path ?? undefined,
+  description: b.description ?? undefined,
+  listed: b.listed,
 });
 
 export const toBranch = (b: Row<"branches">): Branch => ({

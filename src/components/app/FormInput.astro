@@ -9,9 +9,11 @@ interface Props extends Omit<HTMLAttributes<"input">, "form"> {
   hint?: string;
   /** Si se pasa, el campo es un <select>. */
   options?: { value: string; label: string; selected?: boolean }[];
+  /** Si se pasa, el campo es un <textarea> con esas filas. */
+  rows?: number;
 }
 
-const { form, name, label, hint, options, type = "text", ...rest } = Astro.props;
+const { form, name, label, hint, options, rows, type = "text", ...rest } = Astro.props;
 const id = `${form}-${name}`;
 const describedBy = [hint && `${id}-hint`, `${id}-error`].filter(Boolean).join(" ");
 ---
@@ -27,6 +29,8 @@ const describedBy = [hint && `${id}-hint`, `${id}-error`].filter(Boolean).join("
           </option>
         ))}
       </select>
+    ) : rows ? (
+      <textarea class="input" id={id} name={name} rows={rows} aria-describedby={describedBy} {...(rest as HTMLAttributes<"textarea">)}>{rest.value}</textarea>
     ) : (
       <input class="input" id={id} name={name} type={type} aria-describedby={describedBy} {...rest} />
     )

@@ -5,12 +5,18 @@ import EmployeesTable from "@/components/app/EmployeesTable";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
-import { businessContext, fullName } from "@/data/queries";
+import { businessContext, fullName, joinRequests } from "@/data/queries";
+import { stamp } from "@/lib/dates";
 import { initials, plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
 const { business, branchById, employees, shiftById, shifts, branches } = ctx;
+const requests = await joinRequests(Astro.locals, business.id);
+const shiftOptions = [
+  { value: "", label: "Elige un turno" },
+  ...shifts.map((s) => ({ value: s.id, label: branches.length > 1 ? `${branchById(s.branchId)?.name} · ${s.name}` : s.name })),
+];
 
 const rows = employees.map((e) => {
   const shift = shiftById(e.shiftId);
@@ -103,10 +109,63 @@ const rows = employees.map((e) => {
     </div>
   </Modal>
 
+  <section id="pedidos" class="requests" data-region="join-requests" aria-labelledby="requests-title" hidden={requests.length === 0}>
+    <h2 id="requests-title">Pedidos para unirse</h2>
+    <p class="requests-hint">Personas que encontraron {business.name} en Buscar. Al aceptar, eliges su sucursal, su turno y su puesto.</p>
+    <ul class="request-list" role="list">
+      {requests.map((r) => (
+        <li class="request card">
+          <div class="request-body">
+            <p class="request-name">{r.personName}</p>
+            <p class="request-meta">{[r.personEmail, r.branchId && `Prefiere ${branchById(r.branchId)?.name}`, stamp(r.createdAt)].filter(Boolean).join(" · ")}</p>
+            {r.message && <p class="request-message">«{r.message}»</p>}
+          </div>
+          <div class="request-actions">
+            <button type="button" class="btn btn-primary" data-open-dialog={`join-${r.id}`} aria-label={`Aceptar a ${r.personName}`}>Aceptar</button>
+            <form
+              data-action="answerJoin"
+              data-refresh="join-requests"
+              data-success="Pedido rechazado."
+              data-confirm={`¿Rechazar el pedido de ${r.personName}? Le avisamos que no lo aceptaste.`}
+              data-confirm-label="Rechazar"
+              data-danger
+            >
+              <input type="hidden" name="requestId" value={r.id} />
+              <input type="hidden" name="accept" value="false" />
+              <button type="submit" class="btn btn-secondary" aria-label={`Rechazar a ${r.personName}`}>Rechazar</button>
+            </form>
+          </div>
+          <Modal
+            id={`join-${r.id}`}
+            title={`Aceptar a ${r.personName}`}
+            description="Entra al equipo en la sucursal y el turno que elijas. Le llega un aviso."
+            action="answerJoin"
+            submitLabel="Aceptar en el equipo"
+            success={`${r.personName} ya está en tu equipo.`}
+            hidden={{ requestId: r.id, accept: "true" }}
+          >
+            <FormInput form={`join-${r.id}-form`} name="jobTitle" label="Puesto" placeholder="Ej.: Cajera" required maxlength={60} />
+            <div class="field-row-2">
+              <FormInput
+                form={`join-${r.id}-form`}
+                name="branchId"
+                label="Sucursal"
+                required
+                options={branches.map((b) => ({ value: b.id, label: b.name, selected: b.id === r.branchId }))}
+              />
+              <FormInput form={`join-${r.id}-form`} name="shiftId" label="Turno" required options={shiftOptions} />
+            </div>
+          </Modal>
+        </li>
+      ))}
+    </ul>
+  </section>
+
   <div data-region="team">
   <EmployeesTable
     client:visible
     rows={rows}
+    business={business.name}
     branches={branches.map((b) => ({ id: b.id, name: b.name }))}
     shifts={shifts.map((s) => ({ id: s.id, branchId: s.branchId, name: s.name, start: s.start, end: s.end, tone: s.tone }))}
   />
@@ -315,6 +374,65 @@ const rows = employees.map((e) => {
 </script>
 
 <style>
+  .requests {
+    display: grid;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .requests h2 {
+    margin: 0;
+  }
+
+  .requests-hint {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .request-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .request {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .request-body {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+    flex: 1 1 16rem;
+  }
+
+  .request-body p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .request-name {
+    font-weight: var(--font-semibold);
+  }
+
+  .request-meta {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .request-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
   .suggest {
     position: fixed;
     inset: auto;

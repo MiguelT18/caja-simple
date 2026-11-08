@@ -1,5 +1,5 @@
 import { actions } from "astro:actions";
-import { Check, Ellipsis, Store, Trash2 } from "lucide-react";
+import { Check, Crown, Ellipsis, Store, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ShiftTone } from "@/data/types";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { Pager, usePage } from "./Pager";
 import { ShiftBadge } from "./ShiftBadge";
 import { Field, safeAction, selectClass, useActionForm } from "./products/form";
 import { refreshRegions } from "@/scripts/refresh";
-import { confirmDialog, toast } from "@/scripts/dialogs";
+import { confirmDialog, flashToast, toast } from "@/scripts/dialogs";
 
 export interface EmployeeRow {
   id: string;
@@ -48,19 +48,28 @@ interface ShiftOption {
 
 interface Props {
   rows: EmployeeRow[];
+  /** Nombre del negocio, para la confirmación de pasar la propiedad. */
+  business: string;
   branches: BranchOption[];
   shifts: ShiftOption[];
   pageSize?: number;
 }
 
-export default function EmployeesTable({ rows, branches, shifts, pageSize = 10 }: Props) {
+export default function EmployeesTable({ rows, business, branches, shifts, pageSize = 10 }: Props) {
   const pager = usePage(rows, pageSize);
   // Persona y sucursal elegidas en el menú: abre el diálogo para confirmar el turno.
   const [moving, setMoving] = useState<{ employee: EmployeeRow; branch: BranchOption } | null>(null);
   if (rows.length === 0) return <p className="card empty-state">Todavía no invitaste a nadie a tu equipo.</p>;
 
   async function remove(e: EmployeeRow) {
-    if (!(await confirmDialog(`¿Quitar a ${e.name} de tu equipo? Ya no podrá registrar ventas ni gastos.`, { confirmLabel: "Quitar", danger: true }))) return;
+    if (
+      !(await confirmDialog(`Ya no podrá entrar a ${business} ni registrar ventas o gastos. Lo que registró se queda.`, {
+        title: `¿Quitar a ${e.name} del equipo?`,
+        confirmLabel: "Quitar del equipo",
+        danger: true,
+      }))
+    )
+      return;
     const form = new FormData();
     form.set("id", e.id);
     const { error } = await safeAction(() => actions.removeEmployee(form));
@@ -70,6 +79,21 @@ export default function EmployeesTable({ rows, branches, shifts, pageSize = 10 }
       toast(`${e.name} ya no está en tu equipo.`, "success");
       await refreshRegions();
     }
+  }
+
+  async function transfer(e: EmployeeRow) {
+    const ok = await confirmDialog(
+      `${e.name} será la dueña de ${business}: administrará sucursales, equipo, catálogo y el plan. Tú quedas en el equipo, en su sucursal y turno, y ya no podrás administrar el negocio. Solo ${e.name} podrá devolverte la propiedad.`,
+      { title: `¿Pasar ${business} a ${e.name}?`, confirmLabel: "Sí, pasar la propiedad", danger: true },
+    );
+    if (!ok) return;
+    const form = new FormData();
+    form.set("id", e.id);
+    const { error } = await safeAction(() => actions.transferOwnership(form));
+    if (error) return toast(error.message, "error");
+    // Ya no es dueña: las páginas del negocio dejan de estar a su alcance. Vuelve a «Tus negocios».
+    flashToast(`${e.name} ahora es la dueña de ${business}.`);
+    location.assign("/app");
   }
 
   return (
@@ -137,6 +161,13 @@ export default function EmployeesTable({ rows, branches, shifts, pageSize = 10 }
                         );
                       })}
                       <DropdownMenuSeparator />
+                      {/* Solo a quien ya aceptó la invitación: tiene cuenta para entrar como dueña. */}
+                      {e.active && (
+                        <DropdownMenuItem onSelect={() => transfer(e)}>
+                          <Crown />
+                          Pasarle la propiedad del negocio
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem variant="destructive" onSelect={() => remove(e)}>
                         <Trash2 />
                         Quitar del equipo
