@@ -10,6 +10,13 @@ export const differenceLabel = (d: number) => `${d > 0 ? "Sobran" : "Faltan"} ${
 
 export const initials = (first: string, last: string) => `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
 
+/** Color del avatar sin foto: siempre el mismo para la misma persona (uno de los 6 de sucursales, con su par oscuro). */
+export function avatarColor(seed: string) {
+  let hash = 0;
+  for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return `var(--color-branch-${(hash % 6) + 1})`;
+}
+
 /** «1 producto», «3 productos». */
 export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 

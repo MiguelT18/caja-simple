@@ -21,6 +21,6 @@ const lowCount = catalog.filter((p) => p.soldIn.some((s) => s.low)).length;
   />
 
   <div data-region="catalog">
-    <ProductCatalog client:load products={catalog} categories={categories} businessId={business.id} canEdit />
+    <ProductCatalog client:load products={catalog} categories={categories} businessId={business.id} canEdit branches={ctx.membership.branches.map((b) => ({ id: b.id, name: b.name }))} />
   </div>
 </Layout>

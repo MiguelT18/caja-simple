@@ -76,6 +76,14 @@ export interface CatalogProduct {
   description?: string;
   /** URL firmada de la foto, si tiene. */
   image?: string;
+  /** Si tiene, es un combo: lo que incluye. Al venderse descuenta el stock de cada uno. */
+  components?: ComboPart[];
+}
+
+export interface ComboPart {
+  productId: string;
+  name: string;
+  qty: number;
 }
 
 /** Producto tal como lo ve una sucursal: el del catálogo con su precio y stock ahí. */
@@ -187,6 +195,10 @@ export type Notification = {
   id: string;
   createdAt: string;
   read: boolean;
+  /** Negocio del aviso, si es uno donde estás (para llevar a él al tocarlo). */
+  businessId?: string;
+  /** Sucursal del aviso, si la puedes ver (sale de su nombre en `data.branch`). */
+  branchId?: string;
 } & (
   | {
       kind: "invitation";
@@ -260,6 +272,8 @@ export interface PlanCharge {
   taxRate: number;
   amountBs: number;
   method: "qr" | "transferencia" | "tarjeta";
+  /** Descuento aplicado (precio fundador): 0,5 = 50%. `usd` ya va con él. */
+  discount: number;
   createdAt: string;
   expiresAt: string;
   paidAt: string | null;

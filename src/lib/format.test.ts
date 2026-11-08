@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { differenceLabel, formatBs, initials, overnight, plural, toCsv } from "./format";
+import { avatarColor, differenceLabel, formatBs, initials, overnight, plural, toCsv } from "./format";
 
 describe("format", () => {
   it("formatBs usa coma decimal, punto de miles y signo", () => {
@@ -11,6 +11,12 @@ describe("format", () => {
     expect(differenceLabel(5)).toBe("Sobran Bs 5,00");
     expect(differenceLabel(-2)).toBe("Faltan Bs 2,00");
   });
+  it("avatarColor: el mismo color para la misma persona", () => {
+    expect(avatarColor("abc")).toBe(avatarColor("abc"));
+    expect(avatarColor("abc")).toMatch(/^var\(--color-branch-[1-6]\)$/);
+    expect(new Set(["a", "b", "c", "d", "e", "f", "g", "h"].map(avatarColor)).size).toBeGreaterThan(1);
+  });
+
   it("plural, initials y overnight", () => {
     expect(plural(1, "venta", "ventas")).toBe("1 venta");
     expect(plural(0, "venta", "ventas")).toBe("0 ventas");

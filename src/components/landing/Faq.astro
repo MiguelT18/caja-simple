@@ -1,0 +1,149 @@
+---
+// Preguntas frecuentes con <details> nativo: se abren con teclado y sin JS. Las respuestas salen de
+// PRODUCT.md y docs/planes-de-suscripcion.md; no prometen nada que la app no haga.
+import { Plus } from "@lucide/astro";
+
+const faqs = [
+  {
+    q: "¿Necesito una caja registradora o una impresora?",
+    a: "No. Caja Simple funciona en el navegador del celular o de la computadora que ya tienes en el local.",
+  },
+  {
+    q: "¿Mis empleados tienen que pagar?",
+    a: "Nunca. El plan es del negocio y lo paga quien lo administra, por sucursal. Quien trabaja en tu local entra gratis con su propia cuenta.",
+  },
+  {
+    q: "¿Qué pasa si se corta el internet en el local?",
+    a: "Puedes seguir vendiendo: las ventas quedan guardadas en el celular y se envían solas cuando vuelve la conexión.",
+  },
+  {
+    q: "¿Cómo pago el plan?",
+    a: "Por QR bancario, desde la app de cualquier banco. El precio está en dólares y se cobra en bolivianos al tipo de cambio del día. El plan se activa cuando confirmamos el pago.",
+  },
+  {
+    q: "¿Puedo tener mi negocio y además trabajar en uno ajeno?",
+    a: "Sí, con la misma cuenta. Cada negocio aparece con tu papel en él: «Tu negocio» o «Trabajas aquí».",
+  },
+  {
+    q: "¿Puedo llevarme mis datos?",
+    a: "Sí. Desde Tu cuenta descargas toda tu información cuando quieras.",
+  },
+];
+---
+
+<section class="wrap faq" aria-labelledby="faq-title">
+  <header class="section-head">
+    <h2 id="faq-title">Preguntas frecuentes</h2>
+    <p>Lo que suelen preguntar antes de empezar.</p>
+  </header>
+
+  <div class="faq-list">
+    {
+      faqs.map(({ q, a }) => (
+        <details>
+          <summary>
+            <span>{q}</span>
+            <span class="faq-icon" aria-hidden="true"><Plus size={18} stroke-width={1.75} /></span>
+          </summary>
+          <p>{a}</p>
+        </details>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .faq {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
+    align-items: start;
+    gap: clamp(2rem, 1rem + 4vw, 5rem);
+    padding-block: var(--section-gap);
+  }
+
+  .section-head {
+    margin-bottom: 0;
+  }
+
+  details {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  details:first-child {
+    border-top: 1px solid var(--color-border);
+  }
+
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.125rem 0.25rem;
+    border-radius: 0.375rem;
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-lh);
+    font-weight: var(--font-semibold);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+
+  .faq-icon {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+    transition:
+      rotate 300ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 150ms,
+      color 150ms;
+  }
+
+  summary:hover .faq-icon {
+    color: var(--color-text);
+  }
+
+  details[open] .faq-icon {
+    rotate: 45deg;
+    background: var(--color-text);
+    color: var(--color-surface);
+  }
+
+  details p {
+    max-width: 60ch;
+    margin: 0;
+    padding: 0 3rem 1.25rem 0.25rem;
+    color: var(--color-text-muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .faq-icon {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .faq {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+    .section-head {
+      margin-bottom: 1.75rem;
+    }
+    summary {
+      font-size: var(--text-base);
+      line-height: var(--text-base-lh);
+    }
+    details p {
+      padding-right: 0.25rem;
+    }
+  }
+</style>

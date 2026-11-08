@@ -45,7 +45,9 @@ Origen: revisión del código, de las migraciones y de PRODUCT.md del 3 de novie
 - [x] PWA: íconos PNG de 192, 512 y maskable, `apple-touch-icon`, `theme-color` y una página sin conexión. También el favicon, que era el de Astro.
 - [x] Vender sin conexión: guardar el carrito en el dispositivo y una cola de ventas con id idempotente (depende de «Ventas sin duplicados»). Después de vender, no recargar la página entera.
 - [x] Borrar la cuenta y exportar los datos propios (`20261104120000_delete_my_account.sql`; falta aplicarla).
-- [x] Importar productos por CSV (nombre, código de barras, categoría; precio y stock siguen siendo por sucursal).
+- [x] Importar productos por CSV o pegando filas de una planilla (nombre, código de barras, categoría y, si se quiere, precio, stock y mínimo), con plantilla para descargar; lo importado puede entrar directo al inventario de las sucursales elegidas.
+- [x] Agregar varios productos del catálogo a una sucursal de una vez, con precio y stock en la misma tabla.
+- [x] Alta rápida: «Guardar y agregar otro» y lectura del código de barras con la cámara (Chrome/Edge en Android; en iPhone, todavía no).
 
 ## P3: Funciones de los planes pagos (Negocio y Sucursales)
 - [x] Reportes por día, semana y mes de cada sucursal, y exportar a Excel (CSV) o PDF (imprimir): `/app/<negocio>/sucursales/<sucursal>/reportes`, solo la dueña en plan Negocio o superior.

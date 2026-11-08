@@ -151,11 +151,6 @@
 	border-radius: 0 0.375rem 0.375rem 0;
 }
 
-.app-surface .avatar-initials {
-	background: var(--color-surface-hover);
-	color: var(--color-text);
-	font-weight: var(--font-bold);
-}
 
 .app-surface .modal {
 	border-color: var(--color-border);

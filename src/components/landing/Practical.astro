@@ -1,0 +1,130 @@
+---
+// Detalles prácticos: lo que hace falta saber para usarla en el local, como filas de un estante de la app.
+// Solo lo que la app ya hace (venta sin conexión en sale-queue.ts, PWA en public/, rubros en data/kinds.ts).
+import { QrCode, ShieldCheck, Shirt, Smartphone, WifiOff } from "@lucide/astro";
+
+const rows = [
+  {
+    icon: WifiOff,
+    title: "Vende aunque se corte el internet",
+    text: "La venta se guarda en el celular y se envía sola cuando vuelve la conexión. Nunca se registra dos veces.",
+  },
+  {
+    icon: Smartphone,
+    title: "En el celular, como una app",
+    text: "Se instala desde el navegador, sin tienda de apps. Los avisos llegan como notificación; en iPhone, con Caja Simple en la pantalla de inicio.",
+  },
+  {
+    icon: QrCode,
+    title: "Efectivo, QR o transferencia",
+    text: "Cada venta guarda cómo se cobró y, si fue por QR o transferencia, la foto del comprobante. El cuadre cuenta solo el efectivo.",
+  },
+  {
+    icon: Shirt,
+    title: "Para tu rubro",
+    text: "Tienda o almacén, ropa americana o restaurante, donde el catálogo se llama «Menú». Y precio al vender para lo que no tiene precio fijo.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Tus datos son tuyos",
+    text: "Verificación en dos pasos si la quieres, y descargas toda tu información cuando la necesites.",
+  },
+];
+---
+
+<section class="practical" aria-labelledby="practical-title">
+  <div class="wrap practical-grid">
+    <header class="section-head">
+      <h2 id="practical-title">Hecho para el mostrador</h2>
+      <p>Sin caja registradora ni impresora: el celular o la compu que ya tienes. Montos en bolivianos y el día en hora de La Paz.</p>
+    </header>
+
+    <ul class="shelf" role="list">
+      {
+        rows.map(({ icon: Icon, title, text }) => (
+          <li>
+            <span class="shelf-art" aria-hidden="true"><Icon size={22} stroke-width={1.75} /></span>
+            <span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </span>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .practical {
+    padding-block: var(--section-gap);
+    background: var(--color-surface-muted);
+  }
+
+  .practical-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
+    align-items: start;
+    gap: clamp(2rem, 1rem + 4vw, 5rem);
+  }
+
+  .section-head {
+    position: sticky;
+    top: 6rem;
+    margin-bottom: 0;
+  }
+
+  .shelf {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .shelf li {
+    display: flex;
+    gap: 1rem;
+    padding-block: 1.25rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .shelf li:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .shelf-art {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.5rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  h3 {
+    margin: 0;
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-lh);
+    font-weight: var(--font-bold);
+  }
+
+  p {
+    max-width: 60ch;
+    margin: 0.25rem 0 0;
+    color: var(--color-text-muted);
+  }
+
+  @media (max-width: 860px) {
+    .practical-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+    .section-head {
+      position: static;
+      margin-bottom: 1.75rem;
+    }
+  }
+</style>

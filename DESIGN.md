@@ -29,6 +29,8 @@ Tono cálido y cercano, con modo claro y oscuro. Los valores base viven en `src/
 
 ### Marca
 
+**Logo:** una caja abierta y un check que entra en ella, por «la caja cuadra». Va en trazo redondeado de 3/32 sobre un cuadrado ámbar de radio 8/32, y se lee desde 16 px. En la página es `Logo.astro`: el cuadrado es `currentColor` (el ámbar de cada tema) y el trazo es `--color-surface`. Los archivos están en `public/brand/`: `logo.svg`, `logo-512.png`, `logo-wordmark.svg` y `.png` (con «Caja Simple» en Plus Jakarta Sans 800 a trazos). Además están `public/favicon.svg` (con el ámbar oscuro en tema oscuro), `favicon.ico`, `public/icons/` (PWA, con el maskable en la zona segura) y `public/og.png`, la vista previa al compartir de 1200×630.
+
 | Token | Claro | Oscuro | Uso |
 |---|---|---|---|
 | `--color-primary` | `#B45309` | `#F0A04B` | Botón principal, ítem activo, logo |
@@ -86,7 +88,7 @@ Marca, significado, turnos y sucursales no cambian. En la app el ámbar va en el
 | 500 | `--font-medium` | Etiquetas, descripción del encabezado |
 | 600 | `--font-semibold` | Navegación, etiquetas de campo, encabezados de tabla |
 | 700 | `--font-bold` | Botones, ítem activo, títulos de tarjeta, cifras |
-| 800 | `--font-extrabold` | Solo en `/app`: títulos de página y de sección, marca, cifras KPI, monogramas |
+| 800 | `--font-extrabold` | En `/app` y la landing: títulos de página y de sección, marca, cifras KPI, monogramas |
 
 Los tamaños son **fluidos**: cada uno es un `clamp()` que crece de forma lineal entre un viewport de 360px y uno de 1280px. Los interlineados (`--text-*-lh`) no tienen unidad.
 
@@ -129,7 +131,7 @@ El mundo de la app es el de un reproductor de música con la marca de Caja Simpl
 - **Según dónde estás:** en `/app`, «Cuenta» (Tus negocios, Tu cuenta); en las páginas del negocio, la sección del negocio; en una sucursal, la de la sucursal arriba y la del negocio debajo. La empleada nunca ve la sección del negocio ni el resumen de la sucursal.
 - **Ítem activo:** `aria-current="page"`, fondo `--color-surface-muted`, texto `--color-text` en 700 y solo el ícono en ámbar (el ámbar sobre la superficie elevada clara no llega a AA como texto).
 - **Sucursales como filas de biblioteca:** miniatura cuadrada de 2.75rem con la foto de la fachada (`branchImages()`: enlaces firmados del bucket `branch-images`, una sola petición por página); sin foto, el ícono `Store` en el color de la sucursal (`branchColor()`, el mismo orden que en «Sucursales») sobre ese color al 22%. Al lado, el nombre en 700 y, debajo, la dirección. La actual lleva `aria-current`, fondo `--color-surface-hover` y el nombre en ámbar. Al cambiar de sucursal se queda en la misma sección si el rol la puede ver.
-- **Campana** (`NotificationBell.astro`): `.icon-btn` con el número de avisos sin leer, en texto y en el `aria-label` (el color solo refuerza). Abre un popover de 22rem (todo el ancho en móvil) con los avisos, «Marcar todo como leído» y, en una invitación pendiente, «Aceptar» y «Rechazar». Lo sin leer va en negrita, con fondo `--color-primary-soft` y un punto.
+- **Campana** (`NotificationBell.astro`): `.icon-btn` con el número de avisos sin leer, en texto y en el `aria-label` (el color solo refuerza). Abre un popover de 22rem (todo el ancho en móvil) con los avisos, «Marcar todo como leído» y, en una invitación pendiente, «Aceptar» y «Rechazar». Lo sin leer va en negrita, con fondo `--color-primary-soft` y un punto. Cada aviso lleva a lo que trata (`notificationHref()` en `src/data/routes.ts`): turnos y cierres a Turnos de su sucursal, stock bajo al Inventario, equipo a Empleados y el plan a Plan; todo el aviso es el enlace y el foco se dibuja en él. Si es de una sucursal, en lugar del ícono muestra su foto (2.75rem, radio 0.375rem) con el ícono del tipo en un círculo en la esquina, o sin foto el ícono sobre el color de la sucursal al 22 %.
 - **Popovers:** Popover API nativa, `--color-surface`, `--shadow-md`, `border-radius: 0.75rem`.
 - **Móvil:** la marca queda en una barra superior fija de 4rem (superficie al 92% con desenfoque) con el botón de menú; la biblioteca se abre a pantalla completa y el fondo queda `inert`.
 
@@ -186,6 +188,7 @@ El mundo de la app es el de un reproductor de música con la marca de Caja Simpl
 - **Estante** (`.shelf-head`): título de sección con «Mostrar todo» (`.shelf-link`, `--text-sm` 700, atenuado) a la derecha.
 - **Listas y tablas:** como una lista de canciones. El encabezado va sin fondo, en 600 atenuado y con una línea fina `--color-border` debajo; las filas no tienen borde y al pasar el mouse toman `--color-surface-hover` con las puntas redondeadas (0.375rem). Vale para `.table` y para `Table` de shadcn.
 - **Modales:** borde `--color-border`, `--shadow-md`, fondo detrás negro al 60% y título en `--text-xl` 800.
+- **Código de dos pasos** (`CodeInput.astro`): seis casillas con un «-» al medio (123-456), como en Authenticator. Es un solo input real transparente encima de ellas, para que pegar, autocompletar y el lector de pantalla funcionen; la casilla que toca lleva el anillo de foco. En `/auth/verificar` se envía solo al completar los seis dígitos.
 - **Diálogos y avisos:** nunca `window.confirm` ni `window.alert`. Todo `.modal` entra subiendo 0.75rem desde `scale(0.97)` con el fondo que se oscurece (220 ms, `cubic-bezier(0.2, 0.8, 0.2, 1)`) y sale en 160 ms; con movimiento reducido solo hay fundido. Para confirmar, `confirmDialog()` de `src/scripts/dialogs.ts` (o `data-confirm` en un formulario de `action-forms.ts`, con `data-confirm-label` y `data-danger`): el foco empieza en «Cancelar» y lo destructivo va en `.btn-danger`. Para los errores sin un lugar en la página, `toast()`: un aviso flotante abajo a la derecha (arriba y al centro en el celular) con borde izquierdo del color del tono, que se va solo a los 5 s (8 s si es error) o con su «×».
 
 ## Carga
@@ -199,6 +202,15 @@ El mundo de la app es el de un reproductor de música con la marca de Caja Simpl
   - `cards`: negocios y sucursales.
 - **Gráficos:** `ChartContainer` muestra un esqueleto del mismo tamaño hasta montarse.
 - **Fotos de productos, avatares y búsqueda de personas:** esqueleto mientras llegan.
+
+## Landing (`/`)
+
+Sigue el mundo de la app sin cargar `app-surface.css`: `site.css` define con scope `.landing` los botones en píldora (700, el primario a `scale(1.04)` al pasar el mouse), `--font-extrabold` para el h1 y las cifras, y las piezas de ejemplo compartidas (`.demo`, `.demo-head`, `.sample`, `.chip-*`, `.live-dot`).
+
+- **Piezas de ejemplo:** superficie sin borde con `--shadow-md`, la forma de la app (arte del turno, cuenta del mostrador, filas de biblioteca con arte cuadrado, arte tipo álbum con monograma) y siempre el rótulo «Ejemplo».
+- **Recorrido:** hero con la cuenta del turno abierto → «Un día en el local» (cielo y turnos, intacto) → sucursales con el aviso push (`BranchesGlance`) → una cuenta, dos papeles → detalles prácticos como filas de estante (`Practical`) → puente a `/planes` sin cifras → preguntas frecuentes con `<details>` nativo (`Faq`) → cierre.
+- **Cierre:** la noche del día: panel con el tinte del turno noche y una luna; el ámbar queda solo en el botón. El texto va en `--color-text` sobre el tinte.
+- **Movimiento:** el aviso push entra una vez al verse (`landing.ts`, con desenfoque y subida); sin JS o con movimiento reducido ya está a la vista.
 
 ## Páginas de acceso: «Pizarra del día»
 

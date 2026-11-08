@@ -6,6 +6,8 @@ import { ArrowUp } from "@lucide/astro";
 import BaseHead from "../components/BaseHead.astro";
 import Logo from "../components/Logo.astro";
 import ThemeToggle from "../components/ThemeToggle.astro";
+import PromoBar from "../components/PromoBar.astro";
+import { founderPromo } from "../data/queries";
 
 interface Props {
   title: string;
@@ -17,6 +19,8 @@ interface Props {
 const { title, description, active } = Astro.props;
 const signedIn = Boolean(Astro.locals.userId);
 const plansCurrent = active === "planes" ? "page" : undefined;
+// Precio fundador con los cupos reales; si la base no responde, la página sale sin la barra.
+const promo = await founderPromo(Astro.locals.supabase).catch(() => null);
 ---
 
 <html lang="es">
@@ -27,6 +31,12 @@ const plansCurrent = active === "planes" ? "page" : undefined;
   <body class="landing">
     <a class="skip-link" href="#main">Saltar al contenido</a>
     <header class="site-header">
+      {/* Dentro del encabezado fijo: la promo baja con la barra y se esconde con ella. */}
+      {
+        promo && (
+          <PromoBar promo={promo} href={signedIn ? "/planes#pagar" : "/auth/crear-cuenta"} label={signedIn ? "Ver planes" : "Empieza gratis"} />
+        )
+      }
       <div class="wrap header-inner">
         <a href="/" class="brand" aria-label="Caja Simple, inicio">
           <Logo class="brand-logo" />

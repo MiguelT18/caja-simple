@@ -175,14 +175,12 @@ export const account = {
       kind: z.enum(["duda", "problema", "sugerencia"], { error: "Elige de qué se trata" }),
       message: z.string().trim().min(10, "Cuéntanos un poco más (al menos 10 caracteres)").max(2000, "Máximo 2000 caracteres"),
       page: z.string().trim().max(300).optional(),
-      // Un input de archivos vacío manda un File de 0 bytes: se descarta.
-      images: z
-        .array(imageFile)
-        .default([])
-        .transform((files) => files.filter((f): f is File => !!f && f.size > 0))
-        .refine((files) => files.length <= 5, "Puedes adjuntar hasta 5 imágenes"),
+      // Sin .transform() afuera: Astro solo lee todos los archivos del campo (getAll) si ve un array al desenvolver
+      // optional/default; con un pipe afuera manda uno solo. Los File de 0 bytes (input vacío) se descartan en el handler.
+      images: z.array(imageFile).max(5, "Puedes adjuntar hasta 5 imágenes").default([]),
     }),
-    handler: async ({ kind, message, page, images }, context) => {
+    handler: async ({ kind, message, page, images: picked }, context) => {
+      const images = picked.filter((f): f is File => !!f && f.size > 0);
       await uploadLimit(context, ...images);
       await limit(context, "feedback", 5, 3600);
       const sb = db(context);

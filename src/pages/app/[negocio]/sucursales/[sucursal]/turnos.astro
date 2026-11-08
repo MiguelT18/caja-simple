@@ -1,5 +1,6 @@
 ---
 import { CircleCheck, Hourglass, LockOpen, MessageSquareText, Pencil, Plus, RotateCcw, Trash, TriangleAlert } from "@lucide/astro";
+import Avatar from "@/components/Avatar.astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import FormInput from "@/components/app/FormInput.astro";
@@ -7,7 +8,7 @@ import Modal from "@/components/app/Modal.astro";
 import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
 import { branchColor, branchContext, businessHref, closesBetween, shiftBarData, fullName } from "@/data/queries";
-import { differenceLabel, formatBs, initials, overnight, shiftHours } from "@/lib/format";
+import { differenceLabel, formatBs, overnight, shiftHours } from "@/lib/format";
 import { addDays, inShiftWindow, longDate, openFrom, parseRange, shortDate, stamp } from "@/lib/dates";
 
 const { negocio, sucursal } = Astro.params;
@@ -103,9 +104,7 @@ const tones = [
                   <ul class="staff" role="list">
                     {staff.map((e) => (
                       <li>
-                        <span class="avatar-initials" aria-hidden="true">
-                          {initials(e.firstName, e.lastName)}
-                        </span>
+                        <Avatar seed={e.personId ?? e.id} />
                         <span>
                           {fullName(e)}
                           <span class="role">{e.status === "invitado" ? "Invitación pendiente" : e.jobTitle}</span>

@@ -5,6 +5,9 @@ import { z } from "astro/zod";
 import { rateLimit } from "@/lib/cache";
 import { imageInfo, tooLarge } from "@/lib/image";
 
+// Los mensajes que zod arma solo (los que no escribimos a mano) también en español: nada en inglés llega a la pantalla.
+z.config(z.locales.es());
+
 export const uuid = z.uuid();
 export const name = (max: number, message: string) => z.string().trim().min(1, message).max(max, `Máximo ${max} caracteres`);
 export const money = z.coerce.number({ error: "Ingresa un monto" }).min(0, "No puede ser negativo").max(9_999_999);

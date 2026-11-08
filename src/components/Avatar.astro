@@ -1,0 +1,29 @@
+---
+// Foto de una persona o, sin foto (o si no carga), el ícono de persona sobre un color que es siempre el suyo.
+import { User } from "@lucide/astro";
+import { avatarColor } from "@/lib/format";
+
+interface Props {
+  /** URL de la foto (subida a avatars o la del proveedor, p. ej. Google). */
+  src?: string;
+  /** Algo estable de la persona (su id): decide el color. */
+  seed: string;
+  /** Lado en rem. */
+  size?: number;
+  lazy?: boolean;
+  class?: string;
+}
+
+const { src, seed, size = 2, lazy = false, class: className } = Astro.props;
+const px = Math.round(size * 16);
+---
+
+<span class:list={["avatar-default", className]} style={`--avatar: ${avatarColor(seed)}; --avatar-size: ${size}rem`} aria-hidden="true">
+  <User stroke-width={1.75} />
+  {
+    src && (
+      // no-referrer: las fotos de Google (lh3.googleusercontent.com) responden 403 si llevan la página de origen.
+      <img src={src} alt="" width={px} height={px} referrerpolicy="no-referrer" decoding="async" loading={lazy ? "lazy" : undefined} data-fallback />
+    )
+  }
+</span>

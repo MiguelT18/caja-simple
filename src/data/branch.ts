@@ -1,8 +1,8 @@
 // Datos de una página de sucursal y de su barra del turno.
 import { businessVersion, cached } from "@/lib/cache";
 import { inShiftWindow, lastWeek, minutesUntilOpen, openFrom, today } from "@/lib/dates";
-import { cents, shiftCash, sum, totalsBy } from "./cash";
-import { EMPLOYEE_COLUMNS, fail, toCatalogProduct, toEmployee, toShift } from "./mappers";
+import { cents, comboStock, shiftCash, sum, totalsBy } from "./cash";
+import { COMBO_PARTS, EMPLOYEE_COLUMNS, fail, toCatalogProduct, toEmployee, toShift } from "./mappers";
 import { branchHref } from "./routes";
 import { membership, type Membership } from "./session";
 import { closesOf, headerBackdrop, imageUrls, lastCount, movements } from "./shared";
@@ -32,7 +32,7 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
     });
   const [rows, inventory, [closes, moves], soldItems, history, previous, backdrop, reopenRows] = await Promise.all([
     cached(`br:${locals.userId}:${branch.id}`, 600, slow, () => [businessVersion(m.business.id)]),
-    sb.from("inventory").select("price, stock, min_stock, products(*, categories(name))").eq("branch_id", branch.id),
+    sb.from("inventory").select(`price, stock, min_stock, products(*, categories(name), ${COMBO_PARTS})`).eq("branch_id", branch.id),
     // Desde el día del turno abierto si es más viejo que la semana: su esperado se calcula con sus movimientos.
     closesOf(sb, [branch.id], day).then(async (closes) => {
       const openDates = closes.filter((c) => c.status === "en-curso").map((c) => c.business_date);
@@ -66,6 +66,9 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
   const products: Product[] = (inventory.data ?? [])
     .flatMap((i) => (i.products ? [{ ...toCatalogProduct(i.products, images), price: i.price === null ? null : Number(i.price), stock: i.stock, minStock: i.min_stock }] : []))
     .sort((a, b) => a.name.localeCompare(b.name, "es"));
+  // Un combo alcanza para lo que alcancen sus productos en esta sucursal.
+  const stockHere = new Map(products.map((p) => [p.id, p.stock]));
+  for (const p of products) if (p.components) p.stock = comboStock(p.components, (id) => stockHere.get(id));
   const categories: Category[] = categoryRows.data ?? [];
   const staff = (staffRows.data ?? []).map(toEmployee);
 

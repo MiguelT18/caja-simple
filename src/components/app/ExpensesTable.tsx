@@ -4,7 +4,8 @@ import { useState } from "react";
 import type { ShiftTone } from "@/data/types";
 import { formatBs } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
+import { AppDialog } from "./AppDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableCaption, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { confirmDialog, toast } from "@/scripts/dialogs";
@@ -171,14 +172,7 @@ export default function ExpensesTable({
 function EditDialog({ expense, categories, onClose }: { expense: ExpenseRow; categories: string[]; onClose: () => void }) {
   const save = useActionForm((form) => actions.updateExpense(form) as never, onClose, (form) => `Gasto «${form.get("concept") ?? expense.concept}» actualizado.`);
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Editar gasto</DialogTitle>
-          <DialogDescription>
-            {when(expense)} · turno {expense.shift.name.toLowerCase()}
-          </DialogDescription>
-        </DialogHeader>
+    <AppDialog title="Editar gasto" description={`${when(expense)} · turno ${expense.shift.name.toLowerCase()}`} onClose={onClose}>
         <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
           <input type="hidden" name="expenseId" value={expense.id} />
           <Field id="edit-concept" label="Concepto" error={save.errors.concept}>
@@ -209,7 +203,6 @@ function EditDialog({ expense, categories, onClose }: { expense: ExpenseRow; cat
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </AppDialog>
   );
 }

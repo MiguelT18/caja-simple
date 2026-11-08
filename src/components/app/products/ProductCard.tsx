@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleSlash, Ellipsis, Package, Pencil, ScanBarcode, TriangleAlert } from "lucide-react";
+import { CircleSlash, Ellipsis, Layers, Package, Pencil, ScanBarcode, Trash2, TriangleAlert } from "lucide-react";
 import type { Product } from "@/data/types";
 import type { Category } from "@/data/types";
 import { formatBs } from "@/lib/format";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { type Item, isLow, NONE } from "./catalog";
+import { type Item, comboSummary, isLow, NONE } from "./catalog";
 
 export function ProductImage({ src, color }: { src?: string; color: string }) {
   const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
@@ -102,6 +102,7 @@ export function ProductCard({
   categories,
   onMove,
   onEdit,
+  onDelete,
   onOpen,
 }: {
   product: Item;
@@ -110,6 +111,8 @@ export function ProductCard({
   categories: Category[];
   onMove?: (categoryId: string | null) => void;
   onEdit?: () => void;
+  /** Elimina el producto del catálogo (confirma antes quien lo llama). */
+  onDelete?: () => void;
   /** Abre el detalle: toda la tarjeta es el botón (el nombre se estira sobre ella). */
   onOpen?: () => void;
 }) {
@@ -175,6 +178,15 @@ export function ProductCard({
                 ))}
                 <DropdownMenuRadioItem value={NONE}>Sin categoría</DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
+              {onDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                    <Trash2 />
+                    Eliminar del catálogo
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -197,10 +209,19 @@ export function ProductCard({
             product.name
           )}
         </h3>
-        <p className={cn("m-0 flex items-center gap-1.5 text-sm text-muted-foreground", !product.barcode && "@max-lg/list:hidden")}>
-          <ScanBarcode className="size-4 shrink-0" aria-hidden="true" />
-          {product.barcode ? <span className="tabular-nums">{product.barcode}</span> : <span>Sin código</span>}
-        </p>
+        {product.components ? (
+          <p className="m-0 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+            <Layers className="size-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              <span className="font-semibold text-foreground">Combo:</span> {comboSummary(product.components)}
+            </span>
+          </p>
+        ) : (
+          <p className={cn("m-0 flex items-center gap-1.5 text-sm text-muted-foreground", !product.barcode && "@max-lg/list:hidden")}>
+            <ScanBarcode className="size-4 shrink-0" aria-hidden="true" />
+            {product.barcode ? <span className="tabular-nums">{product.barcode}</span> : <span>Sin código</span>}
+          </p>
+        )}
         {"soldIn" in product ? (
           product.soldIn.length === 0 ? (
             <p className="m-0 mt-auto pt-2 text-sm text-muted-foreground">No se vende en ninguna sucursal</p>

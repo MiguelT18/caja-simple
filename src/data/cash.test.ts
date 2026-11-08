@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { byPeriod, cashStatus, cents, shiftCash, sum, totalsBy } from "./cash";
+import { byPeriod, cashStatus, cents, comboStock, shiftCash, sum, totalsBy } from "./cash";
 import type { Row } from "./mappers";
 import type { Expense, Sale } from "./types";
 
@@ -51,5 +51,19 @@ describe("byPeriod", () => {
       { date: "2026-11-02", sales: 0.3, expenses: 3, count: 2 },
       { date: "2026-11-09", sales: 0, expenses: 0, count: 0 },
     ]);
+  });
+});
+
+describe("comboStock", () => {
+  const parts = [{ productId: "a", qty: 2 }, { productId: "b", qty: 1 }];
+  it("alcanza para lo que alcance el producto más justo", () => {
+    expect(comboStock(parts, (id) => ({ a: 7, b: 5 } as Record<string, number>)[id])).toBe(3);
+  });
+  it("ignora los productos sin control de stock", () => {
+    expect(comboStock(parts, (id) => ({ a: null, b: 4 } as Record<string, number | null>)[id])).toBe(4);
+    expect(comboStock(parts, () => null)).toBeNull();
+  });
+  it("no alcanza si un producto no está en la sucursal", () => {
+    expect(comboStock(parts, (id) => (id === "a" ? 10 : undefined))).toBe(0);
   });
 });

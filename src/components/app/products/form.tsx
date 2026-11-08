@@ -55,7 +55,12 @@ export async function safeAction<T extends ActionResult>(call: () => Promise<T>)
  * Envía el formulario a la acción. Si sale bien: cierra (onDone), actualiza la página y avisa con `success` (texto fijo
  * o armado con lo enviado). Si falla, el error queda dentro del diálogo: una notificación quedaría detrás del modal.
  */
-export function useActionForm(action: (form: FormData) => Promise<ActionResult>, onDone?: () => void, success?: string | ((form: FormData) => string)) {
+export function useActionForm(
+  action: (form: FormData) => Promise<ActionResult>,
+  onDone?: () => void,
+  // Sin texto (la función devuelve undefined), no hay toast: el diálogo sigue abierto y avisa él mismo.
+  success?: string | ((form: FormData) => string | undefined),
+) {
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
@@ -78,7 +83,8 @@ export function useActionForm(action: (form: FormData) => Promise<ActionResult>,
       // Sin recargar: se cierra el diálogo y la página cambia solo lo que muestra estos datos (scripts/refresh.ts).
       onDone?.();
       await refreshRegions();
-      if (success) toast(typeof success === "string" ? success : success(form), "success");
+      const text = typeof success === "string" ? success : success?.(form);
+      if (text) toast(text, "success");
       return setBusy(false);
     }
     setBusy(false);
@@ -120,6 +126,14 @@ export function StockFields({ product, errors }: { product?: Product; errors: Re
           <p className="field-hint m-0">Quien vende escribe el precio en cada venta.</p>
         )}
       </div>
+      {product?.components ? (
+        // Un combo no tiene stock propio: alcanza para lo que alcancen sus productos (comboStock).
+        <p className="field-hint m-0 border-t pt-4">
+          {product.stock === null
+            ? "El stock sale de los productos del combo; ninguno lo controla."
+            : `El stock sale de los productos del combo: alcanza para ${product.stock}.`}
+        </p>
+      ) : (
       <div className="grid min-w-0 gap-2 border-t pt-4">
         <Toggle name="trackStock" label="Controlar stock" checked={trackStock} onChange={setTrackStock} />
         {/* Si ya se controlaba, el stock de ahora: al guardar se aplica solo la diferencia (ver saveInventory). */}
@@ -137,6 +151,7 @@ export function StockFields({ product, errors }: { product?: Product; errors: Re
           <p className="field-hint m-0">Se vende sin tope y sin avisos de stock bajo.</p>
         )}
       </div>
+      )}
     </div>
   );
 }

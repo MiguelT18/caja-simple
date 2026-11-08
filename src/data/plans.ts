@@ -12,8 +12,8 @@ export const planLimits: Record<PlanName, { branches: number | null; historyDays
   Sucursales: { branches: null, historyDays: null, reports: true },
 };
 
-// Enlace del botón «Mejorar plan» (WhatsApp, formulario…). Sin él, la página de plan solo explica el proceso.
-export const upgradeUrl: string | undefined = PUBLIC_UPGRADE_URL || undefined;
+// WhatsApp donde llegan los comprobantes de pago (+591 67677457). PUBLIC_UPGRADE_URL lo reemplaza si está definida.
+export const upgradeUrl: string = PUBLIC_UPGRADE_URL || "https://wa.me/59167677457";
 
 export interface Plan {
   name: PlanName;
@@ -40,6 +40,9 @@ export const usdFor = (plan: PlanName, period: Period, extra = 0) =>
  */
 export const bsTotal = (usd: number, rate: number, tax: number) => Math.round((usd * rate) / (1 - tax) + 1e-9);
 
+/** US$ con descuento (precio fundador), redondeado a centavos como la base: round(usd × (1 − d), 2). */
+export const discounted = (usd: number, discount: number) => Math.round(usd * (1 - discount) * 100 + 1e-9) / 100;
+
 const usdFormat = (n: number) => n.toLocaleString("es-BO", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
 /** «US$ 5,50», «US$ 55». */
 export const usdLabel = (n: number) => `US$ ${usdFormat(n)}`;
@@ -53,7 +56,7 @@ export interface Quote {
 }
 
 /**
- * Precio de un plan como lo muestra la app: «US$ 5,50 + impuestos · hoy Bs 79». Sin tipo de cambio, solo dólares.
+ * Precio de un plan como lo muestra la app: «US$ 5,50 + impuestos · hoy Bs 77». Sin tipo de cambio, solo dólares.
  * En Sucursales, el precio base y aparte lo de cada sucursal extra.
  */
 export function priceOf(plan: PlanName, period: Period, quote?: Quote | null) {
@@ -79,21 +82,24 @@ export const plans: Plan[] = [
     name: "Gratis",
     audience: "Puesto o tienda que recién empieza",
     features: [
-      "1 negocio y 1 sucursal",
+      "1 sucursal por negocio, negocios ilimitados",
       "Empleados ilimitados",
       "Ventas, gastos, turnos y cuadre",
-      "Aviso de cada cierre de caja",
+      "Cobros en efectivo, QR o transferencia",
+      "Inventario y stock de tu sucursal",
+      "Vende aunque se corte el internet",
+      "Aviso de cada cierre y si la caja no cuadra",
       "Historial de los últimos 60 días",
     ],
   },
   {
     name: "Negocio",
-    audience: "El local que ya depende de la app",
+    audience: "Cuando quieres comparar con el mes pasado",
     features: [
       "Todo lo del plan Gratis",
-      "Historial completo",
+      "Historial completo, sin límite de días",
       "Reportes por día, semana y mes",
-      "Exportar a Excel o PDF",
+      "Exporta a Excel o imprime en PDF",
     ],
   },
   {

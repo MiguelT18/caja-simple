@@ -1,5 +1,5 @@
 ---
-import { ChevronLeft, ChevronRight, UserPlus } from "@lucide/astro";
+import { ChevronLeft, ChevronRight, User, UserPlus } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import EmployeesTable from "@/components/app/EmployeesTable";
 import FormInput from "@/components/app/FormInput.astro";
@@ -7,7 +7,7 @@ import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
 import { businessContext, fullName, joinRequests } from "@/data/queries";
 import { stamp } from "@/lib/dates";
-import { initials, plural } from "@/lib/format";
+import { plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
@@ -22,7 +22,7 @@ const rows = employees.map((e) => {
   const shift = shiftById(e.shiftId);
   return {
     id: e.id,
-    initials: initials(e.firstName, e.lastName),
+    avatarSeed: e.personId ?? e.id,
     name: fullName(e),
     email: e.email,
     role: e.jobTitle,
@@ -172,8 +172,12 @@ const rows = employees.map((e) => {
   </div>
 </Layout>
 
+<!-- Ícono de los avatares de las sugerencias (el script los arma en el navegador). -->
+<template id="avatar-icon"><User stroke-width={1.75} /></template>
+
 <script>
   import { actions } from "astro:actions";
+  import { avatarColor } from "@/lib/format";
 
   // byEmail: se encontró por su correo y se ve completo; si no, por su nombre, con el correo enmascarado.
   type Person = { id: string; email: string; byEmail: boolean; name: string; avatarUrl?: string };
@@ -255,14 +259,16 @@ const rows = employees.map((e) => {
       li.setAttribute("role", "option");
       li.setAttribute("aria-selected", "false");
       li.className = "suggest-option";
-      let avatar: HTMLElement;
+      // Como Avatar.astro: el ícono sobre el color de la persona y la foto encima; si no carga, queda el ícono.
+      const avatar = Object.assign(document.createElement("span"), { className: "avatar-default" });
+      avatar.setAttribute("aria-hidden", "true");
+      avatar.style.setProperty("--avatar", avatarColor(p.id));
+      avatar.append(document.querySelector<HTMLTemplateElement>("#avatar-icon")!.content.cloneNode(true));
       if (p.avatarUrl) {
-        avatar = Object.assign(document.createElement("img"), { src: p.avatarUrl, alt: "", referrerPolicy: "no-referrer" });
-      } else {
-        avatar = document.createElement("span");
-        avatar.textContent = (p.name || p.email).split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+        const img = Object.assign(document.createElement("img"), { src: p.avatarUrl, alt: "", referrerPolicy: "no-referrer" });
+        img.addEventListener("error", () => (img.hidden = true));
+        avatar.append(img);
       }
-      avatar.className = "suggest-avatar avatar-initials";
       const text = Object.assign(document.createElement("span"), { className: "suggest-text" });
       text.append(Object.assign(document.createElement("span"), { className: "suggest-name", textContent: p.name || p.email }));
       if (p.name) text.append(Object.assign(document.createElement("span"), { className: "suggest-email", textContent: p.email }));
@@ -469,13 +475,6 @@ const rows = employees.map((e) => {
   .suggest :global(.suggest-option:hover),
   .suggest :global(.suggest-option[aria-selected="true"]) {
     background: var(--color-surface-muted);
-  }
-
-  .suggest :global(.suggest-avatar) {
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    object-fit: cover;
   }
 
   .suggest :global(.suggest-text),

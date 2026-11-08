@@ -1,4 +1,5 @@
 import { getActionContext } from "astro:actions";
+import type { APIContext, MiddlewareNext } from "astro";
 import { defineMiddleware } from "astro:middleware";
 import { bump, businessVersion, userVersion } from "./lib/cache";
 import { loadSession } from "./data/queries";
@@ -29,6 +30,9 @@ const LIVE_ACTIONS = new Set([
   "saveCloseNote",
   "reopenShift",
   "recordStockMove",
+  "saveInventory",
+  "removeInventory",
+  "addToInventory",
   "markNotificationsRead",
   "deleteNotification",
   "clearNotifications",
@@ -41,9 +45,34 @@ const LIVE_ACTIONS = new Set([
   "changePassword",
 ]);
 
+/** Acciones tras las que la persona puede dejar de ver un negocio: para invalidarlo hay que leer sus negocios antes. */
+const LOSES_ACCESS = new Set(["deleteBusiness", "transferOwnership", "removeEmployee", "deleteAccount"]);
+
+/**
+ * Encabezados de seguridad de toda respuesta de servidor, redirecciones incluidas.
+ * shortcut: las páginas prerenderizadas (/, /planes, /terminos, /privacidad) salen del CDN sin ellos (Vercel ignora vercel.json
+ * con el adaptador de Astro); no tienen sesión ni formularios de la caja. Si hace falta, quitarles el prerender.
+ */
+const SECURITY_HEADERS = {
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+  // Nadie puede meter la app en un iframe (clickjacking sobre la caja).
+  "Content-Security-Policy": "frame-ancestors 'none'",
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  // La cámara es para el escáner de códigos de barras.
+  "Permissions-Policy": "camera=(self), microphone=(), geolocation=()",
+};
+
 export const onRequest = defineMiddleware(async (context, next) => {
   // Las páginas prerenderizadas (la landing) no tienen petición real.
   if (context.isPrerendered) return next();
+  const response = await handle(context, next);
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) response.headers.set(key, value);
+  return response;
+});
+
+async function handle(context: APIContext, next: MiddlewareNext): Promise<Response> {
 
   const cacheHeaders = new Headers();
   const supabase = createSupabase({ request: context.request, cookies: context.cookies, headers: cacheHeaders });
@@ -65,12 +94,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return context.redirect(safeNext(context.url.searchParams.get("next")));
   }
 
-  // Toda otra acción invalida la caché de la persona y de cada negocio que veía antes o ve después de escribir
-  // (así cubre negocios nuevos y borrados, y llega a las demás personas del negocio).
+  // Toda otra acción invalida la caché de la persona y de cada negocio que ve después de escribir (y, si pudo perder
+  // el acceso, también de los que veía antes): así cubre negocios nuevos y borrados, y llega a las demás personas.
   const { action } = getActionContext(context);
   const invalidates = userId && action && !LIVE_ACTIONS.has(action.name);
   const businessIds = async () => ((await supabase.from("businesses").select("id")).data ?? []).map((b) => b.id);
-  const before = invalidates ? await businessIds() : [];
+  // Los negocios de después bastan, salvo que la acción quite el acceso a alguno (ahí se leen también los de antes).
+  const before = invalidates && LOSES_ACCESS.has(action.name) ? await businessIds() : [];
 
   let response: Response;
   try {
@@ -85,4 +115,4 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (invalidates) await bump(userVersion(userId), ...[...before, ...(await businessIds())].map(businessVersion));
   cacheHeaders.forEach((value, key) => response.headers.set(key, value));
   return response;
-});
+}

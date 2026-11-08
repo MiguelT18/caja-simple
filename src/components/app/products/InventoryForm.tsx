@@ -2,7 +2,8 @@ import { actions } from "astro:actions";
 import { Trash2 } from "lucide-react";
 import type { Product } from "@/data/types";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
+import { AppDialog } from "../AppDialog";
 import { safeAction, useActionForm, StockFields } from "./form";
 import { refreshRegions } from "@/scripts/refresh";
 import { confirmDialog, toast } from "@/scripts/dialogs";
@@ -24,12 +25,7 @@ export function InventoryForm({ businessId, branchId, product, onClose }: { busi
   }
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-lg">
-        <DialogHeader className="pr-8 text-left">
-          <DialogTitle className="[overflow-wrap:anywhere]">{product.name}</DialogTitle>
-          <DialogDescription>Precio y stock en esta sucursal.</DialogDescription>
-        </DialogHeader>
+    <AppDialog title={product.name} description="Precio y stock en esta sucursal." onClose={onClose}>
         <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
           <input type="hidden" name="businessId" value={businessId} />
           <input type="hidden" name="branchId" value={branchId} />
@@ -56,7 +52,6 @@ export function InventoryForm({ businessId, branchId, product, onClose }: { busi
             </div>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </AppDialog>
   );
 }

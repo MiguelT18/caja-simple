@@ -75,11 +75,17 @@ export async function loadSession(sb: Supabase, userId: string): Promise<Session
   });
   // Primero los negocios propios, después donde trabaja.
   memberships.sort((a, b) => (a.role === b.role ? 0 : a.role === "dueño" ? -1 : 1));
+  // Los avisos guardan el nombre de la sucursal, no su id: se busca entre las que ves en ese negocio.
+  // shortcut: si la sucursal cambió de nombre después del aviso, ese aviso lleva al negocio; guardar branch_id en notifications si molesta.
+  const branchOf = (businessId: string | null, name: unknown) =>
+    typeof name === "string" ? memberships.find((m) => m.business.id === businessId)?.branches.find((b) => b.name === name)?.id : undefined;
   const notifications = (inbox.data ?? []).map(
     (n) =>
       ({
         id: n.id,
         kind: n.kind,
+        businessId: n.business_id ?? undefined,
+        branchId: branchOf(n.business_id, (n.data as { branch?: unknown } | null)?.branch),
         createdAt: n.created_at,
         read: n.read_at !== null,
         data: n.data,

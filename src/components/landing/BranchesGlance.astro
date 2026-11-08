@@ -1,0 +1,218 @@
+---
+// Varias sucursales de un vistazo: filas como la biblioteca de la app (arte cuadrado en el color de cada
+// sucursal) con el estado de la caja, y el aviso push que llega cuando un cierre no cuadra. Todo es ejemplo.
+// El aviso entra al verse en pantalla (landing.ts); sin JS o con movimiento reducido ya está ahí.
+import { CircleCheck, Store, TriangleAlert } from "@lucide/astro";
+import Logo from "../Logo.astro";
+import { differenceLabel, formatBs } from "../../lib/format";
+
+const branches = [
+  { name: "Sucursal Centro", where: "Av. 16 de Julio", color: "--color-branch-1", shift: "Tarde", chip: "chip-afternoon", sales: 950, state: "live" },
+  { name: "Sucursal Sur", where: "Calacoto, calle 21", color: "--color-branch-2", shift: "Tarde", chip: "chip-afternoon", sales: 684, state: "short", diff: -12 },
+  { name: "Sucursal Norte", where: "Villa Fátima", color: "--color-branch-3", shift: "Mañana", chip: "chip-morning", sales: 402.5, state: "ok" },
+] as const;
+const short = branches.find((b) => b.state === "short")!;
+---
+
+<section class="wrap glance" aria-labelledby="glance-title">
+  <header class="section-head">
+    <h2 id="glance-title">Todas tus sucursales, sin ir a cada una</h2>
+    <p>Cada local cierra su turno y tú ves cuál cuadró. Si uno no cuadra, te llega un aviso al celular.</p>
+  </header>
+
+  <div class="glance-stage">
+    <figure class="demo glance-list" aria-labelledby="glance-list-title">
+      <figcaption class="demo-head">
+        <span id="glance-list-title" class="demo-title">Sucursales de Tienda Doña Rosa</span>
+        <span class="sample">Ejemplo</span>
+      </figcaption>
+      <ul role="list">
+        {
+          branches.map((b) => (
+            <li style={`--tone: var(${b.color})`}>
+              <span class="art" aria-hidden="true"><Store size={20} stroke-width={1.75} /></span>
+              <span class="who">
+                <span class="name">{b.name}</span>
+                <span class="where">{b.where}</span>
+              </span>
+              <span class:list={["chip", b.chip, "shift"]}>{b.shift}</span>
+              <span class="num amount-income sales">{formatBs(b.sales, "+")}</span>
+              {b.state === "live" && (
+                <span class="chip chip-live state"><span class="live-dot" aria-hidden="true" />En curso</span>
+              )}
+              {b.state === "ok" && (
+                <span class="chip chip-ok state"><CircleCheck size={14} stroke-width={2} />Cuadra</span>
+              )}
+              {b.state === "short" && (
+                <span class="chip chip-warn state"><TriangleAlert size={14} stroke-width={2} /><span class="num">{differenceLabel(b.diff)}</span></span>
+              )}
+            </li>
+          ))
+        }
+      </ul>
+    </figure>
+
+    <aside class="push" aria-label="Ejemplo de aviso en el celular" data-push>
+      <span class="push-icon" aria-hidden="true"><Logo class="push-logo" /></span>
+      <span class="push-body">
+        <span class="push-meta">Caja Simple · ahora <span class="sample">Ejemplo</span></span>
+        <strong>La caja no cuadra en {short.name}</strong>
+        <span>En el cierre del turno tarde faltan <span class="num">{formatBs(-short.diff)}</span>.</span>
+      </span>
+    </aside>
+  </div>
+</section>
+
+<style>
+  .glance {
+    padding-block: var(--section-gap);
+  }
+
+  .glance-stage {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+    align-items: start;
+    gap: clamp(1.5rem, 1rem + 3vw, 3.5rem);
+  }
+
+  .glance-list ul {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .glance-list li {
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr) auto auto 9.5rem;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+  }
+
+  .glance-list li:nth-child(odd) {
+    background: var(--color-surface-muted);
+  }
+
+  .art {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.375rem;
+    background: color-mix(in oklab, var(--tone) 22%, var(--color-surface));
+    color: var(--tone);
+  }
+
+  .who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .name {
+    font-weight: var(--font-bold);
+  }
+
+  .where {
+    overflow: hidden;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .state {
+    justify-self: end;
+  }
+
+  /* El aviso imita la tarjeta de una notificación del celular, encima de la lista. */
+  .push {
+    display: flex;
+    gap: 0.75rem;
+    align-self: center;
+    padding: 0.875rem 1rem;
+    border-radius: 1.25rem;
+    background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+    box-shadow:
+      0 18px 40px -12px light-dark(rgb(31 26 23 / 0.28), rgb(0 0 0 / 0.7)),
+      var(--shadow-sm);
+    backdrop-filter: blur(12px);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .push-icon {
+    flex-shrink: 0;
+  }
+
+  .push-icon :global(.push-logo) {
+    display: block;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--color-primary);
+  }
+
+  .push-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .push-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs-lh);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.push.is-armed) {
+      transition:
+        opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+        translate 700ms cubic-bezier(0.16, 1, 0.3, 1),
+        filter 700ms cubic-bezier(0.16, 1, 0.3, 1);
+      transition-delay: 350ms;
+    }
+    :global(.push.is-armed:not(.is-seen)) {
+      opacity: 0;
+      translate: 0 -1.25rem;
+      filter: blur(6px);
+    }
+  }
+
+  @media (max-width: 960px) {
+    .glance-stage {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    /* El aviso baja sobre la lista, como llega al celular. */
+    .push {
+      grid-row: 1;
+      max-width: 24rem;
+      margin: 0 0 -0.5rem auto;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .glance-list li {
+      grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+      row-gap: 0.375rem;
+    }
+    .shift {
+      display: none;
+    }
+    .sales {
+      justify-self: end;
+    }
+    .state {
+      grid-column: 2 / -1;
+      justify-self: start;
+    }
+  }
+</style>

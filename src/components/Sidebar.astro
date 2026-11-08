@@ -2,7 +2,8 @@
 import { BriefcaseBusiness, GripVertical, Store } from "@lucide/astro";
 import type { Branch, User } from "../data/types";
 import { NAV_ORDER_COOKIE, appNav, applyNavOrder } from "../data/navigation";
-import { branchColor, branchHref, branchImages, branchSections, businessHref, entryHref, myBusinesses, type Membership } from "../data/queries";
+import { branchColor, branchHref, branchImages, branchSections, businessHref, entryHref, founderPromo, myBusinesses, type Membership } from "../data/queries";
+import PromoBar from "./PromoBar.astro";
 import ContextSwitcher from "./ContextSwitcher.astro";
 import Logo from "./Logo.astro";
 import NotificationBell from "./NotificationBell.astro";
@@ -21,6 +22,9 @@ const m = context?.membership;
 const branch = context?.branch;
 
 const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
+// Precio fundador: solo a quien tiene un negocio propio en Gratis, y no en su página de plan (ahí va el detalle).
+const freeOwned = myBusinesses(Astro.locals).find((other) => other.role === "dueño" && other.business.plan === "Gratis")?.business;
+const promo = freeOwned && !currentPath.endsWith("/plan") && !currentPath.includes("/cobro/") ? await founderPromo(Astro.locals.supabase).catch(() => null) : null;
 const navSections = applyNavOrder(appNav(m, branch), Astro.cookies.get(NAV_ORDER_COOKIE)?.value);
 
 const businessOptions = myBusinesses(Astro.locals).map((other) => ({
@@ -158,6 +162,7 @@ const branchLinks = m
     </nav>
 
     <footer class="sidebar-footer">
+      {promo && freeOwned && <PromoBar variant="card" promo={promo} href={`${businessHref(freeOwned)}/plan`} label="Usar descuento" />}
       <UserCard user={user} />
     </footer>
   </div>

@@ -1,8 +1,9 @@
 import { actions } from "astro:actions";
 import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
-import { LayoutGrid, List, Package, Plus, Search, TriangleAlert } from "lucide-react";
+import { Layers, LayoutGrid, List, Package, Plus, Search, TriangleAlert } from "lucide-react";
 import type { Category, Product } from "@/data/types";
+import type { CatalogEntry } from "@/data/queries";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,8 @@ import { ImportProducts } from "./ImportProducts";
 import { InventoryForm } from "./InventoryForm";
 import { AddToBranch } from "./AddToBranch";
 import { safeAction } from "./form";
-import { announce, toast } from "@/scripts/dialogs";
+import { announce, confirmDialog, toast } from "@/scripts/dialogs";
+import { refreshRegions } from "@/scripts/refresh";
 
 const ALL = "all";
 const PAGE_SIZE = 12;
@@ -50,9 +52,11 @@ interface Props {
   canEdit: boolean;
   /** En la sucursal: productos del catálogo que todavía no se venden ahí. */
   addable?: { id: string; name: string }[];
+  /** En el negocio: sucursales a las que puede entrar lo que se importa. */
+  branches?: { id: string; name: string }[];
 }
 
-export default function ProductCatalog({ products: initialProducts, categories: initialCategories, businessId, branchId, canEdit, addable = [] }: Props) {
+export default function ProductCatalog({ products: initialProducts, categories: initialCategories, businessId, branchId, canEdit, addable = [], branches = [] }: Props) {
   const mode = branchId ? "branch" : "business";
   const [products, setProducts] = useState(initialProducts);
   const [categories, setCategories] = useState(initialCategories);
@@ -63,7 +67,21 @@ export default function ProductCatalog({ products: initialProducts, categories: 
   const [filter, setFilter] = useState<string>(ALL);
   const [lowOnly, setLowOnly] = useState(false);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState<Item | "new" | null>(null);
+  const [editing, setEditing] = useState<Item | "new" | "combo" | null>(null);
+  // Productos con que empieza un combo nuevo (la idea «Arma un combo» del Resumen enlaza con ?combo=a,b).
+  const [comboSeed, setComboSeed] = useState<string[]>([]);
+  const startCombo = (seed: string[] = []) => {
+    setComboSeed(seed);
+    setEditing("combo");
+  };
+  useEffect(() => {
+    const url = new URL(location.href);
+    const seed = url.searchParams.get("combo");
+    if (!seed || mode !== "business" || !canEdit) return;
+    url.searchParams.delete("combo");
+    history.replaceState(history.state, "", url);
+    startCombo(seed.split(",").slice(0, 20));
+  }, []);
   // Por id: tras guardar, el detalle muestra los datos nuevos que llegan como props.
   const [detailId, setDetailId] = useState<string | null>(null);
   const detail = detailId ? products.find((p) => p.id === detailId) : undefined;
@@ -95,6 +113,21 @@ export default function ProductCatalog({ products: initialProducts, categories: 
     if (!error) return toast(`«${product.name}» ahora está en ${category ? `«${category.name}»` : "Sin categoría"}.`, "success");
     swap({ categoryId: product.categoryId, category: product.category });
     setError(error.message);
+  }
+
+  // Borrar del catálogo lo quita de todas las sucursales: se confirma nombrando dónde se vende.
+  async function remove(product: Item) {
+    const soldIn = "soldIn" in product ? product.soldIn.length : 0;
+    const where = soldIn ? ` Se quita también de ${soldIn === 1 ? "la sucursal donde se vende" : `las ${soldIn} sucursales donde se vende`}.` : "";
+    if (!(await confirmDialog(`¿Eliminar «${product.name}» del catálogo?${where}`, { confirmLabel: "Eliminar", danger: true }))) return;
+    const form = new FormData();
+    form.set("id", product.id);
+    setError("");
+    const { error } = await safeAction(() => actions.deleteProduct(form));
+    if (error) return setError(error.message);
+    setProducts((list) => list.filter((p) => p.id !== product.id));
+    toast(`«${product.name}» se eliminó del catálogo.`, "success");
+    await refreshRegions();
   }
 
   const categoryOf = (p: Item) => (p.categoryId && categories.some((c) => c.id === p.categoryId) ? p.categoryId : null);
@@ -170,7 +203,13 @@ export default function ProductCatalog({ products: initialProducts, categories: 
                 }
                 counts={counts}
               />
-              <ImportProducts businessId={businessId} />
+              <ImportProducts businessId={businessId} branches={branches} />
+              {products.length > 0 && (
+                <Button variant="outline" className="h-11" onClick={() => startCombo()}>
+                  <Layers />
+                  Armar combo
+                </Button>
+              )}
               <Button className="h-11" onClick={() => setEditing("new")}>
                 <Plus />
                 Agregar producto
@@ -291,6 +330,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
                   color={index >= 0 ? colorOf(index) : "var(--color-text-subtle)"}
                   categories={categories}
                   onMove={canEdit && mode === "business" ? (id) => move(product, id) : undefined}
+                  onDelete={canEdit && mode === "business" ? () => remove(product) : undefined}
                   onEdit={canEdit ? () => setEditing(product) : undefined}
                   onOpen={() => openDetail(product.id)}
                 />
@@ -327,11 +367,15 @@ export default function ProductCatalog({ products: initialProducts, categories: 
         <ProductForm
           businessId={businessId}
           categories={categories}
-          product={editing === "new" ? undefined : editing}
+          product={editing === "new" || editing === "combo" ? undefined : editing}
+          combo={editing === "combo"}
+          comboSeed={comboSeed}
+          catalog={products as CatalogEntry[]}
+          branches={branches}
           onClose={() => setEditing(null)}
         />
       )}
-      {editing && editing !== "new" && mode === "branch" && !("soldIn" in editing) && (
+      {editing && typeof editing !== "string" && mode === "branch" && !("soldIn" in editing) && (
         <InventoryForm businessId={businessId} branchId={branchId!} product={editing} onClose={() => setEditing(null)} />
       )}
       {filtered && visible.length > 0 && (

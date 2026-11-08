@@ -1,0 +1,205 @@
+---
+// Barra de la promoción de fundadores (docs/planes-de-suscripcion.md › Precio fundador). Los cupos son los reales
+// (founderPromo): sin cupos o con la promo apagada, quien la usa no la monta. En la app se puede ocultar; vuelve
+// a aparecer cuando cambian los cupos.
+import { Sparkles, X } from "@lucide/astro";
+import type { FounderPromo } from "@/data/queries";
+import { plural } from "@/lib/format";
+
+interface Props {
+  promo: FounderPromo;
+  href: string;
+  label: string;
+  /** En la app: tarjeta compacta en el menú lateral, con botón para ocultarla. En el sitio: franja arriba. */
+  variant?: "bar" | "card";
+}
+
+const { promo, href, label, variant = "bar" } = Astro.props;
+const dismissible = variant === "card";
+const pct = `${Math.round(promo.discount * 100)}%`;
+const year = promo.months === 12 ? "el primer año" : `los primeros ${plural(promo.months, "mes", "meses")}`;
+const left = promo.left === 1 ? "Queda 1 cupo" : `Quedan ${promo.left} cupos`;
+---
+
+{
+  variant === "bar" ? (
+    <aside class="promo" aria-label="Promoción de fundadores">
+      <div class="promo-inner">
+        <Sparkles size={16} stroke-width={1.75} aria-hidden="true" />
+        <p>
+          <strong>Precio fundador:</strong>{" "}
+          <span class="promo-long">{pct} de descuento {year} para los primeros {promo.slots} negocios que paguen.</span>
+          <span class="promo-short">−{pct} {year}.</span>{" "}
+          <strong class="num">{left}.</strong>
+        </p>
+        <a href={href} class="promo-link">{label}</a>
+      </div>
+    </aside>
+  ) : (
+    <aside class="promo-card" aria-labelledby="promo-card-title" data-promo={String(promo.left)}>
+      <p class="promo-card-head">
+        <Sparkles size={16} stroke-width={1.75} aria-hidden="true" />
+        <strong id="promo-card-title">Precio fundador −{pct}</strong>
+      </p>
+      <p class="promo-card-text">
+        {year[0].toUpperCase() + year.slice(1)}, para los primeros {promo.slots} negocios. <strong class="num">{left}.</strong>
+      </p>
+      <a href={href} class="promo-link">{label}</a>
+      <button type="button" class="promo-close" aria-label="Ocultar promoción" data-promo-close>
+        <X size={16} stroke-width={1.75} />
+      </button>
+    </aside>
+  )
+}
+
+{
+  dismissible && (
+    <script is:inline>
+      // Antes de pintar: si ya la ocultaste con estos mismos cupos, no aparece (sin parpadeo).
+      (() => {
+        const bar = document.currentScript?.previousElementSibling;
+        try {
+          if (bar && localStorage.getItem("promo-hidden") === bar.getAttribute("data-promo")) bar.hidden = true;
+        } catch {}
+      })();
+    </script>
+  )
+}
+
+<script>
+  document.addEventListener("click", (event) => {
+    const close = (event.target as Element).closest("[data-promo-close]");
+    const bar = close?.closest<HTMLElement>(".promo-card");
+    if (!bar) return;
+    bar.hidden = true;
+    try {
+      localStorage.setItem("promo-hidden", bar.dataset.promo ?? "");
+    } catch {}
+  });
+</script>
+
+<style>
+  .promo {
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-primary-soft);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .promo-card {
+    position: relative;
+    display: grid;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 2.5rem 0.75rem 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    background: var(--color-primary-soft);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .promo-card[hidden] {
+    display: none;
+  }
+
+  .promo-card p {
+    margin: 0;
+  }
+
+  .promo-card-head {
+    display: flex;
+    gap: 0.375rem;
+    align-items: center;
+  }
+
+  .promo-card-head :global(svg) {
+    flex-shrink: 0;
+    color: var(--color-primary);
+  }
+
+  /* Sobre el fondo de color, el texto atenuado no llega a AA: va en el color de texto. */
+  .promo-card-text {
+    color: var(--color-text);
+  }
+
+  .promo-card .promo-link {
+    justify-self: start;
+  }
+
+  .promo-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem 0.75rem;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding: 0.5rem 1rem;
+  }
+
+  .promo-inner > :global(svg) {
+    flex-shrink: 0;
+    color: var(--color-primary);
+  }
+
+  .promo p {
+    margin: 0;
+  }
+
+  .promo-short {
+    display: none;
+  }
+
+  /* Enlace con subrayado: no se distingue solo por color. */
+  .promo-link {
+    color: var(--color-text);
+    font-weight: var(--font-semibold);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .promo-close {
+    position: absolute;
+    top: 0.375rem;
+    right: 0.375rem;
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .promo-close:hover {
+    background: var(--color-surface);
+  }
+
+  /* En el celular va fija con la barra: una fila, el texto se corta en dos líneas como mucho y el enlace queda al lado. */
+  @media (max-width: 640px) {
+    .promo-inner {
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      padding-block: 0.375rem;
+    }
+    .promo p {
+      flex: 1;
+      min-width: 0;
+    }
+    .promo-link {
+      flex-shrink: 0;
+    }
+    .promo-long {
+      display: none;
+    }
+    .promo-short {
+      display: inline;
+    }
+  }
+</style>

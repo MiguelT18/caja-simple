@@ -66,7 +66,10 @@ export const toPerson = (p: Row<"profiles">): Person => ({
 
 /** Producto del catálogo con su categoría y la URL firmada de su foto (de imageUrls). */
 export const toCatalogProduct = (
-  p: Row<"products"> & { categories: { name: string } | null },
+  p: Row<"products"> & {
+    categories: { name: string } | null;
+    components?: { component_id: string; qty: number; product: { name: string } | null }[];
+  },
   images: Map<string, string>,
 ): Omit<CatalogProduct, "businessId"> => ({
   id: p.id,
@@ -76,4 +79,9 @@ export const toCatalogProduct = (
   barcode: p.barcode ?? undefined,
   description: p.description ?? undefined,
   image: p.image_path ? images.get(p.image_path) : undefined,
+  components: p.components?.length ? p.components.map((c) => ({ productId: c.component_id, name: c.product?.name ?? "", qty: c.qty })) : undefined,
 });
+
+/** Embed de PostgREST con lo que incluye un combo (para el select de products). */
+export const COMBO_PARTS =
+  "components:product_components!product_components_combo_id_business_id_fkey(component_id, qty, product:products!product_components_component_id_business_id_fkey(name))";

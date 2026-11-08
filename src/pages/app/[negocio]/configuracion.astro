@@ -1,5 +1,6 @@
 ---
 import { ArrowRight, ChevronRight, CircleCheck, CircleMinus, Gem, MapPin, Pencil, Plus, Store, Trash, TriangleAlert, Users, Clock } from "@lucide/astro";
+import Avatar from "@/components/Avatar.astro";
 import PageHeader from "@/components/PageHeader.astro";
 import BranchDialogs from "@/components/app/BranchDialogs.astro";
 import BusinessProfileFields from "@/components/app/BusinessProfileFields.astro";
@@ -11,7 +12,7 @@ import { businessKinds, catalogLabel, kindOptions } from "@/data/kinds";
 import { branchColor, businessContext, businessHref, businessImages, currentUser } from "@/data/queries";
 import { planLimits } from "@/data/plans";
 import { longDate } from "@/lib/dates";
-import { initials, plural } from "@/lib/format";
+import { plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
@@ -48,6 +49,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
   <div class="settings">
     <aside class="index">
       <nav aria-label="Secciones de configuración">
+        <p class="index-label" aria-hidden="true">En esta página</p>
         <ul role="list" class="index-list">
           {
             sections.map(({ id, label, icon: Icon }) => (
@@ -62,15 +64,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
         </ul>
       </nav>
       <a href="/app/cuenta" class="account">
-        {
-          user.avatarUrl ? (
-            <img class="account-avatar skeleton" src={user.avatarUrl} alt="" width="40" height="40" decoding="async" data-fallback />
-          ) : (
-            <span class="account-avatar avatar-initials" aria-hidden="true">
-              {initials(user.firstName, user.lastName || user.email)}
-            </span>
-          )
-        }
+        <Avatar src={user.avatarUrl} seed={user.id} size={2.5} />
         <span class="account-text">
           <span class="account-title">Tu cuenta</span>
           <span class="account-meta">Foto, contraseña y verificación en dos pasos</span>
@@ -81,22 +75,14 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
 
     <div class="sections">
       <a href="/app/cuenta" class="account account-narrow">
-        {
-          user.avatarUrl ? (
-            <img class="account-avatar skeleton" src={user.avatarUrl} alt="" width="40" height="40" decoding="async" data-fallback />
-          ) : (
-            <span class="account-avatar avatar-initials" aria-hidden="true">
-              {initials(user.firstName, user.lastName || user.email)}
-            </span>
-          )
-        }
+        <Avatar src={user.avatarUrl} seed={user.id} size={2.5} />
         <span class="account-text">
           <span class="account-title">Tu cuenta</span>
           <span class="account-meta">Foto, contraseña y verificación en dos pasos</span>
         </span>
         <ChevronRight size={18} stroke-width={1.75} />
       </a>
-      <section id="negocio" class="section" aria-labelledby="business-title">
+      <section id="negocio" class="section" tabindex="-1" aria-labelledby="business-title">
         <header class="section-head">
           <h2 id="business-title">Negocio</h2>
           <p>Cómo se llama, a qué se dedica y su logo.</p>
@@ -143,7 +129,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
         </form>
       </section>
 
-      <section id="sucursales" class="section" aria-labelledby="branches-title">
+      <section id="sucursales" class="section" tabindex="-1" aria-labelledby="branches-title">
         <header class="section-head">
           <h2 id="branches-title">Sucursales</h2>
           <p>{plural(branchSummary.length, "sucursal", "sucursales")} · cada una con su caja, sus turnos y su inventario.</p>
@@ -214,7 +200,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
         </div>
       </section>
 
-      <section id="plan" class="section" aria-labelledby="plan-title">
+      <section id="plan" class="section" tabindex="-1" aria-labelledby="plan-title">
         <header class="section-head">
           <h2 id="plan-title">Plan</h2>
           <p>Lo que incluye el plan de {business.name} y cuánto usas.</p>
@@ -251,7 +237,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
         </div>
       </section>
 
-      <section id="eliminar" class="section" aria-labelledby="danger-title">
+      <section id="eliminar" class="section" tabindex="-1" aria-labelledby="danger-title">
         <header class="section-head">
           <h2 id="danger-title" class="danger-title">
             <TriangleAlert size={22} stroke-width={2} />
@@ -365,6 +351,8 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
 
   // Índice: marca la sección que se está leyendo (la que ocupa la franja alta del panel).
   const links = new Map([...document.querySelectorAll<HTMLAnchorElement>("[data-index-link]")].map((a) => [a.dataset.indexLink!, a]));
+  const ids = [...links.keys()];
+  const last = ids[ids.length - 1];
   const mark = (id: string) => {
     links.forEach((a, key) => (key === id ? a.setAttribute("aria-current", "true") : a.removeAttribute("aria-current")));
     // En el celular el índice es una fila de píldoras: la activa queda a la vista (solo scroll horizontal de la fila).
@@ -372,20 +360,74 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     const list = link?.closest("ul");
     if (link && list && list.scrollWidth > list.clientWidth) list.scrollTo({ left: link.offsetLeft - 16, behavior: "smooth" });
   };
+
+  // Quien hace scroll: <main> en escritorio, la página en el celular (main sin overflow).
+  const first = document.getElementById(ids[0]);
+  let box: HTMLElement = document.scrollingElement as HTMLElement;
+  for (let p = first?.parentElement; p; p = p.parentElement) {
+    if (/(auto|scroll)/.test(getComputedStyle(p).overflowY)) {
+      box = p;
+      break;
+    }
+  }
+  const isPage = box === document.scrollingElement;
+  const atEnd = () => box.scrollTop + box.clientHeight >= box.scrollHeight - 2;
+
+  // Tras un clic, la marca queda en lo elegido hasta que termina el scroll.
+  let pinned: string | null = null;
+  let unpin = 0;
+  const release = () => {
+    clearTimeout(unpin);
+    pinned = null;
+  };
+  // Respaldo para navegadores sin scrollend.
+  const scrollTarget = isPage ? window : box;
+  scrollTarget.addEventListener("scrollend", release);
+  scrollTarget.addEventListener(
+    "scroll",
+    () => {
+      if (pinned) {
+        clearTimeout(unpin);
+        unpin = window.setTimeout(release, 600);
+      } else if (atEnd()) mark(last);
+    },
+    { passive: true },
+  );
+
   const visible = new Set<string>();
   const observer = new IntersectionObserver(
     (entries) => {
       for (const e of entries) e.isIntersecting ? visible.add(e.target.id) : visible.delete(e.target.id);
-      const first = [...links.keys()].find((id) => visible.has(id));
-      if (first) mark(first);
+      if (pinned) return;
+      // Al fondo, la última sección (corta) nunca llega a la franja alta: se marca igual.
+      const current = atEnd() ? last : ids.find((id) => visible.has(id));
+      if (current) mark(current);
     },
     { rootMargin: "-10% 0px -60% 0px" },
   );
-  links.forEach((_, id) => {
+
+  links.forEach((a, id) => {
     const section = document.getElementById(id);
-    if (section) observer.observe(section);
+    if (!section) return;
+    observer.observe(section);
+    // Sin el salto nativo del ancla: ese desplaza también a los ancestros y corría la app entera hacia abajo.
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const offset = isPage ? 0 : box.getBoundingClientRect().top;
+      const top = section.getBoundingClientRect().top - offset + box.scrollTop - parseFloat(getComputedStyle(section).scrollMarginTop);
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      box.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
+      history.replaceState(null, "", `#${id}`);
+      pinned = id;
+      clearTimeout(unpin);
+      unpin = window.setTimeout(release, 600);
+      mark(id);
+      section.focus({ preventScroll: true });
+    });
   });
-  mark("negocio");
+
+  const fromHash = decodeURIComponent(location.hash.slice(1));
+  mark(links.has(fromHash) ? fromHash : ids[0]);
 </script>
 
 <style>
@@ -411,7 +453,12 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
   .section {
     display: grid;
     gap: 1rem;
-    scroll-margin-top: 5rem;
+    scroll-margin-top: 1.5rem;
+  }
+
+  /* Recibe el foco desde el índice (para teclado y lector), sin anillo: no es un control. */
+  .section:focus {
+    outline: none;
   }
 
   .section-head h2 {
@@ -482,10 +529,23 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     background: var(--color-surface-hover);
   }
 
+  .index-link.danger :global(svg) {
+    color: var(--color-expense);
+  }
+
   /* Píldora activa invertida, como los filtros de Vender. */
   .index-link[aria-current] {
     background: var(--color-text);
     color: var(--color-surface);
+  }
+
+  .index-label {
+    display: none;
+    margin: 0 0 0.5rem;
+    padding: 0 0.75rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
   }
 
   .account {
@@ -522,18 +582,32 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
   }
 
   @container (min-width: 50rem) {
+    /* Índice a la derecha, como «En esta página»: no compite con el Sidebar de la izquierda. */
     .settings {
-      grid-template-columns: 13rem minmax(0, 1fr);
+      grid-template-columns: minmax(0, 52rem) 13rem;
       gap: 2.5rem;
       align-items: start;
+      justify-content: center;
     }
 
     .index {
+      grid-column: 2;
+      grid-row: 1;
       top: 1.5rem;
       align-content: start;
       margin: 0;
-      padding: 0;
+      padding: 0 0 0 1rem;
+      border-left: 1px solid var(--color-border);
       background: none;
+    }
+
+    .sections {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .index-label {
+      display: block;
     }
 
     .index-list {
@@ -566,9 +640,6 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
       color: var(--color-primary);
     }
 
-    .index-link.danger[aria-current] :global(svg) {
-      color: var(--color-expense);
-    }
 
     .index .account {
       display: grid;
@@ -577,22 +648,6 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     .account-narrow {
       display: none;
     }
-  }
-
-  .account-avatar {
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    object-fit: cover;
-  }
-
-  span.account-avatar {
-    display: grid;
-    place-items: center;
-    background: var(--color-primary-soft);
-    color: var(--color-text);
-    font-size: var(--text-sm);
-    font-weight: var(--font-extrabold);
   }
 
   .account-text {

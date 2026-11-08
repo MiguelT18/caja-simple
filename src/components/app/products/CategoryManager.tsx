@@ -3,7 +3,8 @@ import { useRef, useState } from "react";
 import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import type { Category } from "@/data/types";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
+import { AppDialog } from "../AppDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { colorOf } from "./catalog";
@@ -86,28 +87,26 @@ export function CategoryManager({
   };
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
+    <AppDialog
+      title="Categorías de productos"
+      description="Arma las que use tu negocio. Sirven para filtrar el catálogo."
+      trigger={
         <Button variant="outline" className="h-11 bg-card">
           <Tags />
           Categorías
         </Button>
-      </DialogTrigger>
-      <DialogContent
-        className="sm:max-w-md"
+      }
+      contentProps={{
         // Escape mientras se renombra: cancela el cambio y no cierra todo el diálogo.
-        onEscapeKeyDown={(e) => {
+        onEscapeKeyDown: (e) => {
           if (!editing) return;
           e.preventDefault();
           const id = editing.id;
           setEditing(null);
           focusRow(id);
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle>Categorías de productos</DialogTitle>
-          <DialogDescription>Arma las que use tu negocio. Sirven para filtrar el catálogo.</DialogDescription>
-        </DialogHeader>
+        },
+      }}
+    >
 
         <form onSubmit={add} className="grid gap-2" noValidate>
           <Label htmlFor="new-category">Nueva categoría</Label>
@@ -206,8 +205,7 @@ export function CategoryManager({
         <DialogFooter className="text-sm text-muted-foreground sm:justify-start">
           Al borrar una categoría, sus productos quedan en «Sin categoría».
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </AppDialog>
   );
 }
 

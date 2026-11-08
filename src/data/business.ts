@@ -1,8 +1,8 @@
 // Datos de las páginas del negocio (solo la dueña): resumen por sucursal, catálogo y equipo.
 import { businessVersion, cached } from "@/lib/cache";
 import { addDays, today } from "@/lib/dates";
-import { cashStatus, isLowStock, shiftCash, sum } from "./cash";
-import { EMPLOYEE_COLUMNS, fail, toCatalogProduct, toEmployee, toShift } from "./mappers";
+import { cashStatus, comboStock, isLowStock, shiftCash, sum } from "./cash";
+import { COMBO_PARTS, EMPLOYEE_COLUMNS, fail, toCatalogProduct, toEmployee, toShift } from "./mappers";
 import { branchHref } from "./routes";
 import { membership } from "./session";
 import { closesOf, headerBackdrop, imageUrls, movements } from "./shared";
@@ -26,7 +26,7 @@ export async function businessContext(locals: App.Locals, businessSlug: string) 
   const slow = () =>
     Promise.all([
       sb.from("shifts").select("*").in("branch_id", branchIds).order("start_time"),
-      sb.from("products").select("*, categories(name)").eq("business_id", business.id).order("name"),
+      sb.from("products").select(`*, categories(name), ${COMBO_PARTS}`).eq("business_id", business.id).order("name"),
       sb.from("categories").select("id, name").eq("business_id", business.id).order("name"),
       sb.from("employees").select(EMPLOYEE_COLUMNS).eq("business_id", business.id).order("created_at"),
     ]).then(([shifts, products, categories, staff]) => {
@@ -79,15 +79,26 @@ export async function businessContext(locals: App.Locals, businessSlug: string) 
   });
 
   const images = await imageUrls(sb, (productRows.data ?? []).map((p) => p.image_path));
-  const catalog: CatalogEntry[] = (productRows.data ?? []).map((p) => ({
-    ...toCatalogProduct(p, images),
-    soldIn: m.branches.flatMap((branch) => {
-      const item = stock.find((i) => i.branch_id === branch.id && i.product_id === p.id);
-      return item
-        ? [{ branchId: branch.id, branch: branch.name, price: item.price === null ? null : Number(item.price), stock: item.stock, minStock: item.min_stock, low: lowStock(item) }]
-        : [];
-    }),
-  }));
+  const catalog: CatalogEntry[] = (productRows.data ?? []).map((p) => {
+    const product = toCatalogProduct(p, images);
+    return {
+      ...product,
+      soldIn: m.branches.flatMap((branch) => {
+        const item = stock.find((i) => i.branch_id === branch.id && i.product_id === p.id);
+        if (!item) return [];
+        const here = (id: string) => stock.find((i) => i.branch_id === branch.id && i.product_id === id)?.stock;
+        return [{
+          branchId: branch.id,
+          branch: branch.name,
+          price: item.price === null ? null : Number(item.price),
+          // Un combo alcanza para lo que alcancen sus productos en esa sucursal.
+          stock: product.components ? comboStock(product.components, here) : item.stock,
+          minStock: item.min_stock,
+          low: lowStock(item),
+        }];
+      }),
+    };
+  });
 
   return {
     ...m,

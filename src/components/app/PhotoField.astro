@@ -26,7 +26,7 @@ const max = round || square ? 512 : 1280;
   <span class="field-label" id={`${form}-image-label`}>{label}</span>
   <div class="photo-row">
     <div class="photo-preview">
-      <img src={image} alt="" hidden={!image} decoding="async" data-photo-preview data-fallback />
+      <img src={image} alt="" hidden={!image} decoding="async" referrerpolicy="no-referrer" data-photo-preview data-fallback />
       <Placeholder size={28} stroke-width={1.5} aria-hidden="true" />
     </div>
     <div class="photo-actions">

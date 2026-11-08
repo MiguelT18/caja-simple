@@ -1,20 +1,52 @@
 ---
-// Planes y precios. Con sesión, el plan se cambia desde cada negocio (/app/[negocio]/plan).
+// Planes y precios: solo informa. El plan se paga desde cada negocio (/app/[negocio]/plan); con sesión, esta página
+// lleva directo ahí.
 export const prerender = false;
 
-import { Check } from "@lucide/astro";
+import { ArrowRight, Check } from "@lucide/astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import PlanCalculator from "../components/PlanCalculator.astro";
 import PeriodSwitch from "../components/plans/PeriodSwitch.astro";
 import PlanPrice from "../components/plans/PlanPrice.astro";
-import { currentQuote } from "../data/billing";
-import { plans, type Period } from "../data/plans";
+import { currentQuote, ownedBusinesses } from "@/data/queries";
+import { plans, type Period, type PlanName } from "../data/plans";
+import { longDate } from "@/lib/dates";
 
 const signupHref = "/auth/crear-cuenta";
 const signedIn = Boolean(Astro.locals.userId);
 const period: Period = Astro.url.searchParams.get("periodo") === "anual" ? "anual" : "mensual";
 // Sin tipo de cambio (la base todavía no lo trajo o falló la consulta), los precios van solo en dólares.
-const quote = await currentQuote(Astro.locals.supabase).catch(() => null);
+const sb = Astro.locals.supabase;
+const userId = Astro.locals.userId;
+const [quote, mine] = await Promise.all([
+  currentQuote(sb).catch(() => null),
+  // Si falla (p. ej. 2FA sin verificar), se cae al enlace genérico a /app.
+  userId ? ownedBusinesses(sb, userId).catch(() => null) : null,
+]);
+const owned = mine?.owned ?? [];
+const only = owned.length === 1 ? owned[0] : null;
+const planHref = (slug: string) => `/app/${slug}/plan${period === "anual" ? "?periodo=anual" : ""}`;
+const until = (date: string) => longDate(date).replace(/^\S+ /, "");
+
+/** Qué ofrece cada tarjeta: un enlace, o «es tu plan actual» (sin botón). */
+function cta(plan: PlanName, i: number): { href: string; label: string; primary: boolean } | { current: string } {
+  if (!signedIn) return { href: signupHref, label: "Empieza gratis", primary: i === 0 };
+  if (!mine) return { href: "/app", label: "Ir a tus negocios", primary: i === 0 };
+  if (owned.length === 0) return { href: "/app", label: "Crea tu negocio", primary: i === 0 };
+  if (only) {
+    if (only.plan === plan) return { current: `Plan actual de ${only.name}` };
+    if (plan === "Gratis") return { href: `/app/${only.slug}`, label: "Ir a tu negocio", primary: false };
+    return { href: planHref(only.slug), label: `Pagar en ${only.name}`, primary: true };
+  }
+  if (plan === "Gratis") return { href: "/app", label: "Ir a tus negocios", primary: false };
+  return { href: "#pagar", label: "Elegir negocio", primary: true };
+}
+
+const steps = [
+  { title: "Empieza gratis", text: "Creas tu cuenta y tu negocio. El plan Gratis no vence." },
+  { title: "Elige el plan en tu negocio", text: "Cada negocio tiene su propio plan: lo eliges en Configuración › Plan." },
+  { title: "Paga por QR", text: "Desde la app de cualquier banco, en bolivianos. Activamos el plan al ver tu comprobante." },
+];
 ---
 
 <SiteLayout
@@ -27,8 +59,24 @@ const quote = await currentQuote(Astro.locals.supabase).catch(() => null);
       <header class="section-head">
         <h1 id="plans-title">Pagas por sucursal, no por persona</h1>
         <p>Tus empleados entran siempre gratis. Empieza sin pagar y cambia de plan cuando tu negocio crezca.</p>
-        {signedIn && <p class="plans-signed">El plan es de cada negocio: lo cambias desde la configuración del negocio.</p>}
       </header>
+
+      <section class="how" aria-labelledby="how-title">
+        <h2 id="how-title" class="how-title">Cómo se paga</h2>
+        <ol role="list">
+          {
+            steps.map((step, i) => (
+              <li>
+                <span class="how-num num" aria-hidden="true">{i + 1}</span>
+                <span>
+                  <strong>{step.title}</strong>
+                  <span class="how-text">{step.text}</span>
+                </span>
+              </li>
+            ))
+          }
+        </ol>
+      </section>
 
       <PeriodSwitch period={period} quote={quote} />
 
@@ -53,18 +101,73 @@ const quote = await currentQuote(Astro.locals.supabase).catch(() => null);
                   </li>
                 ))}
               </ul>
-              <a href={signedIn ? "/app" : signupHref} class:list={["btn", i === 0 ? "btn-primary" : "btn-secondary"]}>
-                {signedIn ? (i === 0 ? "Ir a tus negocios" : "Elegir en tu negocio") : i === 0 ? "Crear cuenta gratis" : "Crear cuenta"}
-              </a>
+              {(() => {
+                const action = cta(plan.name, i);
+                return (
+                  <div class="plan-cta" data-region={`cta-${plan.name}`}>
+                    {"current" in action ? (
+                      <p class="plan-current">
+                        <span class="chip chip-income">
+                          <Check size={14} stroke-width={2} />
+                          {action.current}
+                        </span>
+                      </p>
+                    ) : (
+                      <a href={action.href} class:list={["btn", action.primary ? "btn-primary" : "btn-secondary"]}>
+                        {action.label}
+                      </a>
+                    )}
+                    {!signedIn && i > 0 && <p class="plan-hint">Lo eliges desde tu negocio cuando lo necesites.</p>}
+                  </div>
+                );
+              })()}
             </article>
           ))
         }
       </div>
 
+      {
+        signedIn && mine && (
+          <section id="pagar" class="pay" aria-labelledby="pay-title" data-region="pay">
+            <h2 id="pay-title" class="how-title">Paga el plan de tu negocio</h2>
+            {owned.length > 0 ? (
+              <>
+                <p class="pay-intro">Cada negocio paga su propio plan. Elige cuál quieres mejorar:</p>
+                <ul role="list" class="pay-list">
+                  {owned.map((b) => (
+                    <li>
+                      <span class="pay-name">
+                        <strong>{b.name}</strong>
+                        <span class="pay-plan">
+                          Plan {b.plan}
+                          {b.planUntil && `, pagado hasta el ${until(b.planUntil)}`}
+                        </span>
+                      </span>
+                      <a href={planHref(b.slug)} class="btn btn-secondary">
+                        Ver planes y pagar<span class="sr-only"> de {b.name}</span>
+                        <ArrowRight size={16} stroke-width={1.75} />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <div class="pay-empty">
+                <p>Para pagar un plan necesitas un negocio propio. Créalo gratis y elige el plan desde ahí.</p>
+                <a href="/app" class="btn btn-primary">Crea tu negocio</a>
+              </div>
+            )}
+            {mine.worksElsewhere && (
+              <p class="pay-note">Los negocios donde trabajas los paga quien los administra: a ti no te cuesta.</p>
+            )}
+          </section>
+        )
+      }
+
       <PlanCalculator period={period} quote={quote} />
 
       <p class="plans-note">
-        Pagas en bolivianos con QR bancario, transferencia o tarjeta, el mes o el año. El plan se activa apenas vemos el
+        Pagas en bolivianos con QR bancario desde cualquier banco, el mes o el año. El plan se activa apenas vemos el
         pago.
       </p>
     </div>
@@ -190,8 +293,148 @@ const quote = await currentQuote(Astro.locals.supabase).catch(() => null);
     text-wrap: balance;
   }
 
-  .plans-signed {
-    color: var(--color-text);
-    font-weight: var(--font-medium);
+  /* Cómo se paga: tres pasos con número visible. */
+  .how {
+    margin-block: 1.5rem 2rem;
+  }
+
+  .how-title {
+    margin: 0 0 0.75rem;
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-lh);
+    font-weight: var(--font-semibold);
+  }
+
+  .how ol {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .how li {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .how li > span:last-child {
+    display: grid;
+    gap: 0.125rem;
+  }
+
+  .how-num {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+    font-weight: var(--font-semibold);
+  }
+
+  .how-text,
+  .plan-hint,
+  .pay-plan,
+  .pay-intro,
+  .pay-note {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .plan-cta {
+    display: grid;
+    gap: 0.5rem;
+    justify-items: start;
+  }
+
+  .plan-hint,
+  .plan-current {
+    margin: 0;
+  }
+
+  .plan-current .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  /* Paga el plan de tu negocio */
+  .pay {
+    scroll-margin-top: calc(var(--header-h, 4rem) + 2rem);
+    margin-top: 2rem;
+    padding: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    background: var(--color-surface);
+  }
+
+  .pay-intro,
+  .pay-note {
+    margin: 0;
+  }
+
+  .pay-note {
+    margin-top: 1rem;
+  }
+
+  .pay-list {
+    display: grid;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pay-list li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: center;
+    justify-content: space-between;
+    padding-block: 0.875rem;
+  }
+
+  .pay-list li + li {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .pay-name {
+    display: grid;
+  }
+
+  .pay-list .btn {
+    gap: 0.375rem;
+  }
+
+  .pay-empty {
+    display: grid;
+    gap: 0.75rem;
+    justify-items: start;
+  }
+
+  .pay-empty p {
+    margin: 0;
+  }
+
+  @media (max-width: 640px) {
+    .how ol {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .plan-cta,
+    .pay-empty {
+      justify-items: stretch;
+    }
+    .pay-list .btn,
+    .pay-empty .btn {
+      width: 100%;
+      justify-content: center;
+    }
   }
 </style>

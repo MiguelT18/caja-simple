@@ -12,6 +12,7 @@ import { PUBLIC_VAPID_PUBLIC_KEY } from "astro:env/client";
 const { user, jobs, totpFactorId, hasPassword } = await accountSettings(Astro.locals);
 const vapidKey = PUBLIC_VAPID_PUBLIC_KEY ?? "";
 const owned = myBusinesses(Astro.locals).filter((m) => m.role === "dueño").map((m) => m.business.name);
+import CodeInput from "@/components/CodeInput.astro";
 ---
 
 <Layout title="Tu cuenta">
@@ -144,7 +145,7 @@ const owned = myBusinesses(Astro.locals).filter((m) => m.role === "dueño").map(
         danger
         hidden={{ factorId: totpFactorId }}
       >
-        <FormInput form="totp-disable-form" name="code" label="Código de 6 dígitos" inputmode="numeric" autocomplete="one-time-code" maxlength={6} required />
+        <CodeInput id="totp-disable-form-code" label="Código de 6 dígitos" required />
       </Modal>
     ) : (
       <Modal
@@ -160,7 +161,7 @@ const owned = myBusinesses(Astro.locals).filter((m) => m.role === "dueño").map(
           <span class="skeleton qr-skeleton" aria-hidden="true"></span>
         </div>
         <p class="field-hint secret">¿No puedes escanear? Escribe esta clave en la app: <code data-totp-secret>…</code></p>
-        <FormInput form="totp-enroll-form" name="code" label="Código de 6 dígitos" inputmode="numeric" autocomplete="one-time-code" maxlength={6} required />
+        <CodeInput id="totp-enroll-form-code" label="Código de 6 dígitos" required />
       </Modal>
     )
   }
@@ -276,7 +277,15 @@ const owned = myBusinesses(Astro.locals).filter((m) => m.role === "dueño").map(
         set(true, "Activadas: los avisos te llegan a este dispositivo.");
       } catch (e) {
         console.error(e);
-        set(on, "Algo falló al cambiar los avisos. Intenta de nuevo.");
+        // «push service error»: el navegador no consiguió canal con su servicio de push (Brave con el push apagado,
+        // Chromium sin servicios de Google, o una red que bloquea fcm.googleapis.com). No es algo de la app.
+        const pushService = e instanceof DOMException && e.name === "AbortError" && /push service/i.test(e.message);
+        set(
+          on,
+          pushService
+            ? "Tu navegador no pudo conectarse con su servicio de avisos. En Brave, activa «Usar los servicios de Google para mensajes push» en la privacidad del navegador; si no, prueba con Chrome o Edge, o desde otra red (sin VPN ni bloqueador)."
+            : "Algo falló al cambiar los avisos. Intenta de nuevo.",
+        );
       }
     });
 

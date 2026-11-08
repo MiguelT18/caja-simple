@@ -4,6 +4,8 @@
  */
 .landing {
   --wrap: 72rem;
+  /* Como en /app: títulos grandes y cifras en 800. */
+  --font-extrabold: 800;
   --section-gap: clamp(3.5rem, 2rem + 5vw, 6rem);
 }
 
@@ -54,7 +56,7 @@
 
 html:has(.landing) {
   scroll-behavior: smooth;
-  scroll-padding-top: 5rem;
+  scroll-padding-top: calc(var(--header-h, 4rem) + 1rem);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -354,4 +356,136 @@ html:has(.landing) {
 .legal-see {
   margin-top: 2.5rem;
   color: var(--color-text-muted);
+}
+
+/* Botones en píldora, como en la app (app-surface.css): quien se registra entra a un mundo que ya vio. */
+.landing .btn {
+  border-radius: 999px;
+  font-weight: var(--font-bold);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    color 150ms,
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.landing .btn-primary:hover:not(:disabled) {
+  transform: scale(1.04);
+}
+
+.landing .btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.landing .btn-secondary {
+  background: transparent;
+  border-color: var(--color-border-strong);
+}
+
+.landing .btn-secondary:hover:not(:disabled) {
+  background: transparent;
+  border-color: var(--color-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing .btn {
+    transition: none;
+  }
+  .landing .btn-primary:hover:not(:disabled),
+  .landing .btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/*
+ * Piezas de ejemplo de la landing: forma de la app (superficie sin borde, arte cuadrado, chips) y siempre con
+ * el rótulo «Ejemplo». Las comparten index.astro y los componentes de src/components/landing/.
+ */
+.demo {
+  margin: 0;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+.demo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.demo-title {
+  font-size: var(--text-base);
+  line-height: var(--text-base-lh);
+  font-weight: var(--font-bold);
+}
+
+.sample {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  font-weight: var(--font-medium);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  font-weight: var(--font-semibold);
+}
+
+.chip-morning { background: var(--color-shift-morning-soft); color: var(--color-shift-morning); }
+.chip-afternoon { background: var(--color-shift-afternoon-soft); color: var(--color-shift-afternoon); }
+.chip-night { background: var(--color-shift-night-soft); color: var(--color-shift-night); }
+.chip-ok { background: var(--color-income-soft); color: var(--color-income); }
+.chip-warn { background: var(--color-warning-soft); color: var(--color-warning); }
+.chip-live { background: var(--color-primary-soft); color: var(--color-primary); }
+.chip-neutral { background: var(--color-surface-muted); color: var(--color-text-muted); }
+
+.amount-income { color: var(--color-income); font-weight: var(--font-semibold); }
+.amount-expense { color: var(--color-expense); font-weight: var(--font-semibold); }
+
+/* «En curso»: el punto acompaña al texto, como la luz de un equipo encendido (mismo gesto que en la app). */
+.live-dot {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .live-dot::after {
+    animation: live-ping 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+}
+
+@keyframes live-ping {
+  from { opacity: 0.45; scale: 1; }
+  to { opacity: 0; scale: 2.6; }
 }

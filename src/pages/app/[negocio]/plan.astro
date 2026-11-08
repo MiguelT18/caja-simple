@@ -1,12 +1,11 @@
 ---
-import { ArrowLeft, Check, CreditCard, Landmark, QrCode } from "@lucide/astro";
+import { ArrowLeft, Check, ChevronDown, ExternalLink, MessageCircle, Sparkles, Store, X } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import PlanCalculator from "@/components/PlanCalculator.astro";
-import FormInput from "@/components/app/FormInput.astro";
 import PeriodSwitch from "@/components/plans/PeriodSwitch.astro";
 import PlanPrice from "@/components/plans/PlanPrice.astro";
 import Layout from "@/layouts/Layout.astro";
-import { businessContext, businessHref, currentQuote, paymentDetails, planCharges } from "@/data/queries";
+import { businessContext, businessHref, currentQuote, founderPromo, myBusinesses, planCharges } from "@/data/queries";
 import { plans, upgradeUrl, usdLabel, type Period } from "@/data/plans";
 import { longDate, shortDate, stamp } from "@/lib/dates";
 import { plural } from "@/lib/format";
@@ -16,24 +15,36 @@ if (!ctx) return Astro.rewrite("/404");
 const { business } = ctx;
 const sb = Astro.locals.supabase;
 const period: Period = Astro.url.searchParams.get("periodo") === "anual" ? "anual" : "mensual";
-const [quote, payment, charges] = await Promise.all([currentQuote(sb), paymentDetails(sb), planCharges(sb, business.id)]);
+const [quote, charges, promo] = await Promise.all([
+  currentQuote(sb),
+  planCharges(sb, business.id),
+  founderPromo(sb, business.id).catch(() => null),
+]);
+// Lo que pagaría hoy: con su precio fundador vigente o, si aún no lo es, mientras queden cupos.
+const discount = promo ? promo.discount : 0;
+const pct = (d: number) => `${Math.round(d * 100)}%`;
 const branches = ctx.membership.branches.length;
-const extra = Math.max(branches - 1, 0);
+// Cada negocio paga su plan: desde aquí se puede pasar al de otro negocio propio.
+const ownedOthers = myBusinesses(Astro.locals).filter((other) => other.role === "dueño" && other.business.id !== business.id);
+const chargeHref = (id: string) => `${businessHref(business)}/cobro/${id}`;
 
-const methods = [
-  { value: "qr", icon: QrCode, label: "QR bancario", detail: "Desde la app de tu banco." },
-  { value: "transferencia", icon: Landmark, label: "Transferencia bancaria", detail: "A nuestra cuenta, por el monto exacto." },
-  { value: "tarjeta", icon: CreditCard, label: "Tarjeta de crédito", detail: "Con un enlace de pago que te enviamos." },
-] as const;
-const methodLabel = Object.fromEntries(methods.map((m) => [m.value, m.label])) as Record<string, string>;
+// Se cobra solo por QR; los otros nombres quedan para los cobros viejos del historial.
+const methodLabel: Record<string, string> = { qr: "QR bancario", transferencia: "Transferencia bancaria", tarjeta: "Tarjeta de crédito" };
 
 // El cobro por pagar más reciente: con su monto fijo en Bs e instrucciones. Los demás van al historial.
 const pending = charges.find((c) => c.status === "pendiente");
 const history = charges.filter((c) => c !== pending);
 const code = (id: string) => id.slice(0, 8).toUpperCase();
+// En WhatsApp, el aviso de pago va con el mensaje ya escrito.
+const proofUrl =
+  upgradeUrl && pending && /wa\.me|whatsapp/.test(upgradeUrl)
+    ? `${upgradeUrl}${upgradeUrl.includes("?") ? "&" : "?"}text=${encodeURIComponent(
+        `Hola, pagué el plan de ${business.name}: Bs ${pending.amountBs.toLocaleString("es-BO")}, código ${code(pending.id)}. Te envío el comprobante.`,
+      )}`
+    : upgradeUrl;
 const statusLabel = { pendiente: "Por pagar", vencido: "Vencido", pagado: "Pagado" } as const;
 const chargeName = (c: (typeof charges)[number]) =>
-  `${c.plan}${c.extraBranches ? ` + ${plural(c.extraBranches, "sucursal extra", "sucursales extra")}` : ""} · ${c.period}`;
+  `${c.plan}${c.extraBranches ? ` + ${plural(c.extraBranches, "sucursal extra", "sucursales extra")}` : ""} · ${c.period}${c.discount > 0 ? ` · precio fundador −${pct(c.discount)}` : ""}`;
 const rateText = (c: (typeof charges)[number]) =>
   `${usdLabel(c.usd)} × Bs ${c.rate.toLocaleString("es-BO", { maximumFractionDigits: 4 })} (BCB, ${shortDate(c.rateDate)}) + ${Math.round(c.taxRate * 100)}% de IVA e IT`;
 ---
@@ -77,102 +88,87 @@ const rateText = (c: (typeof charges)[number]) =>
     }
   </div>
 
-  <PlanCalculator branches={branches} current={branches} period={period} quote={quote} />
-
-  {
-    pending && (
-      <section class="card charge" aria-labelledby="charge-title">
-        <header class="charge-head">
-          <h2 class="card-title" id="charge-title">
-            Tu cobro · {chargeName(pending)}
-          </h2>
-          <span class="chip chip-warning">{statusLabel.pendiente}</span>
-        </header>
-        <p class="charge-amount num">Bs {pending.amountBs.toLocaleString("es-BO")}</p>
-        <p class="charge-meta">
-          {methodLabel[pending.method]} · el monto vale hasta el {stamp(pending.expiresAt)}; después se recalcula con el tipo de cambio de ese día.
-        </p>
-        <p class="charge-meta num">{rateText(pending)}</p>
-
-        <div class="charge-how">
-          {pending.method === "qr" &&
-            (payment.qrImageUrl ? (
-              <>
-                <img class="charge-qr" src={payment.qrImageUrl} alt="QR bancario de Caja Simple" width="220" height="220" decoding="async" />
-                <p>Escanéalo desde la app de tu banco y paga exactamente Bs {pending.amountBs.toLocaleString("es-BO")}.</p>
-              </>
-            ) : (
-              <p>Avísanos y te enviamos el QR por el monto de este cobro.</p>
-            ))}
-          {pending.method === "transferencia" &&
-            (payment.bankDetails ? (
-              <>
-                <p class="charge-bank">{payment.bankDetails}</p>
-                <p>Transfiere exactamente Bs {pending.amountBs.toLocaleString("es-BO")} y pon el código {code(pending.id)} en la glosa.</p>
-              </>
-            ) : (
-              <p>Avísanos y te pasamos la cuenta para transferir.</p>
-            ))}
-          {pending.method === "tarjeta" && <p>{payment.cardNote}</p>}
-        </div>
-
-        <p class="charge-code">
-          Código del cobro: <strong class="num">{code(pending.id)}</strong>. Cuando pagues, avísanos con este código y activamos tu plan apenas
-          vemos el pago.
-        </p>
-        {upgradeUrl && (
-          <a href={upgradeUrl} class="btn btn-primary" target="_blank" rel="noopener">
-            Ya pagué: avisar<span class="sr-only"> (se abre en otra pestaña)</span>
-          </a>
-        )}
-      </section>
-    )
-  }
-
   <section class="card pay" aria-labelledby="pay-title">
-    <h2 class="card-title" id="pay-title">{pending ? "Generar otro cobro" : "Pagar tu plan"}</h2>
+    <h2 class="card-title" id="pay-title">Pagar tu plan</h2>
     <p class="pay-intro">
-      Eliges el plan y cómo pagas; te mostramos el monto en bolivianos con impuestos, fijo por unos días. Activamos tu plan apenas vemos el pago. No pierdes nada de lo que ya registraste.
+      Elige cuántos locales pagas y el período arriba (mensual o anual): el total cambia al instante. Pagas por QR desde cualquier banco y
+      activamos tu plan apenas vemos el comprobante. No pierdes nada de lo que ya registraste.
     </p>
     {
       quote ? (
-        <form id="pay" class="pay-form" data-action="createPlanCharge" data-success="Cobro generado." novalidate>
+        <form id="pay" class="pay-form" data-action="createPlanCharge" data-redirect={`${businessHref(business)}/cobro/{id}`} novalidate>
           <input type="hidden" name="businessId" value={business.id} />
-          <div class="pay-fields">
-            <FormInput
-              form="pay"
-              name="plan"
-              label="Plan"
-              options={[
-                { value: "Negocio", label: "Negocio", selected: branches <= 1 },
-                { value: "Sucursales", label: `Sucursales (${plural(branches, "local", "locales")}${extra ? `: ${plural(extra, "extra", "extras")}` : ""})`, selected: branches > 1 },
-              ]}
-            />
-            <FormInput
-              form="pay"
-              name="period"
-              label="Período"
-              options={[
-                { value: "mensual", label: "Mensual", selected: period === "mensual" },
-                { value: "anual", label: "Anual (2 meses gratis)", selected: period === "anual" },
-              ]}
-            />
+          <input type="hidden" name="period" id="pay-period" value={period} />
+          <div class="for-business">
+            <p>
+              <Store size={18} stroke-width={1.75} aria-hidden="true" />
+              <span>Pagas el plan de <strong>{business.name}</strong></span>
+            </p>
+            {ownedOthers.length > 0 && (
+              <details class="switch">
+                <summary>
+                  Cambiar de negocio
+                  <ChevronDown size={16} stroke-width={1.75} aria-hidden="true" />
+                </summary>
+                <ul role="list">
+                  {ownedOthers.map((other) => (
+                    <li>
+                      <a href={`${businessHref(other.business)}/plan${period === "anual" ? "?periodo=anual" : ""}`}>
+                        <strong>{other.business.name}</strong>
+                        <span>Plan {other.business.plan} · {plural(other.branches.length, "sucursal", "sucursales")}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
-          <fieldset class="methods">
-            <legend class="field-label">Cómo pagas</legend>
-            {methods.map((m, i) => (
-              <label class="method">
-                <input type="radio" name="method" value={m.value} checked={i === 0} />
-                <m.icon size={20} stroke-width={1.75} />
-                <span>
-                  <span class="method-label">{m.label}</span>
-                  <span class="method-detail">{m.detail}</span>
-                </span>
-              </label>
-            ))}
-          </fieldset>
+          {promo && (
+            <p class="founder">
+              <Sparkles size={16} stroke-width={1.75} aria-hidden="true" />
+              <span>
+                <strong>Precio fundador: −{pct(promo.discount)}</strong>{" "}
+                {promo.until
+                  ? `en todos tus cobros hasta el ${longDate(promo.until).replace(/^\S+ /, "")}.`
+                  : `${promo.months === 12 ? "el primer año" : `por ${promo.months} meses`} desde tu primer pago. ${promo.left === 1 ? "Queda 1 cupo" : `Quedan ${promo.left} cupos`}: el tuyo se reserva al confirmar el pago.`}
+              </span>
+            </p>
+          )}
+          <PlanCalculator branches={pending ? pending.extraBranches + 1 : branches} current={branches} min={Math.max(branches, 1)} name="branches" form="pay" discount={discount} period={period} quote={quote} />
+
+          {pending && (
+            <div class="pending" role="group" aria-labelledby="pending-title">
+              {/* Dentro del formulario #pay: la X envía el de eliminar, que está afuera (los formularios no se anidan). */}
+              <button type="submit" form={`delete-charge-${pending.id}`} class="icon-btn charge-delete pending-delete" aria-label={`Eliminar el cobro ${code(pending.id)}`} title="Eliminar cobro">
+                <X size={18} stroke-width={1.75} aria-hidden="true" />
+              </button>
+              <p class="pending-head">
+                <span class="chip chip-warning">{statusLabel.pendiente}</span>
+                <strong id="pending-title">
+                  Tienes un cobro de <span class="num">Bs {pending.amountBs.toLocaleString("es-BO")}</span> · {chargeName(pending)}
+                </strong>
+              </p>
+              <p class="charge-meta">
+                Código <strong class="num">{code(pending.id)}</strong> · el monto vale hasta el {stamp(pending.expiresAt)}. {rateText(pending)}.
+              </p>
+              <div class="pending-actions">
+                <a href={chargeHref(pending.id)} class="btn btn-primary" target="_blank" rel="noopener">
+                  <ExternalLink size={16} stroke-width={1.75} />Ver QR y cómo pagar<span class="sr-only"> (se abre en otra pestaña)</span>
+                </a>
+                {proofUrl && (
+                  <a href={proofUrl} class="btn btn-secondary" target="_blank" rel="noopener">
+                    <MessageCircle size={16} stroke-width={1.75} />Ya pagué: enviar comprobante<span class="sr-only"> por WhatsApp (se abre en otra pestaña)</span>
+                  </a>
+                )}
+              </div>
+              <p class="charge-meta">Si cambias los locales o el período, genera un cobro nuevo con ese monto.</p>
+            </div>
+          )}
+
           <p class="notice notice-error" role="alert" data-form-notice />
-          <button type="submit" class="btn btn-primary">Generar cobro</button>
+          <button type="submit" class:list={["btn", pending ? "btn-secondary" : "btn-primary"]}>
+            {pending ? "Generar cobro nuevo" : "Generar cobro y ver QR"}
+          </button>
         </form>
       ) : (
         <p class="notice" role="status">
@@ -188,6 +184,22 @@ const rateText = (c: (typeof charges)[number]) =>
     }
   </section>
 
+  {/* Eliminar un cobro sin pagar (fuera de #pay: los formularios no se anidan; el botón apunta aquí con form=). */}
+  {charges.filter((c) => c.status !== "pagado").map((c) => (
+    <form
+      id={`delete-charge-${c.id}`}
+      hidden
+      data-action="deletePlanCharge"
+      data-reload
+      data-confirm={`¿Eliminar el cobro ${code(c.id)} de Bs ${c.amountBs.toLocaleString("es-BO")}? Si ya lo pagaste, no lo elimines: lo usamos para activar tu plan.`}
+      data-confirm-label="Eliminar"
+      data-danger
+      data-success="Cobro eliminado."
+    >
+      <input type="hidden" name="id" value={c.id} />
+    </form>
+  ))}
+
   {
     history.length > 0 && (
       <section class="history" aria-labelledby="history-title">
@@ -196,7 +208,7 @@ const rateText = (c: (typeof charges)[number]) =>
           {history.map((c) => (
             <li class="card">
               <div>
-                <p class="history-name">{chargeName(c)}</p>
+                <p class="history-name"><a href={chargeHref(c.id)}>{chargeName(c)}</a></p>
                 <p class="history-meta">
                   {stamp(c.createdAt)} · {methodLabel[c.method]} · código {code(c.id)}
                 </p>
@@ -206,6 +218,11 @@ const rateText = (c: (typeof charges)[number]) =>
                 {statusLabel[c.status]}
                 {c.paidAt && ` el ${shortDate(c.paidAt.slice(0, 10))}`}
               </span>
+              {c.status !== "pagado" && (
+                <button type="submit" form={`delete-charge-${c.id}`} class="icon-btn charge-delete" aria-label={`Eliminar el cobro ${code(c.id)}`} title="Eliminar cobro">
+                  <X size={18} stroke-width={1.75} aria-hidden="true" />
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -217,8 +234,8 @@ const rateText = (c: (typeof charges)[number]) =>
 <script>
   // El selector «Período» del cobro sigue al de arriba (mensual/anual sin recargar, PeriodSwitch).
   document.addEventListener("period:change", (event) => {
-    const select = document.querySelector<HTMLSelectElement>("#pay-period");
-    if (select) select.value = (event as CustomEvent<string>).detail;
+    const field = document.querySelector<HTMLInputElement>("#pay-period");
+    if (field) field.value = (event as CustomEvent<string>).detail;
   });
 </script>
 
@@ -295,7 +312,6 @@ const rateText = (c: (typeof charges)[number]) =>
     color: var(--color-income);
   }
 
-  .charge,
   .pay {
     display: grid;
     gap: 0.75rem;
@@ -303,24 +319,64 @@ const rateText = (c: (typeof charges)[number]) =>
     padding: 1.25rem;
   }
 
-  .charge {
-    border: 2px solid var(--color-primary);
+  /* La calculadora va dentro de la tarjeta: sin su propio marco. */
+  .pay :global(.calc) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
   }
 
-  .charge-head {
+  .founder {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-panel);
+    background: var(--color-primary-soft);
+    font-size: var(--text-sm);
+  }
+
+  .founder :global(svg) {
+    flex-shrink: 0;
+    margin-top: 0.15em;
+    color: var(--color-primary);
+  }
+
+  /* El cobro por pagar: borde y chip (no solo color). */
+  .pending {
+    position: relative;
+    display: grid;
+    gap: 0.5rem;
+    padding: 1rem 3.25rem 1rem 1rem;
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-panel);
+  }
+
+  .charge-delete {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .pending-delete {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .pending-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem 1rem;
+    gap: 0.5rem;
+    margin: 0;
   }
 
-  .charge-amount {
-    margin: 0;
-    font-size: var(--text-4xl);
-    line-height: var(--text-4xl-lh);
-    font-weight: var(--font-extrabold);
-    letter-spacing: -0.02em;
+  .pending-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .charge-meta,
@@ -331,33 +387,79 @@ const rateText = (c: (typeof charges)[number]) =>
     font-size: var(--text-sm);
   }
 
-  .charge-how {
-    display: grid;
-    gap: 0.5rem;
-    justify-items: start;
-    padding: 1rem;
-    border-radius: var(--radius-panel);
-    background: var(--color-surface);
-  }
-
-  .charge-how p,
   .charge-code {
     margin: 0;
   }
 
-  .charge-qr {
-    width: min(220px, 100%);
-    height: auto;
-    border-radius: 0.5rem;
-    background: white;
+  .for-business {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
   }
 
-  .charge-bank {
-    white-space: pre-line;
+  .for-business > p {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 0;
+  }
+
+  .for-business :global(svg) {
+    flex-shrink: 0;
+    color: var(--color-primary);
+  }
+
+  .switch summary {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    color: var(--color-text);
+    font-size: var(--text-sm);
     font-weight: var(--font-semibold);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+    list-style: none;
   }
 
-  .charge .btn,
+  .switch summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .switch[open] summary :global(svg) {
+    transform: rotate(180deg);
+  }
+
+  .switch ul {
+    display: grid;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .switch li + li {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .switch a {
+    display: grid;
+    padding: 0.625rem 0.25rem;
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .switch a span {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .switch a:hover strong {
+    text-decoration: underline;
+  }
+
+
   .pay-form .btn {
     justify-self: start;
   }
@@ -365,68 +467,6 @@ const rateText = (c: (typeof charges)[number]) =>
   .pay-form {
     display: grid;
     gap: 1rem;
-  }
-
-  .pay-fields {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-    gap: 1rem;
-  }
-
-  /* Cómo paga: tarjetas con radio; la elegida con borde y fondo (no solo color). */
-  .methods {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    min-width: 0;
-  }
-
-  .methods legend {
-    margin-bottom: 0.5rem;
-    padding: 0;
-  }
-
-  .method {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.625rem;
-    padding: 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-panel);
-    background: var(--color-surface);
-    cursor: pointer;
-  }
-
-  .method:has(:checked) {
-    border-color: var(--color-primary);
-    background: var(--color-primary-soft);
-    box-shadow: inset 0 0 0 1px var(--color-primary);
-  }
-
-  .method input {
-    margin-top: 0.2rem;
-    accent-color: var(--color-primary);
-  }
-
-  .method :global(svg) {
-    flex-shrink: 0;
-    color: var(--color-primary);
-  }
-
-  .method > span {
-    display: grid;
-  }
-
-  .method-label {
-    font-weight: var(--font-semibold);
-  }
-
-  .method-detail {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
   }
 
   .history {

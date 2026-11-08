@@ -62,7 +62,7 @@ export async function headerBackdrop(locals: App.Locals, m: Membership, branch?:
 }
 
 /** Fotos de las fachadas de un negocio (enlaces firmados por un día), por id de sucursal. Solo pide las que tienen foto. */
-export async function branchImages(locals: App.Locals, m: Membership) {
+export async function branchImages(locals: App.Locals, m: Pick<Membership, "branches">) {
   const urls = await imageUrls(locals.supabase, m.branches.map((b) => b.imagePath), "branch-images");
   return new Map(m.branches.flatMap((b) => (b.imagePath && urls.has(b.imagePath) ? [[b.id, urls.get(b.imagePath)!]] : [])));
 }

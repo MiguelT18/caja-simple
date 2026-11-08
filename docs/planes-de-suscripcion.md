@@ -20,7 +20,7 @@ Tres planes, con precio en dólares y sin impuestos. El monto final en boliviano
 
 | Plan | Para quién | Incluye | Mensual (US$, sin impuestos) | Anual (US$, 2 meses gratis) |
 | --- | --- | --- | --- | --- |
-| Gratis | Puesto o tienda que recién empieza | 1 negocio, 1 sucursal, empleados ilimitados, ventas, gastos, turnos y cuadre. Historial de 60 días | 0 | — |
+| Gratis | Puesto o tienda que recién empieza | 1 sucursal por negocio (negocios ilimitados), empleados ilimitados, ventas, gastos, turnos y cuadre. Historial de 60 días | 0 | — |
 | Negocio | El local que ya depende de la app | Todo lo anterior, con historial completo, reportes por día, semana y mes, exportar a Excel o PDF | 5,50 | 55 |
 | Sucursales | Dueño con 2 o más locales | Todo lo de Negocio, más vista consolidada, comparación entre sucursales, permisos por empleado y sucursal, e historial de quién hizo cada cambio | 5,50 + 3,50 por sucursal extra | 55 + 35 por sucursal extra |
 
@@ -34,19 +34,19 @@ El sistema calcula el total en bolivianos al generar cada cobro: precio en dóla
 
 El 0,16 es IVA (13%) más IT (3%), ambos calculados sobre el total facturado. Por eso se divide entre 0,84 en vez de multiplicar por 1,16: así, después de impuestos, queda limpio el precio en dólares.
 
-Ejemplo con un tipo de cambio de Bs 12,00 (solo ilustrativo):
+Ejemplo con el tipo de cambio de Bs 11,81 (7 de noviembre de 2026):
 
 | Concepto | US$ sin impuestos | Bs con impuestos |
 | --- | --- | --- |
-| Negocio, mensual | 5,50 | 79 |
-| Sucursal extra, mensual | 3,50 | 50 |
-| Sucursales con 3 locales, mensual | 12,50 | 179 |
-| Negocio, anual | 55 | 786 |
-| Sucursal extra, anual | 35 | 500 |
+| Negocio, mensual | 5,50 | 77 |
+| Sucursal extra, mensual | 3,50 | 49 |
+| Sucursales con 3 locales, mensual | 12,50 | 176 |
+| Negocio, anual | 55 | 773 |
+| Sucursal extra, anual | 35 | 492 |
 
-- La factura y el cobro (QR, transferencia o tarjeta) van siempre en bolivianos. El dólar es solo la referencia del precio.
+- La factura y el cobro (por QR) van siempre en bolivianos. El dólar es solo la referencia del precio.
 - El monto en Bs queda fijo desde que se genera el cobro hasta que vence (por ejemplo, 3 días). Si vence sin pagarse, se recalcula con el tipo de cambio nuevo.
-- La app muestra los dos valores: "US$ 5,50 + impuestos · hoy Bs 79".
+- La app muestra los dos valores: "US$ 5,50 + impuestos · hoy Bs 77".
 - Si ese día no se puede obtener el tipo de cambio, se usa el último disponible y se registra cuál fue.
 - La tasa de 0,16 es configurable y hay que confirmarla con un contador según el régimen ante el SIN. No incluye la comisión de la pasarela de pago.
 
@@ -65,7 +65,7 @@ Muchos negocios pequeños pagan por QR bancario y pocos tienen tarjeta para cobr
 
 Con QR no hay cobro automático, así que hacen falta recordatorios antes de que venza el plan.
 
-En la app (`/app/<negocio>/plan`) se ofrecen tres métodos: **QR bancario**, **transferencia bancaria** y **tarjeta de crédito** (con un enlace de pago enviado a mano). Los tres muestran el monto ya convertido a bolivianos con impuestos, y con cualquiera de ellos el plan se activa a mano al ver el pago.
+En la app (`/app/<negocio>/plan`) el único método es el **QR bancario** de monto abierto (BCP), con el monto ya convertido a bolivianos con impuestos. El QR del BCP vive en `public/pagos/`: `qr.jpg` es el original (póster completo), `qr-codigo.webp` el recorte de la tarjeta que se muestra en la página del cobro y `qr-descarga.jpg` la copia liviana para descargar (los dos salen de `qr.jpg` con sharp). Si `billing_settings.qr_image_url` tiene otra imagen, se usa esa para todo. **El QR actual vence el 07/11/2028.** Cada cobro tiene su página, `/app/<negocio>/cobro/<id>`: para qué negocio es, el monto, el QR y los pasos (pagar, enviar el comprobante por WhatsApp, activación y avisos de vencimiento). La base todavía acepta transferencia y tarjeta (`plan_charges.method`), pero la página no las ofrece.
 
 ## Límites en la app
 
@@ -74,17 +74,16 @@ La base de datos aplica los límites (migración `supabase/migrations/2026103101
 | Límite | Gratis | Negocio | Sucursales | Dónde se aplica |
 | --- | --- | --- | --- | --- |
 | Sucursales por negocio | 1 | 1 | sin tope (cada extra se cobra) | trigger `branches_check_limit` |
-| Negocios en Gratis por persona | 1 | — | — | trigger `businesses_check_free` |
 | Historial de ventas, gastos y cierres a la vista | últimos 60 días | completo | completo | RLS (`private.history_start`) |
 | Reportes por día, semana y mes; exportar | no | sí | sí | solo en la app (`planLimits.reports`): RLS ya filtra los datos |
 
-- Un negocio nuevo siempre empieza en Gratis. Para abrir un segundo negocio, el primero tiene que estar en un plan pago.
+- Un negocio nuevo siempre empieza en Gratis. Una persona puede tener los negocios que quiera: cada uno paga su propio plan (migración `20261108130000_charge_by_branches_unlimited_businesses.sql`).
 - La vista consolidada, los permisos por empleado y el historial de cambios todavía no existen en la app, así que no hay nada que limitar ahí.
 - **Al bajar de plan no se borra nada.** Las sucursales que sobran siguen funcionando, pero no se pueden agregar otras. El historial de más de 60 días se oculta y vuelve a aparecer al pagar.
 
 ### Activar un plan tras el pago
 
-La dueña ve el uso de su plan en `/app/<negocio>/configuracion` y los planes con sus precios en `/app/<negocio>/plan`. Ahí genera el **cobro**: elige plan, mensual o anual, y método (QR, transferencia o tarjeta), y ve el monto en bolivianos con impuestos, fijo hasta que vence, con su código y las instrucciones del método. No puede cambiar de plan ella misma.
+La dueña ve el uso de su plan en `/app/<negocio>/configuracion` y los planes con sus precios en `/app/<negocio>/plan`. Ahí genera el **cobro**: elige cuántos locales paga (nunca menos de los que tiene; 1 = Negocio, más = Sucursales) y mensual o anual, ve el total al instante, y ve el monto en bolivianos con impuestos, fijo hasta que vence, con su código y el QR para pagar. No puede cambiar de plan ella misma.
 
 Cómo funciona por dentro (migración `20261104150000_plan_charges.sql`):
 
@@ -105,6 +104,20 @@ La tasa de impuestos, los días que dura un cobro y los datos para pagar (imagen
 pnpm dlx supabase db query --db-url "$DB_URL" "update public.billing_settings set qr_image_url = 'https://…/qr.png', bank_details = E'Banco …\nCuenta …\nTitular …';"
 ```
 
-El botón «Ya pagué: avisar» lleva a `PUBLIC_UPGRADE_URL` (WhatsApp, un formulario…). Si la variable no está definida, la página solo muestra el código para avisar.
+El botón «Ya pagué: enviar comprobante» lleva a `PUBLIC_UPGRADE_URL`. Con un enlace de WhatsApp (`https://wa.me/591…`), el mensaje va ya escrito con el negocio, el monto y el código del cobro. Si la variable no está definida, se usa el WhatsApp de cobros, +591 67677457 (`src/data/plans.ts`).
 
-Pendiente: el precio fundador (50% el primer año) y la factura electrónica.
+### Precio fundador
+
+Los primeros **20 negocios que pagan** tienen **50% de descuento durante 12 meses** desde su primer pago (migración `20261108140000_founder_promo.sql`). Con TC 11,81: Negocio a Bs 39 al mes o Bs 387 al año.
+
+- **Cupo:** lo ocupa el negocio al activarse su primer cobro con descuento (`activate_plan_charge` pone `businesses.founder_since`). Un cobro generado y sin pagar no ocupa cupo.
+- **Cobro:** `create_plan_charge` aplica el descuento si el negocio ya es fundador y está dentro de sus 12 meses, o si todavía quedan cupos. Lo guarda en `plan_charges.discount`, y `usd` ya va con descuento.
+- **Caso borde:** si varios cobros con descuento se generan con el último cupo libre, todos se respetan al pagarse (el monto se mostró fijo). Puede pasarse de 20 por uno o dos.
+- **Barra:** `PromoBar` muestra los cupos reales de `public.founder_promo()` en `/`, `/planes` y en `/app` (solo a quien tiene un negocio propio en Gratis; ahí se puede ocultar). Sin cupos, o con la promo apagada, no aparece.
+- **Configurar o apagar:** en `public.billing_settings` (`founder_active`, `founder_slots`, `founder_discount`, `founder_months`):
+
+```sh
+pnpm dlx supabase db query --db-url "$DB_URL" "update public.billing_settings set founder_active = false;"
+```
+
+Pendiente: la factura electrónica.

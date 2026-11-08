@@ -9,6 +9,21 @@ export const cents = (amount: number) => Math.round(amount * 100) / 100;
 /** Sin control de stock (null) nunca está bajo. */
 export const isLowStock = (p: { stock: number | null; minStock: number | null }) => p.stock !== null && p.minStock !== null && p.stock <= p.minStock;
 
+/**
+ * Cuántos combos alcanzan en una sucursal: el mínimo de stock / cantidad entre sus productos que controlan stock.
+ * stockOf devuelve undefined si el producto no está en esa sucursal (entonces no alcanza ninguno) y null si no
+ * controla stock. Sin ninguno que controle, null: el combo tampoco lo controla.
+ */
+export function comboStock(parts: { productId: string; qty: number }[], stockOf: (productId: string) => number | null | undefined) {
+  let fits: number | null = null;
+  for (const part of parts) {
+    const stock = stockOf(part.productId);
+    if (stock === undefined) return 0;
+    if (stock !== null) fits = Math.min(fits ?? Infinity, Math.floor(stock / part.qty));
+  }
+  return fits;
+}
+
 /** Suma por clave, de mayor a menor: [{ name, value }]. */
 export const totalsBy = (pairs: [string, number][]) => {
   const totals = new Map<string, number>();

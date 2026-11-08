@@ -3,7 +3,8 @@ import { Check, Crown, Ellipsis, Store, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ShiftTone } from "@/data/types";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
+import { AppDialog } from "./AppDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,13 +16,15 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pager, usePage } from "./Pager";
 import { ShiftBadge } from "./ShiftBadge";
+import { Avatar } from "./Avatar";
 import { Field, safeAction, selectClass, useActionForm } from "./products/form";
 import { refreshRegions } from "@/scripts/refresh";
 import { confirmDialog, flashToast, toast } from "@/scripts/dialogs";
 
 export interface EmployeeRow {
   id: string;
-  initials: string;
+  /** Decide el color del avatar (la persona, si ya tiene cuenta). */
+  avatarSeed: string;
   name: string;
   email: string;
   role: string;
@@ -118,9 +121,7 @@ export default function EmployeesTable({ rows, business, branches, shifts, pageS
               <TableRow key={e.id}>
                 <TableCell>
                   <span className="inline-flex items-center gap-3 whitespace-nowrap">
-                    <span className="avatar-initials" aria-hidden="true">
-                      {e.initials}
-                    </span>
+                    <Avatar seed={e.avatarSeed} />
                     <span className="grid">
                       {e.name}
                       <span className="text-muted-foreground text-sm">{e.email}</span>
@@ -201,14 +202,11 @@ function AssignDialog({ employee, branch, shifts, onClose }: { employee: Employe
   // Propone el turno actual si sigue en la misma sucursal; si cambia, uno del mismo momento del día.
   const suggested = (same && shifts.find((s) => s.id === employee.shiftId)) || shifts.find((s) => s.tone === employee.shift?.tone) || shifts[0];
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{same ? `Cambiar turno de ${employee.name}` : `Asignar a ${employee.name} a ${branch.name}`}</DialogTitle>
-          <DialogDescription>
-            {same ? `Sigue en ${branch.name}.` : `Deja ${employee.branch} y pasa a trabajar en ${branch.name}.`} Elige su turno en esta sucursal.
-          </DialogDescription>
-        </DialogHeader>
+    <AppDialog
+      title={same ? `Cambiar turno de ${employee.name}` : `Asignar a ${employee.name} a ${branch.name}`}
+      description={`${same ? `Sigue en ${branch.name}.` : `Deja ${employee.branch} y pasa a trabajar en ${branch.name}.`} Elige su turno en esta sucursal.`}
+      onClose={onClose}
+    >
         {shifts.length === 0 ? (
           <p className="notice m-0">{branch.name} todavía no tiene turnos. Créalos en Turnos de esa sucursal y vuelve a intentarlo.</p>
         ) : (
@@ -239,7 +237,6 @@ function AssignDialog({ employee, branch, shifts, onClose }: { employee: Employe
             </DialogFooter>
           </form>
         )}
-      </DialogContent>
-    </Dialog>
+    </AppDialog>
   );
 }

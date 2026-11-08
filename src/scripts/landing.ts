@@ -26,6 +26,21 @@ if ("IntersectionObserver" in window) {
     shift.classList.add("is-armed");
     observer.observe(shift);
   }
+
+  // El aviso push de ejemplo llega una vez, cuando su sección entra en vista; sin JS ya está ahí.
+  const push = document.querySelector<HTMLElement>("[data-push]");
+  if (push) {
+    push.classList.add("is-armed");
+    const pushObserver = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        push.classList.add("is-seen");
+        pushObserver.disconnect();
+      },
+      { rootMargin: "0px 0px -30% 0px" },
+    );
+    pushObserver.observe(push);
+  }
 }
 
 // Volver arriba: se muestra cuando el primer bloque de la página (el hero en /) ya salió de la pantalla.
@@ -40,6 +55,13 @@ if (toTop && hero && "IntersectionObserver" in window) {
     window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
     document.querySelector<HTMLElement>(".site-header .brand")?.focus({ preventScroll: true });
   });
+}
+
+// Alto real del encabezado (con la promo de fundadores, que se corta en una o dos líneas): lo usan la franja del cielo
+// y los anclajes (scroll-padding) para quedar justo debajo.
+const header = document.querySelector<HTMLElement>(".site-header");
+if (header && "ResizeObserver" in window) {
+  new ResizeObserver(() => document.documentElement.style.setProperty("--header-h", `${header.offsetHeight}px`)).observe(header);
 }
 
 // Barra: se esconde al bajar y aparece al subir. Ignora movimientos pequeños para no parpadear.

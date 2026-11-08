@@ -1,9 +1,9 @@
-import { CircleSlash, Pencil, ScanBarcode, TriangleAlert, X } from "lucide-react";
+import { CircleSlash, Layers, Pencil, ScanBarcode, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { type Item, isLow } from "./catalog";
+import { type Item, comboSummary, isLow } from "./catalog";
 import { ProductImage, priceLabel, priceSummary, stockSummary } from "./ProductCard";
 
 /** Nombre que comparten la foto de la tarjeta y la del detalle: el navegador la pasa de una a otra. */
@@ -95,10 +95,19 @@ export function ProductDetail({
               {category?.name ?? "Sin categoría"}
             </Badge>
             <DialogTitle className="text-[length:var(--text-2xl)] leading-tight font-bold [overflow-wrap:anywhere]">{product.name}</DialogTitle>
-            <p className="m-0 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <ScanBarcode className="size-4 shrink-0" aria-hidden="true" />
-              {product.barcode ? <span className="tabular-nums">{product.barcode}</span> : <span>Sin código de barras</span>}
-            </p>
+            {product.components ? (
+              <p className="m-0 flex items-start gap-1.5 text-sm text-muted-foreground">
+                <Layers className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span>
+                  <span className="font-semibold text-foreground">Combo:</span> {comboSummary(product.components)}. Al venderlo se descuenta el stock de cada uno.
+                </span>
+              </p>
+            ) : (
+              <p className="m-0 flex items-center gap-1.5 text-sm text-muted-foreground">
+                <ScanBarcode className="size-4 shrink-0" aria-hidden="true" />
+                {product.barcode ? <span className="tabular-nums">{product.barcode}</span> : <span>Sin código de barras</span>}
+              </p>
+            )}
           </div>
 
           {product.description ? (

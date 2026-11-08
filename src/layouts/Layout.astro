@@ -61,8 +61,24 @@ const { title, context } = Astro.props;
 		row-gap: 0;
 	}
 
+	/* Al abrir un menú o diálogo de Radix, react-remove-scroll-bar copia los márgenes del body (0) a su padding
+	   (body[data-scroll-locked]) y el shell crecía hasta los bordes. Con más especificidad, el padding queda igual.
+	   Solo en escritorio: en el celular el body no tiene padding. */
+	@media (min-width: 769px) {
+		body.app-surface[data-scroll-locked] {
+			padding: 0.5rem;
+		}
+
+		body.app-surface[data-scroll-locked]:has(> .shift-bar) {
+			padding-bottom: 0;
+		}
+	}
+
 	/* El panel de contenido tiene su propio scroll; los encabezados de página llegan hasta sus bordes. */
 	main {
+		/* Contiene lo posicionado (los .sr-only de los inputs de archivo): si no, se escapa del scroll de main, alarga
+		   la página y un focus() o scrollIntoView() desplaza toda la app hacia arriba. */
+		position: relative;
 		min-width: 0;
 		overflow-y: auto;
 		overscroll-behavior: contain;

@@ -1,6 +1,7 @@
 ---
 import { LifeBuoy, LogOut } from "@lucide/astro";
 import type { User } from "../data/types";
+import Avatar from "./Avatar.astro";
 
 interface Props {
   user: User;
@@ -11,20 +12,11 @@ const { user } = Astro.props;
 const fullName = `${user.firstName} ${user.lastName}`;
 // Ayuda guarda desde qué página se escribe, para entender el contexto del mensaje.
 const helpHref = `/app/ayuda?desde=${encodeURIComponent(Astro.url.pathname)}`;
-const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? user.email[0] ?? ""}`.toUpperCase();
 ---
 
 <div class="user-card">
   <a href="/app/cuenta" class="user-link" title="Tu cuenta">
-  {
-    user.avatarUrl ? (
-      <img class="avatar skeleton" src={user.avatarUrl} alt="" width="36" height="36" decoding="async" data-fallback />
-    ) : (
-      <span class="avatar avatar-initials" aria-hidden="true">
-        {initials}
-      </span>
-    )
-  }
+  <Avatar src={user.avatarUrl} seed={user.id} size={2.25} />
   <div class="user-info">
     <span class="user-name">{fullName}</span>
     <span class="user-email">{user.email}</span>
@@ -49,23 +41,6 @@ const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? user.email[0] 
     padding: 0.5rem;
     border-radius: 0.75rem;
     background: var(--color-surface-muted);
-  }
-
-  .avatar {
-    flex-shrink: 0;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 50%;
-    object-fit: cover;
-  }
-
-  .avatar-initials {
-    display: grid;
-    place-items: center;
-    background: var(--color-primary-soft);
-    color: var(--color-primary);
-    font-size: var(--text-xs);
-    font-weight: var(--font-semibold);
   }
 
   /* Foto y nombre llevan a Tu cuenta; cerrar sesión queda aparte. */

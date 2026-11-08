@@ -1,0 +1,371 @@
+---
+// Cómo pagar un cobro del plan: para qué negocio es, el monto, el QR y los pasos (QR → comprobante por WhatsApp →
+// activación y avisos de vencimiento). Se abre desde /app/[negocio]/plan, también en otra pestaña.
+import { ArrowLeft, BellRing, Download, MessageCircle, Store } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import Layout from "@/layouts/Layout.astro";
+import { businessHref, membership, paymentDetails, planCharges } from "@/data/queries";
+import { upgradeUrl, usdLabel } from "@/data/plans";
+import { shortDate, stamp } from "@/lib/dates";
+import { plural } from "@/lib/format";
+
+const m = membership(Astro.locals, Astro.params.negocio!);
+// Solo la dueña ve y paga los cobros (RLS hace lo mismo).
+if (!m || m.role !== "dueño") return Astro.rewrite("/404");
+const { business } = m;
+const sb = Astro.locals.supabase;
+const [charges, payment] = await Promise.all([planCharges(sb, business.id), paymentDetails(sb)]);
+const charge = charges.find((c) => c.id === Astro.params.cobro);
+if (!charge) return Astro.rewrite("/404");
+
+const planHref = `${businessHref(business)}/plan`;
+const code = charge.id.slice(0, 8).toUpperCase();
+const amount = `Bs ${charge.amountBs.toLocaleString("es-BO")}`;
+const pct = Math.round(charge.discount * 100);
+const planName = `${charge.plan}${charge.extraBranches ? ` + ${plural(charge.extraBranches, "sucursal extra", "sucursales extra")}` : ""}`;
+const locales = plural(charge.extraBranches + 1, "local", "locales");
+// usd ya va con el descuento: el precio de lista sale de deshacerlo.
+const listUsd = charge.discount > 0 ? Math.round((charge.usd / (1 - charge.discount)) * 100) / 100 : charge.usd;
+const status = { pendiente: { label: "Por pagar", tone: "chip-warning" }, pagado: { label: "Pagado", tone: "chip-income" }, vencido: { label: "Vencido", tone: "chip-neutral" } }[charge.status];
+const proofUrl = /wa\.me|whatsapp/.test(upgradeUrl)
+  ? `${upgradeUrl}${upgradeUrl.includes("?") ? "&" : "?"}text=${encodeURIComponent(
+      `Hola, pagué el plan ${planName} (${charge.period}) de ${business.name}: ${amount}, código ${code}. Te envío el comprobante.`,
+    )}`
+  : upgradeUrl;
+---
+
+<Layout title={`Pagar ${amount} · ${business.name}`} context={{ membership: m }}>
+  <PageHeader title={`Paga el plan de ${business.name}`} description={`Plan ${planName} · ${charge.period} · ${locales}. Sigue estos pasos para activarlo.`}>
+    <a slot="back" class="back" href={planHref}><ArrowLeft size={16} stroke-width={1.75} />Plan de {business.name}</a>
+  </PageHeader>
+
+  <div class="layout">
+    {
+      charge.status === "pendiente" ? (
+        <section class="card steps" aria-labelledby="steps-title">
+          <h2 id="steps-title" class="card-title">Cómo pagar</h2>
+          <ol role="list">
+            <li>
+              <span class="step-num num" aria-hidden="true">1</span>
+              <div class="step-body">
+                <h3>Paga exactamente {amount} por QR</h3>
+                <p>
+                  En la app de cualquier banco, elige «Pagar con QR» y escanea este código. El QR no trae monto: escribe <strong class="num">{amount}</strong>.
+                  Si estás en el celular, descárgalo y elígelo desde la galería.
+                </p>
+                <figure class="qr">
+                  <img src={payment.qrImageUrl} alt={`QR bancario de Caja Simple (BCP) para pagar ${amount}`} width="280" height="396" decoding="async" />
+                </figure>
+                <a class="btn btn-secondary" href={payment.qrDownloadUrl} download="QR-Caja-Simple.jpg">
+                  <Download size={16} stroke-width={1.75} />Descargar QR
+                </a>
+              </div>
+            </li>
+            <li>
+              <span class="step-num num" aria-hidden="true">2</span>
+              <div class="step-body">
+                <h3>Envía tu comprobante por WhatsApp</h3>
+                <p>
+                  Con el código <strong class="num">{code}</strong>, para saber que el pago es de {business.name}. El mensaje ya va escrito.
+                </p>
+                <a href={proofUrl} class="btn btn-primary" target="_blank" rel="noopener">
+                  <MessageCircle size={16} stroke-width={1.75} />Enviar comprobante por WhatsApp<span class="sr-only"> (se abre en otra pestaña)</span>
+                </a>
+              </div>
+            </li>
+            <li>
+              <span class="step-num num" aria-hidden="true">3</span>
+              <div class="step-body">
+                <h3>Activamos tu plan</h3>
+                <p>
+                  Apenas vemos el comprobante. Te avisamos 7, 3 y 1 día antes de que venza para que lo renueves desde la página de plan. Si vence,
+                  {business.name} vuelve a Gratis sin perder nada.
+                </p>
+                <p class="note">
+                  <BellRing size={16} stroke-width={1.75} aria-hidden="true" />
+                  Los avisos llegan a tu bandeja y, si los activaste, como notificación.
+                </p>
+              </div>
+            </li>
+          </ol>
+        </section>
+      ) : (
+        <section class="card steps" aria-labelledby="steps-title">
+          <h2 id="steps-title" class="card-title">{charge.status === "pagado" ? "Tu plan está activo" : "Este cobro venció"}</h2>
+          <p>
+            {charge.status === "pagado"
+              ? `Recibimos el pago de ${business.name}. Te avisaremos antes de que venza para renovarlo.`
+              : "El monto ya no vale: se recalcula con el tipo de cambio del día."}
+          </p>
+          <a href={planHref} class="btn btn-primary">{charge.status === "pagado" ? "Ver el plan" : "Generar un cobro nuevo"}</a>
+        </section>
+      )
+    }
+
+    <aside class="card summary" aria-labelledby="summary-title">
+      <h2 id="summary-title" class="card-title">Resumen del cobro</h2>
+      <p class="business">
+        <Store size={18} stroke-width={1.75} aria-hidden="true" />
+        <span>Para <strong>{business.name}</strong></span>
+      </p>
+      <div class="total">
+        <p class="amount num">{amount}</p>
+        <p class="state">
+          <span class:list={["chip", status.tone]}>{status.label}</span>
+          {charge.status === "pendiente" && <span class="valid">Vale hasta el {stamp(charge.expiresAt)}</span>}
+        </p>
+      </div>
+
+      <dl class="rows">
+        <div><dt>Plan</dt><dd>{planName}</dd></div>
+        <div><dt>Período</dt><dd>{charge.period === "mensual" ? "Mensual" : "Anual"} · {locales}</dd></div>
+        <div><dt>Código</dt><dd><strong class="num code">{code}</strong></dd></div>
+      </dl>
+
+      <dl class="rows rows-money">
+        <div><dt>Precio</dt><dd class="num">{usdLabel(listUsd)}</dd></div>
+        {pct > 0 && <div><dt>Precio fundador −{pct}%</dt><dd class="num">− {usdLabel(Math.round((listUsd - charge.usd) * 100) / 100)}</dd></div>}
+        <div>
+          <dt>Tipo de cambio</dt>
+          <dd class="num">Bs {charge.rate.toLocaleString("es-BO", { maximumFractionDigits: 4 })} <span class="muted">(BCB, {shortDate(charge.rateDate)})</span></dd>
+        </div>
+        <div><dt>Impuestos</dt><dd class="num">{Math.round(charge.taxRate * 100)}% <span class="muted">IVA e IT</span></dd></div>
+        <div class="row-total"><dt>Total</dt><dd class="num">{amount}</dd></div>
+      </dl>
+    </aside>
+  </div>
+</Layout>
+
+<style>
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-bottom: 0.75rem;
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    text-decoration: none;
+  }
+
+  /* Pasos a la izquierda (lo que hay que hacer), el recibo a la derecha. */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .steps,
+  .summary {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+    padding: 1.25rem;
+  }
+
+  .steps > p {
+    margin: 0;
+  }
+
+  .steps > .btn {
+    justify-self: start;
+  }
+
+  .summary {
+    position: sticky;
+    top: 1rem;
+  }
+
+  .business {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .business :global(svg) {
+    flex-shrink: 0;
+    color: var(--color-primary);
+  }
+
+  .total {
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  .amount {
+    margin: 0;
+    font-size: var(--text-4xl);
+    line-height: var(--text-4xl-lh);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.02em;
+  }
+
+  .state {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 0.5rem;
+    align-items: center;
+    margin: 0;
+  }
+
+  .valid,
+  .muted {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  /* Filas del recibo: etiqueta a la izquierda, valor a la derecha; lo largo baja de línea, no se desborda. */
+  .rows {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-sm);
+  }
+
+  .rows > div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.125rem 1rem;
+  }
+
+  .rows dt {
+    color: var(--color-text-muted);
+  }
+
+  .rows dd {
+    min-width: 0;
+    margin: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  .code {
+    letter-spacing: 0.04em;
+  }
+
+  .row-total {
+    margin-top: 0.25rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-base);
+  }
+
+  .row-total dt,
+  .row-total dd {
+    color: var(--color-text);
+    font-weight: var(--font-bold);
+  }
+
+  /* Pasos: número y una línea que los une, para leer el orden de un vistazo. */
+  .steps ol {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .steps li {
+    position: relative;
+    display: flex;
+    gap: 0.875rem;
+    align-items: flex-start;
+    padding-bottom: 1.75rem;
+  }
+
+  .steps li:last-child {
+    padding-bottom: 0;
+  }
+
+  .steps li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: 2.25rem;
+    bottom: 0.25rem;
+    left: calc(1rem - 0.5px);
+    border-left: 1px solid var(--color-border);
+  }
+
+  .step-num {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+    font-weight: var(--font-semibold);
+  }
+
+  .step-body {
+    display: grid;
+    gap: 0.625rem;
+    justify-items: start;
+    min-width: 0;
+  }
+
+  .step-body h3 {
+    margin: 0;
+    padding-top: 0.25rem;
+    font-size: var(--text-base);
+    font-weight: var(--font-semibold);
+  }
+
+  .step-body p {
+    margin: 0;
+  }
+
+  /* Del ancho del código, con fondo blanco en los dos temas: el lector del banco necesita el borde claro. */
+  .qr {
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    margin: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    background: white;
+  }
+
+  .qr img {
+    display: block;
+    width: 280px;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .note {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .note :global(svg) {
+    flex-shrink: 0;
+    margin-top: 0.15em;
+  }
+
+  @media (max-width: 860px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .summary {
+      position: static;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .step-body .btn,
+    .steps > .btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+</style>

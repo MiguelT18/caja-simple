@@ -4,23 +4,36 @@
 // La cuenta es la misma del cobro (usdFor y bsTotal, src/data/plans.ts).
 import { Minus, Plus, RotateCcw } from "@lucide/astro";
 import type { Period, Quote } from "../data/plans";
+import { shortDate, today } from "../lib/dates";
 
 interface Props {
   // Locales con los que arranca (en la app, las sucursales que ya tiene el negocio).
   branches?: number;
   /** En la app: las sucursales que tiene hoy el negocio. Si se cambia el número, ofrece volver a él. */
   current?: number;
+  /** En la app: no se paga por menos locales de los que ya tiene el negocio. */
+  min?: number;
+  /** Para que el número de locales vaya en un formulario (el del cobro). */
+  name?: string;
+  form?: string;
+  /** Precio fundador (0,5 = 50%): el total va con descuento y se muestra el de antes. */
+  discount?: number;
   period: Period;
   quote: Quote | null;
 }
 
 const MAX = 20;
-const { period, quote, current } = Astro.props;
-const branches = Math.min(MAX, Math.max(1, Astro.props.branches ?? 1));
+const { period, quote, current, name, form, discount = 0 } = Astro.props;
+const min = Math.min(MAX, Math.max(1, Astro.props.min ?? 1));
+const branches = Math.min(MAX, Math.max(min, Astro.props.branches ?? 1));
 const per = period === "mensual" ? "al mes" : "al año";
+// El total en Bs sale de este tipo de cambio (el del BCB de hoy o, si aún no llegó, el último).
+const rateText = quote
+  ? `Tipo de cambio ${quote.rateDate === today() ? "de hoy" : `del ${shortDate(quote.rateDate)}`}: Bs ${quote.rate.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} por US$ 1 (BCB).`
+  : "Todavía no tenemos el tipo de cambio de hoy: el total en bolivianos aparece apenas llegue.";
 ---
 
-<section class="calc" aria-labelledby="calc-title" data-branches={branches} data-current={current} data-max={MAX} data-period={period} data-quote={quote ? JSON.stringify(quote) : ""}>
+<section class="calc" aria-labelledby="calc-title" data-branches={branches} data-current={current} data-min={min} data-discount={discount} data-max={MAX} data-period={period} data-quote={quote ? JSON.stringify(quote) : ""}>
   <div class="calc-input">
     <div class="calc-head">
       <h2 id="calc-title" class="calc-title"><label for="calc-branches">¿Cuántos locales tienes?</label></h2>
@@ -35,8 +48,10 @@ const per = period === "mensual" ? "al mes" : "al año";
         class="stepper-value num"
         type="number"
         inputmode="numeric"
-        min="1"
+        min={min}
         max={MAX}
+        name={name}
+        form={form}
         step="1"
         value={branches}
         aria-describedby="calc-range"
@@ -45,7 +60,7 @@ const per = period === "mensual" ? "al mes" : "al año";
         <Plus size={20} stroke-width={1.75} />
       </button>
     </div>
-    <p class="calc-range" id="calc-range">De 1 a {MAX} locales</p>
+    <p class="calc-range" id="calc-range">{min > 1 ? `Desde ${min} (los que ya tienes) hasta ${MAX} locales` : `De 1 a ${MAX} locales`}</p>
     {
       current !== undefined && (
         <p class="calc-current" data-current-note hidden>
@@ -69,29 +84,42 @@ const per = period === "mensual" ? "al mes" : "al año";
         <dt data-extra-label></dt>
         <dd class="num" data-extra></dd>
       </div>
+      {
+        discount > 0 && (
+          <div class="bill-row">
+            <dt>Precio fundador · −{Math.round(discount * 100)}%</dt>
+            <dd class="num" data-discount-amount></dd>
+          </div>
+        )
+      }
       <div class="bill-total">
         <dt data-per>Total {per}</dt>
         <dd aria-live="polite" aria-atomic="true">
-          <span class="calc-price num"></span>
+          <span class="calc-price num"><span data-usd></span> <small>+ impuestos</small></span>
           <span class="calc-bs num"></span>
         </dd>
       </div>
     </dl>
+    <p class="calc-rate">{rateText}</p>
     <p class="calc-detail"></p>
   </div>
 </section>
 
 <script>
-  import { bsTotal, planUsd, usdFor, usdLabel, type Period, type Quote } from "../data/plans";
+  import { bsTotal, discounted, planUsd, usdFor, usdLabel, type Period, type Quote } from "../data/plans";
 
   for (const calc of document.querySelectorAll<HTMLElement>(".calc")) {
     const max = Number(calc.dataset.max);
+    const min = Number(calc.dataset.min ?? 1);
+    const discount = Number(calc.dataset.discount ?? 0);
+    const discountAmount = calc.querySelector("[data-discount-amount]");
     let period = calc.dataset.period as Period;
     const quote: Quote | null = calc.dataset.quote ? JSON.parse(calc.dataset.quote) : null;
     const current = calc.dataset.current ? Number(calc.dataset.current) : undefined;
     const input = calc.querySelector<HTMLInputElement>("input")!;
     const price = calc.querySelector<HTMLElement>(".calc-price")!;
     const bs = calc.querySelector<HTMLElement>(".calc-bs")!;
+    const usdText = price.querySelector("[data-usd]")!;
     const detail = calc.querySelector(".calc-detail")!;
     const base = calc.querySelector("[data-base]")!;
     const extraRow = calc.querySelector<HTMLElement>("[data-extra-row]")!;
@@ -99,24 +127,30 @@ const per = period === "mensual" ? "al mes" : "al año";
     const extraAmount = calc.querySelector("[data-extra]")!;
     const currentNote = calc.querySelector<HTMLElement>("[data-current-note]");
     const [less, more] = calc.querySelectorAll<HTMLButtonElement>("[data-step]");
-    const clamp = (n: number) => Math.min(max, Math.max(1, Math.round(n)));
+    const clamp = (n: number) => Math.min(max, Math.max(min, Math.round(n)));
     let branches = Number(calc.dataset.branches);
 
     const render = () => {
       input.value = String(branches);
       // aria-disabled y no disabled: en el tope el botón conserva el foco (el clic ya no cambia nada).
-      less.setAttribute("aria-disabled", String(branches === 1));
+      less.setAttribute("aria-disabled", String(branches === min));
       more.setAttribute("aria-disabled", String(branches === max));
       // Un local: Negocio (o Gratis). Más: Sucursales, con cada local extra aparte.
       const extra = branches - 1;
-      const usd = usdFor(extra === 0 ? "Negocio" : "Sucursales", period, extra);
+      const full = usdFor(extra === 0 ? "Negocio" : "Sucursales", period, extra);
+      const usd = discounted(full, discount);
+      if (discountAmount) discountAmount.textContent = `− ${usdLabel(Math.round((full - usd) * 100) / 100)}`;
       base.textContent = usdLabel(planUsd.base[period]);
       extraRow.hidden = extra === 0;
       extraLabel.textContent = `${extra} ${extra === 1 ? "sucursal extra" : "sucursales extra"} × ${usdLabel(planUsd.extraBranch[period])}`;
       extraAmount.textContent = usdLabel(Math.round(extra * planUsd.extraBranch[period] * 100) / 100);
-      price.textContent = usdLabel(usd);
-      bs.textContent = quote ? `+ impuestos · hoy Bs ${bsTotal(usd, quote.rate, quote.tax).toLocaleString("es-BO")}` : "+ impuestos";
-      detail.textContent = extra === 0 ? "Plan Negocio (o Gratis, sin pagar)." : `Plan Sucursales: ${branches} locales en total.`;
+      // Dólares sin impuestos y bolivianos con impuestos, al tipo de cambio de hoy (la misma cuenta del cobro).
+      usdText.textContent = usdLabel(usd);
+      bs.hidden = !quote;
+      bs.textContent = quote ? `Bs ${bsTotal(usd, quote.rate, quote.tax).toLocaleString("es-BO")} con impuestos` : "";
+      detail.textContent =
+        (extra === 0 ? "Plan Negocio (o Gratis, sin pagar)." : `Plan Sucursales: ${branches} locales en total.`) +
+        (discount > 0 ? ` Sin el precio fundador serían ${usdLabel(full)}.` : "");
       if (currentNote) currentNote.hidden = current === undefined || branches === current;
     };
 
@@ -154,10 +188,10 @@ const per = period === "mensual" ? "al mes" : "al año";
       });
     }
 
-    // Escribir el número: se acota a 1–20 al salir del campo; lo que no es número vuelve al valor de antes.
+    // Escribir el número: se acota a min–20 al salir del campo; lo que no es número vuelve al valor de antes.
     input.addEventListener("input", () => {
       const typed = Number(input.value);
-      if (input.value !== "" && Number.isFinite(typed) && typed >= 1 && typed <= max) set(typed);
+      if (input.value !== "" && Number.isFinite(typed) && typed >= min && typed <= max) set(typed);
     });
     input.addEventListener("change", () => set(input.value === "" || !Number.isFinite(Number(input.value)) ? branches : Number(input.value)));
     input.addEventListener("keydown", (event) => {
@@ -387,12 +421,24 @@ const per = period === "mensual" ? "al mes" : "al año";
     font-weight: var(--font-bold);
   }
 
-  .calc-bs {
+  .calc-price small {
     color: var(--color-text-muted);
     font-size: var(--text-sm);
     font-weight: var(--font-semibold);
   }
 
+  .calc-bs {
+    color: var(--color-text);
+    font-size: var(--text-xl);
+    line-height: var(--text-xl-lh);
+    font-weight: var(--font-bold);
+  }
+
+  .calc-bs[hidden] {
+    display: none;
+  }
+
+  .calc-rate,
   .calc-detail {
     margin: 0;
     color: var(--color-text-muted);

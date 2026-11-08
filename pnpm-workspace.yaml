@@ -3,3 +3,10 @@ minimumReleaseAgeExclude:
   - '@astrojs/prism@4.1.2'
   - '@astrojs/telemetry@3.4.2'
   - astro@7.4.4
+
+# Parches de seguridad en dependencias de otras dependencias (pnpm audit). Quitar cuando los padres los traigan solos.
+overrides:
+  path-to-regexp@>=4.0.0 <6.3.0: ^6.3.0
+  zod@<4.6.6: ^4.6.6
+  glob@>=9.0.0 <=14.0.1: ^14.0.2
+  minimatch@>=7.0.0 <11.0.1: ^11.0.1
