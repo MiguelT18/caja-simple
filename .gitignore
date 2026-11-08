@@ -25,3 +25,5 @@ pnpm-debug.log*
 
 # salida del adaptador de Vercel
 .vercel/
+.vercel
+.env*
