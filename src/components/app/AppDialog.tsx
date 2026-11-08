@@ -38,7 +38,13 @@ export function AppDialog({
   return (
     <Dialog open={controlled} onOpenChange={(next) => (onOpenChange?.(next), !next && onClose?.())}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent {...contentProps} className={cn("max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto", WIDTHS[size], className)}>
+      <DialogContent {...contentProps} className={cn(
+          "max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto",
+          // Celular: hoja inferior (ui/dialog.tsx) con margen para la barra del iPhone; el pie la usa para quedar pegado abajo.
+          "max-sm:p-5 max-sm:pb-[var(--sheet-pad)] max-sm:[--sheet-pad:max(1.25rem,env(safe-area-inset-bottom))]",
+          WIDTHS[size],
+          className,
+        )}>
         <DialogHeader className="pr-8 text-left">
           <DialogTitle className="[overflow-wrap:anywhere]">{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}

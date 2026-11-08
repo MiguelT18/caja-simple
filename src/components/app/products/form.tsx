@@ -1,5 +1,5 @@
 // Piezas de los formularios del catálogo: campo con error, envío a una acción y campos de stock.
-import { cloneElement, isValidElement, useEffect, useRef, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { Product } from "@/data/types";
 import { Label } from "@/components/ui/label";
 import { refreshRegions } from "@/scripts/refresh";
@@ -34,6 +34,48 @@ export function Field({ id, label, error, hint, children }: { id: string; label:
 }
 
 export const selectClass = "input";
+
+/**
+ * Selector de archivo: un recuadro que se toca entero, en vez del input nativo (que en el celular se ve tosco).
+ * El input real queda oculto pero enfocable; dentro de Field recibe aria-invalid y aria-describedby.
+ */
+export function FilePicker({
+  id,
+  name,
+  accept,
+  icon,
+  label,
+  fileName,
+  hint,
+  onChange,
+  ...aria
+}: {
+  id: string;
+  name?: string;
+  accept: string;
+  icon: ReactNode;
+  label: string;
+  fileName?: string;
+  hint?: string;
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
+}) {
+  return (
+    <label
+      className="flex min-h-14 min-w-0 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-[var(--color-input-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm transition-colors hover:bg-[var(--color-surface-muted)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-focus)] has-[[aria-invalid=true]]:border-[var(--color-expense)]"
+    >
+      <span className="grid size-9 shrink-0 place-items-center rounded-md bg-[var(--color-primary-soft)] text-[var(--color-primary)] [&_svg]:size-5" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="grid min-w-0 flex-1">
+        <span className="truncate font-semibold">{fileName || label}</span>
+        <span className="text-xs text-[var(--color-text-muted)]">{fileName ? "Toca para cambiarlo" : hint}</span>
+      </span>
+      <input id={id} name={name} type="file" accept={accept} className="sr-only" onChange={onChange} {...aria} />
+    </label>
+  );
+}
 
 type ActionResult = { error?: { message: string; fields?: Record<string, string[] | undefined> } };
 

@@ -3,7 +3,6 @@ import { useRef, useState } from "react";
 import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import type { Category } from "@/data/types";
 import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
 import { AppDialog } from "../AppDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -202,9 +201,7 @@ export function CategoryManager({
           ))}
           {categories.length === 0 && <li className="px-2 py-4 text-sm text-muted-foreground">Todavía no hay categorías.</li>}
         </ul>
-        <DialogFooter className="text-sm text-muted-foreground sm:justify-start">
-          Al borrar una categoría, sus productos quedan en «Sin categoría».
-        </DialogFooter>
+        <p className="m-0 text-sm text-muted-foreground">Al borrar una categoría, sus productos quedan en «Sin categoría».</p>
     </AppDialog>
   );
 }

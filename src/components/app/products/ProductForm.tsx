@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { AppDialog } from "../AppDialog";
 import { type Item } from "./catalog";
-import { Field, safeAction, selectClass, useActionForm } from "./form";
+import { Field, FilePicker, safeAction, selectClass, useActionForm } from "./form";
 import { ScanBarcode } from "./ScanBarcode";
 import { ComboFields } from "./ComboFields";
 import type { CatalogEntry } from "@/data/queries";
@@ -57,12 +57,14 @@ export function ProductForm({
     (form.elements.namedItem("categoryId") as HTMLSelectElement).value = category;
     if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
     setPreview(undefined);
+    setPhotoName("");
     setFileError("");
     setLastAdded(name);
     (form.elements.namedItem("name") as HTMLInputElement).focus();
   }
   const [preview, setPreview] = useState(product?.image);
   const [removeImage, setRemoveImage] = useState(false);
+  const [photoName, setPhotoName] = useState("");
   // La foto se revisa al elegirla: así el error llega antes de subir un archivo que el servidor va a rechazar.
   const [fileError, setFileError] = useState("");
   // Mientras se achica la foto no se envía: se subiría el original.
@@ -192,12 +194,15 @@ export function ProductForm({
               <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-lg border bg-muted text-muted-foreground">
                 {preview && !removeImage ? <img src={preview} alt="" decoding="async" className="size-full object-cover" /> : <ImagePlus className="size-6" aria-hidden="true" />}
               </span>
-              <input
+              <div className="min-w-0 flex-1">
+              <FilePicker
                 id="product-image"
                 name="image"
-                type="file"
                 accept="image/jpeg,image/png,image/webp"
-                className="w-full min-w-0 text-sm"
+                icon={<ImagePlus />}
+                label={preview && !removeImage ? "Cambiar foto" : "Elegir foto"}
+                hint="Desde la galería o la cámara."
+                fileName={photoName}
                 aria-invalid={imageError ? true : undefined}
                 aria-describedby={imageError ? "product-image-error" : "product-image-hint"}
                 onChange={async (e) => {
@@ -210,12 +215,14 @@ export function ProductForm({
                     : file && file.size > 2 * 1024 * 1024 ? "La foto pesa más de 2 MB. Elige una más liviana."
                     : "";
                   setFileError(problem);
+                  setPhotoName(file && !problem ? file.name : "");
                   if (problem) input.value = "";
                   setRemoveImage(false);
                   if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
                   setPreview(file && !problem ? URL.createObjectURL(file) : product?.image);
                 }}
               />
+              </div>
             </div>
             {product?.image && !removeImage && (
               <button type="button" className="justify-self-start text-sm font-semibold text-primary underline-offset-4 hover:underline" onClick={() => {
@@ -240,18 +247,20 @@ export function ProductForm({
                 Borrar
               </Button>
             ) : (
-              <span />
+              <span className="max-sm:hidden" />
             )}
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>
+            {/* Celular: «Guardar» arriba a todo el ancho y los otros dos en una fila, para que el pie no tape el formulario. */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+              <Button type="button" variant="outline" className={!product && !isCombo ? undefined : "max-sm:col-span-2"} onClick={onClose}>
                 Cancelar
               </Button>
               {!product && !isCombo && (
                 <Button type="submit" variant="outline" data-another {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
-                  Guardar y agregar otro
+                  <span className="sm:hidden">Guardar y otro</span>
+                  <span className="max-sm:hidden">Guardar y agregar otro</span>
                 </Button>
               )}
-              <Button type="submit" {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
+              <Button type="submit" className="max-sm:order-first max-sm:col-span-2" {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
                 {save.busy ? "Guardando…" : "Guardar"}
               </Button>
             </div>

@@ -8,7 +8,7 @@ import { importColumns, productsFromCsv, type ImportOptions } from "@/lib/csv";
 import { formatBs, toCsv } from "@/lib/format";
 import { toast } from "@/scripts/dialogs";
 import { refreshRegions } from "@/scripts/refresh";
-import { Field, safeAction } from "./form";
+import { Field, FilePicker, safeAction } from "./form";
 
 const SHOWN_ERRORS = 8;
 const SHOWN_ROWS = 5;
@@ -84,14 +84,17 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
   const tooMany = rows.length > MAX_ROWS;
   const ready = rows.length > 0 && !tooMany;
 
+  const [fileName, setFileName] = useState("");
   function reset() {
     setText("");
     setMessage("");
+    setFileName("");
   }
 
   async function read(file?: File) {
     reset();
     if (!file) return;
+    setFileName(file.name);
     if (file.size > 1_000_000) return setMessage("El archivo pesa más de 1 MB. Divídelo en partes.");
     setText(await file.text());
   }
@@ -135,7 +138,7 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
               <legend className="mb-1 p-0 text-sm font-semibold">¿A qué sucursales entran?</legend>
               <div className="flex flex-wrap gap-x-5 gap-y-2">
                 {branches.length > 1 && (
-                  <label className="inline-flex items-center gap-2 text-sm font-semibold">
+                  <label className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold sm:min-h-0">
                     <input
                       type="checkbox"
                       className="size-5 accent-[var(--color-primary)]"
@@ -146,7 +149,7 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
                   </label>
                 )}
                 {branches.map((b) => (
-                  <label key={b.id} className="inline-flex items-center gap-2 text-sm">
+                  <label key={b.id} className="inline-flex min-h-11 items-center gap-2 text-sm sm:min-h-0">
                     <input type="checkbox" className="size-5 accent-[var(--color-primary)]" checked={branchIds.includes(b.id)} onChange={(e) => toggleBranch(b.id, e.target.checked)} />
                     {b.name}
                   </label>
@@ -163,7 +166,7 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
                     ["each", "Un stock por sucursal"],
                     ["same", "El mismo stock en todas"],
                   ] as const).map(([value, label]) => (
-                    <label key={value} className="inline-flex items-center gap-2 text-sm">
+                    <label key={value} className="inline-flex min-h-11 items-center gap-2 text-sm sm:min-h-0">
                       <input
                         type="radio"
                         name="import-stock-mode"
@@ -179,8 +182,9 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
             </fieldset>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex rounded-full border p-0.5" role="group" aria-label="Cómo cargarlos">
+          {/* Celular: el selector a todo el ancho (dos mitades de 44 px) y la plantilla debajo. */}
+          <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="grid grid-cols-2 rounded-full border p-0.5 sm:inline-grid" role="group" aria-label="Cómo cargarlos">
               {([
                 ["paste", "Pegar o escribir", ClipboardPaste],
                 ["file", "Subir archivo", FileUp],
@@ -193,14 +197,14 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
                     setSource(value);
                     reset();
                   }}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-[var(--color-text-muted)] aria-pressed:bg-[var(--color-text)] aria-pressed:text-[var(--color-surface)]"
+                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold whitespace-nowrap text-[var(--color-text-muted)] aria-pressed:bg-[var(--color-text)] aria-pressed:text-[var(--color-surface)] sm:min-h-9"
                 >
                   <Icon className="size-4" aria-hidden="true" />
                   {label}
                 </button>
               ))}
             </div>
-            <Button variant="ghost" type="button" onClick={() => downloadTemplate(options)}>
+            <Button variant="ghost" type="button" className="max-sm:h-11 max-sm:border max-sm:bg-[var(--color-surface)]" onClick={() => downloadTemplate(options)}>
               <Download />
               Descargar plantilla
             </Button>
@@ -216,11 +220,11 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
               ))}
             </ol>
             <div className="flex flex-wrap gap-x-5 gap-y-2">
-              <label className="inline-flex items-center gap-2">
+              <label className="inline-flex min-h-11 items-center gap-2 sm:min-h-0">
                 <input type="checkbox" className="size-5 accent-[var(--color-primary)]" checked={withBarcode} onChange={(e) => setWithBarcode(e.target.checked)} />
                 Con código de barras
               </label>
-              <label className="inline-flex items-center gap-2">
+              <label className="inline-flex min-h-11 items-center gap-2 sm:min-h-0">
                 <input type="checkbox" className="size-5 accent-[var(--color-primary)]" checked={withCategory} onChange={(e) => setWithCategory(e.target.checked)} />
                 Con categoría
               </label>
@@ -247,8 +251,16 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
               />
             </Field>
           ) : (
-            <Field id="import-file" label="Archivo CSV" hint="Desde Excel: Guardar como › CSV.">
-              <input id="import-file" type="file" accept=".csv,text/csv" className="input" onChange={(e) => read(e.target.files?.[0])} />
+            <Field id="import-file" label="Archivo CSV">
+              <FilePicker
+                id="import-file"
+                accept=".csv,text/csv"
+                icon={<FileUp />}
+                label="Elegir archivo CSV"
+                hint="Desde Excel: Guardar como › CSV."
+                fileName={fileName}
+                onChange={(e) => read(e.target.files?.[0])}
+              />
             </Field>
           )}
 
@@ -259,6 +271,7 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
                   <strong>{rows.length}</strong> {rows.length === 1 ? "producto listo" : "productos listos"} para importar
                   {rows.length > SHOWN_ROWS ? `. Los primeros ${SHOWN_ROWS}:` : ":"}
                 </p>
+                <p className="m-0 text-xs text-[var(--color-text-muted)] sm:hidden">Desliza la tabla para ver todas las columnas.</p>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[26rem] text-left">
                     <thead className="text-[var(--color-text-muted)]">

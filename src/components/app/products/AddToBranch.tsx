@@ -72,7 +72,9 @@ export function AddToBranch({ businessId, branchId, addable }: { businessId: str
           <label className="relative min-w-0 flex-1 basis-56">
             <span className="sr-only">Buscar en el catálogo</span>
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[var(--color-text-muted)]" aria-hidden="true" />
-            <input type="search" className="input w-full pl-9" placeholder="Buscar" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input type="search" className="input w-full"
+              // .input (sin capa) le gana a pl-9: el lugar de la lupa va en línea.
+              style={{ paddingLeft: "2.25rem" }} placeholder="Buscar" value={query} onChange={(e) => setQuery(e.target.value)} />
           </label>
           <label className="inline-flex items-center gap-2 text-sm font-semibold">
             <input
