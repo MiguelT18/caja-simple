@@ -10,13 +10,13 @@ import PhotoField from "@/components/app/PhotoField.astro";
 import Layout from "@/layouts/Layout.astro";
 import { businessKinds, catalogLabel, kindOptions } from "@/data/kinds";
 import { branchColor, businessContext, businessHref, businessImages, currentUser } from "@/data/queries";
-import { planLimits } from "@/data/plans";
-import { longDate } from "@/lib/dates";
+import { planLimits, untilLabel } from "@/data/plans";
+import { today } from "@/lib/dates";
 import { plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
-const { business, branchSummary } = ctx;
+const { business, branchSummary, catalog } = ctx;
 const base = businessHref(business);
 const limits = planLimits[business.plan];
 const canAddBranch = limits.branches === null || branchSummary.length < limits.branches;
@@ -28,6 +28,14 @@ const branchUse = {
   fill: limits.branches === null ? null : Math.min(100, (branchSummary.length / limits.branches) * 100),
   ok: canAddBranch,
 };
+const canAddProduct = limits.products === null || catalog.length < limits.products;
+const productUse = {
+  label: "Productos",
+  value: limits.products === null ? `${catalog.length} · sin tope` : `${catalog.length} de ${limits.products}${canAddProduct ? "" : " · al tope"}`,
+  fill: limits.products === null ? null : Math.min(100, (catalog.length / limits.products) * 100),
+  ok: canAddProduct,
+};
+const stockUse = { label: "Control de stock", value: limits.stock ? "Incluido" : "Plan Negocio", ok: limits.stock };
 const history = { label: "Historial a la vista", value: limits.historyDays === null ? "Completo" : `Últimos ${limits.historyDays} días`, ok: limits.historyDays === null };
 const sections = [
   { id: "negocio", label: "Negocio", icon: Store },
@@ -209,7 +217,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
           <div class="plan-head">
             <div class="plan-name">
               <span class="plan-value">Plan {business.plan}</span>
-              {business.planUntil && <span class="chip">Pagado hasta el {longDate(business.planUntil).replace(/^\S+ /, "")}</span>}
+              {business.planUntil && <span class="chip">{untilLabel(business, today())!.replace(/^./, (c) => c.toUpperCase())}</span>}
             </div>
             <a href={`${base}/plan`} class="btn btn-secondary">
               Ver planes y precios
@@ -225,6 +233,21 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
               </dd>
               {branchUse.fill !== null && <span class="gauge" style={`--fill: ${branchUse.fill}%`} aria-hidden="true" />}
             </div>
+            <div class:list={["use", { full: !productUse.ok }]}>
+              <dt>{productUse.label}</dt>
+              <dd>
+                {productUse.ok ? <CircleCheck size={16} stroke-width={1.75} /> : <CircleMinus size={16} stroke-width={1.75} />}
+                <span class="num">{productUse.value}</span>
+              </dd>
+              {productUse.fill !== null && <span class="gauge" style={`--fill: ${productUse.fill}%`} aria-hidden="true" />}
+            </div>
+            <div class="use">
+              <dt>{stockUse.label}</dt>
+              <dd>
+                {stockUse.ok ? <CircleCheck size={16} stroke-width={1.75} /> : <CircleMinus size={16} stroke-width={1.75} />}
+                <span>{stockUse.value}</span>
+              </dd>
+            </div>
             <div class="use">
               <dt>{history.label}</dt>
               <dd>
@@ -233,7 +256,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
               </dd>
             </div>
           </dl>
-          {limits.historyDays !== null && <p class="field-hint">Lo anterior no se borra: vuelve a aparecer cuando pasas a un plan pago.</p>}
+          {limits.historyDays !== null && <p class="field-hint">No se borra nada: el historial anterior vuelve a aparecer y el stock vuelve a moverse cuando pasas a un plan pago.</p>}
         </div>
       </section>
 

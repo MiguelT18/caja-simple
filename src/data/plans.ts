@@ -1,16 +1,47 @@
 // Planes y precios (docs/planes-de-suscripcion.md). El precio está en dólares sin impuestos; en bolivianos se calcula
 // al mostrarlo y al cobrar, con el tipo de cambio del BCB del día. Nunca se guarda un precio fijo en Bs.
 import { PUBLIC_UPGRADE_URL } from "astro:env/client";
+import { longDate } from "@/lib/dates";
 
 export type PlanName = "Gratis" | "Negocio" | "Sucursales";
 
-// Lo que la app aplica de cada plan; null = sin tope. La base es la que manda
-// (migración plan_limits): esto solo lo muestra y tiene que coincidir con ella.
-export const planLimits: Record<PlanName, { branches: number | null; historyDays: number | null; reports: boolean }> = {
-  Gratis: { branches: 1, historyDays: 60, reports: false },
-  Negocio: { branches: 1, historyDays: null, reports: true },
-  Sucursales: { branches: null, historyDays: null, reports: true },
+export interface PlanLimits {
+  branches: number | null;
+  historyDays: number | null;
+  reports: boolean;
+  /** Productos en el catálogo. */
+  products: number | null;
+  /** Control de stock: cambiarlo a mano y que las ventas lo descuenten. Sin él, el que había queda a la vista, congelado. */
+  stock: boolean;
+  /** Importar o pegar productos de una planilla, y armar combos. */
+  bulk: boolean;
+}
+
+// Lo que la app aplica de cada plan; null = sin tope. La base es la que manda (migraciones plan_limits y
+// free_plan_limits; bulk de importar, en la Action importProducts): esto solo lo muestra y tiene que coincidir.
+export const planLimits: Record<PlanName, PlanLimits> = {
+  Gratis: { branches: 1, historyDays: 60, reports: false, products: 150, stock: false, bulk: false },
+  Negocio: { branches: 1, historyDays: null, reports: true, products: null, stock: true, bulk: true },
+  Sucursales: { branches: null, historyDays: null, reports: true, products: null, stock: true, bulk: true },
 };
+
+/** Días que dura la prueba del plan Negocio de un negocio nuevo (private.start_trial). */
+export const TRIAL_DAYS = 30;
+
+/** Días que quedan hasta `until` incluido (AAAA-MM-DD): el último día es 1. */
+export const daysLeft = (until: string, today: string) => Math.round((Date.parse(until) - Date.parse(today)) / 86_400_000) + 1;
+
+/** «prueba gratis, quedan 12 días» o «pagado hasta el 8 de diciembre de 2026»; sin vencimiento, null. */
+export function untilLabel({ planUntil, trial }: { planUntil?: string | null; trial?: boolean }, today: string) {
+  if (!planUntil) return null;
+  if (!trial) return `pagado hasta el ${longDate(planUntil).replace(/^\S+ /, "")}`;
+  const n = daysLeft(planUntil, today);
+  return `prueba gratis, ${n <= 1 ? "último día" : `quedan ${n} días`}`;
+}
+
+/** El plan que vale hoy (igual que private.effective_plan): uno pago con `until` ya pasado cuenta como Gratis. */
+export const effectivePlan = (plan: PlanName, until: string | null | undefined, today: string): PlanName =>
+  until && until < today ? "Gratis" : plan;
 
 // WhatsApp donde llegan los comprobantes de pago (+591 67677457). PUBLIC_UPGRADE_URL lo reemplaza si está definida.
 export const upgradeUrl: string = PUBLIC_UPGRADE_URL || "https://wa.me/59167677457";
@@ -86,7 +117,7 @@ export const plans: Plan[] = [
       "Empleados ilimitados",
       "Ventas, gastos, turnos y cuadre",
       "Cobros en efectivo, QR o transferencia",
-      "Inventario y stock de tu sucursal",
+      "Hasta 150 productos, con su precio",
       "Vende aunque se corte el internet",
       "Aviso de cada cierre y si la caja no cuadra",
       "Historial de los últimos 60 días",
@@ -97,6 +128,9 @@ export const plans: Plan[] = [
     audience: "Cuando quieres comparar con el mes pasado",
     features: [
       "Todo lo del plan Gratis",
+      "Productos sin límite",
+      "Control de stock con avisos de stock bajo",
+      "Importa productos desde Excel y arma combos",
       "Historial completo, sin límite de días",
       "Reportes por día, semana y mes",
       "Exporta a Excel o imprime en PDF",

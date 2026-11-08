@@ -1,7 +1,7 @@
 // Catálogo e inventario.
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
-import { check, count, db, imageFile, money, name, optional, storeImage, uuid, uploadLimit } from "./shared";
+import { check, count, db, imageFile, limitsOf, money, name, optional, storeImage, uuid, uploadLimit } from "./shared";
 
 /** Fila de inventario como la guarda saveInventory: sin precio se cobra al vender; sin stock, no se controla. */
 const inventoryRow = (businessId: string, branchId: string, productId: string, v: { price?: number; stock?: number; minStock?: number }) => ({
@@ -134,6 +134,10 @@ export const products = {
     }),
     handler: async ({ businessId, rows, branchIds }, context) => {
       const sb = db(context);
+      // shortcut: solo la Action corta la importación (la base no distingue un alta de una importación); el tope de
+      // 150 productos de Gratis sí lo aplica la base, así que saltarse esto no da más que cargar de a uno.
+      if (!(await limitsOf(sb, businessId)).bulk)
+        throw new ActionError({ code: "FORBIDDEN", message: "Importar productos es del plan Negocio. En el plan Gratis se agregan de a uno." });
       const key = (s: string) => s.toLowerCase();
       const [existing, cats] = await Promise.all([
         sb.from("products").select("id, name, barcode").eq("business_id", businessId),
@@ -238,6 +242,16 @@ export const products = {
       .refine((v) => !v.trackStock || v.minStock !== undefined, { message: "Ingresa un número", path: ["minStock"] }),
     handler: async ({ businessId, branchId, productId, fixedPrice, trackStock, price, stock, stockBefore, minStock }, context) => {
       const sb = db(context);
+      // Gratis: el stock queda congelado (la base no deja cambiarlo). Se guarda solo el precio y el stock queda como estaba.
+      if (!(await limitsOf(sb, businessId)).stock) {
+        const { error } = await sb
+          .from("inventory")
+          .upsert({ business_id: businessId, branch_id: branchId, product_id: productId, price: fixedPrice ? price! : null })
+          .select("product_id")
+          .single();
+        check(error);
+        return { ok: true };
+      }
       // Ya se controlaba el stock: no se pisa (una venta mientras el formulario estaba abierto se perdería).
       // Se guarda el resto y, si la dueña cambió el número, la diferencia entra como ajuste registrado.
       if (trackStock && stockBefore !== undefined) {
@@ -320,10 +334,13 @@ export const products = {
         .max(500, "Máximo 500 productos a la vez"),
     }),
     handler: async ({ businessId, branchId, items }, context) => {
-      const { error } = await db(context)
+      const sb = db(context);
+      // Gratis: sin control de stock, entran solo con su precio.
+      const withStock = (await limitsOf(sb, businessId)).stock;
+      const { error } = await sb
         .from("inventory")
         .upsert(
-          items.map((item) => inventoryRow(businessId, branchId, item.productId, item)),
+          items.map((item) => inventoryRow(businessId, branchId, item.productId, withStock ? item : { price: item.price })),
           { onConflict: "branch_id,product_id", ignoreDuplicates: true },
         );
       check(error);

@@ -4,13 +4,15 @@ import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
 import { plural } from "@/lib/format";
 import { catalogLabel } from "@/data/kinds";
-import { businessContext } from "@/data/queries";
+import { businessContext, businessHref } from "@/data/queries";
+import { planLimits } from "@/data/plans";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
 const { business, catalog, categories } = ctx;
 const label = catalogLabel(business.kind);
 const lowCount = catalog.filter((p) => p.soldIn.some((s) => s.low)).length;
+const limits = planLimits[business.plan];
 ---
 
 <Layout title={`${label} · ${business.name}`} context={{ membership: ctx.membership }}>
@@ -21,6 +23,6 @@ const lowCount = catalog.filter((p) => p.soldIn.some((s) => s.low)).length;
   />
 
   <div data-region="catalog">
-    <ProductCatalog client:load products={catalog} categories={categories} businessId={business.id} canEdit branches={ctx.membership.branches.map((b) => ({ id: b.id, name: b.name }))} />
+    <ProductCatalog client:load products={catalog} categories={categories} businessId={business.id} canEdit branches={ctx.membership.branches.map((b) => ({ id: b.id, name: b.name }))} limits={limits} planHref={`${businessHref(business)}/plan`} />
   </div>
 </Layout>

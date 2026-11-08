@@ -44,14 +44,14 @@ export async function founderPromo(sb: Supabase, businessId?: string): Promise<F
 
 /** Negocios que la persona ve, para /planes (ahí el middleware no carga la sesión). Vencido cuenta como Gratis, como en la base. */
 export async function ownedBusinesses(sb: Supabase, userId: string) {
-  const { data, error } = await sb.from("businesses").select("slug, name, plan, plan_until, owner_id").order("created_at");
+  const { data, error } = await sb.from("businesses").select("slug, name, plan, plan_until, trial, owner_id").order("created_at");
   fail(error);
   const rows = data ?? [];
   const owned = rows
     .filter((b) => b.owner_id === userId)
     .map((b) => {
       const expired = b.plan_until !== null && b.plan_until < today();
-      return { slug: b.slug, name: b.name, plan: expired ? ("Gratis" as const) : b.plan, planUntil: expired ? null : b.plan_until };
+      return { slug: b.slug, name: b.name, plan: expired ? ("Gratis" as const) : b.plan, planUntil: expired ? null : b.plan_until, trial: !expired && b.trial };
     });
   return { owned, worksElsewhere: rows.length > owned.length };
 }

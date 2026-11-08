@@ -152,7 +152,18 @@ function Toggle({ name, label, checked, onChange }: { name: string; label: strin
  * Precio y stock en una sucursal. Sin «Precio fijo», el precio se escribe al vender (prenda única);
  * sin «Controlar stock», se vende sin tope (un plato, una prenda por tipo). Los campos ocultos no se envían.
  */
-export function StockFields({ product, errors }: { product?: Product; errors: Record<string, string> }) {
+export function StockFields({
+  product,
+  errors,
+  stockLocked = false,
+  planHref,
+}: {
+  product?: Product;
+  errors: Record<string, string>;
+  /** Plan Gratis: el stock se ve pero no se cambia (la base lo tiene congelado). */
+  stockLocked?: boolean;
+  planHref?: string;
+}) {
   const [fixedPrice, setFixedPrice] = useState(product?.price !== null);
   const [trackStock, setTrackStock] = useState(product?.stock !== null);
   return (
@@ -175,6 +186,30 @@ export function StockFields({ product, errors }: { product?: Product; errors: Re
             ? "El stock sale de los productos del combo; ninguno lo controla."
             : `El stock sale de los productos del combo: alcanza para ${product.stock}.`}
         </p>
+      ) : stockLocked ? (
+        <div className="grid min-w-0 gap-1 border-t pt-4">
+          <p className="m-0 text-sm font-semibold">
+            {product?.stock == null ? "Sin control de stock" : (
+              <>
+                Stock: <span className="num">{product.stock}</span>
+                {product.minStock != null && (
+                  <>
+                    {" "}· mínimo <span className="num">{product.minStock}</span>
+                  </>
+                )}{" "}
+                (congelado)
+              </>
+            )}
+          </p>
+          <p className="field-hint m-0">
+            {product?.stock == null ? "El control de stock es del plan Negocio." : "Se ve como estaba, pero no cambia con las ventas: el control de stock es del plan Negocio."}{" "}
+            {planHref && (
+              <a href={planHref} className="underline underline-offset-2">
+                Ver planes
+              </a>
+            )}
+          </p>
+        </div>
       ) : (
       <div className="grid min-w-0 gap-2 border-t pt-4">
         <Toggle name="trackStock" label="Controlar stock" checked={trackStock} onChange={setTrackStock} />

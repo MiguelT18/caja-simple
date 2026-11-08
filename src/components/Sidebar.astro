@@ -23,7 +23,8 @@ const branch = context?.branch;
 
 const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
 // Precio fundador: solo a quien tiene un negocio propio en Gratis, y no en su página de plan (ahí va el detalle).
-const freeOwned = myBusinesses(Astro.locals).find((other) => other.role === "dueño" && other.business.plan === "Gratis")?.business;
+// En Gratis o en la prueba de 30 días: los dos todavía no pagaron.
+const freeOwned = myBusinesses(Astro.locals).find((other) => other.role === "dueño" && (other.business.plan === "Gratis" || other.business.trial))?.business;
 const promo = freeOwned && !currentPath.endsWith("/plan") && !currentPath.includes("/cobro/") ? await founderPromo(Astro.locals.supabase).catch(() => null) : null;
 const navSections = applyNavOrder(appNav(m, branch), Astro.cookies.get(NAV_ORDER_COOKIE)?.value);
 

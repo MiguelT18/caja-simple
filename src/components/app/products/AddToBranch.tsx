@@ -2,6 +2,7 @@ import { actions } from "astro:actions";
 import { useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { DialogFooter } from "@/components/ui/dialog";
 import { AppDialog } from "../AppDialog";
 import { toast } from "@/scripts/dialogs";
@@ -16,7 +17,18 @@ const plain = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCa
  * Agrega varios productos del catálogo a la sucursal de una vez: se marcan en una tabla y se les pone precio y stock
  * ahí mismo (vacío = se cobra al vender / no se controla). Escribir un precio o un stock marca la fila.
  */
-export function AddToBranch({ businessId, branchId, addable }: { businessId: string; branchId: string; addable: { id: string; name: string }[] }) {
+export function AddToBranch({
+  businessId,
+  branchId,
+  addable,
+  withStock = true,
+}: {
+  businessId: string;
+  branchId: string;
+  addable: { id: string; name: string }[];
+  /** Sin control de stock (plan Gratis): solo el precio. */
+  withStock?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -52,7 +64,11 @@ export function AddToBranch({ businessId, branchId, addable }: { businessId: str
   return (
     <AppDialog
       title="Agregar a la sucursal"
-      description="Marca los productos del catálogo y ponles precio y stock aquí. Sin precio se cobra al vender; sin stock, no se controla."
+      description={
+        withStock
+          ? "Marca los productos del catálogo y ponles precio y stock aquí. Sin precio se cobra al vender; sin stock, no se controla."
+          : "Marca los productos del catálogo y ponles precio aquí. Sin precio se cobra al vender. El control de stock es del plan Negocio."
+      }
       size="xl"
       className="flex flex-col"
       open={open}
@@ -98,7 +114,10 @@ export function AddToBranch({ businessId, branchId, addable }: { businessId: str
                 return (
                   <li
                     key={p.id}
-                    className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-md px-2 py-2 hover:bg-[var(--color-surface-hover)] sm:grid-cols-[auto_minmax(0,1fr)_8rem_6.5rem]"
+                    className={cn(
+                      "grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-md px-2 py-2 hover:bg-[var(--color-surface-hover)]",
+                      withStock ? "sm:grid-cols-[auto_minmax(0,1fr)_8rem_6.5rem]" : "sm:grid-cols-[auto_minmax(0,1fr)_8rem]",
+                    )}
                   >
                     <input
                       id={`add-${p.id}`}
@@ -121,17 +140,19 @@ export function AddToBranch({ businessId, branchId, addable }: { businessId: str
                       value={d.price}
                       onChange={(e) => edit(p.id, { price: e.target.value, on: d.on || e.target.value !== "" })}
                     />
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      step="1"
-                      min="0"
-                      className="input"
-                      placeholder="Stock"
-                      aria-label={`Stock de ${p.name}`}
-                      value={d.stock}
-                      onChange={(e) => edit(p.id, { stock: e.target.value, on: d.on || e.target.value !== "" })}
-                    />
+                    {withStock && (
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        step="1"
+                        min="0"
+                        className="input"
+                        placeholder="Stock"
+                        aria-label={`Stock de ${p.name}`}
+                        value={d.stock}
+                        onChange={(e) => edit(p.id, { stock: e.target.value, on: d.on || e.target.value !== "" })}
+                      />
+                    )}
                   </li>
                 );
               })}

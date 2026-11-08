@@ -4,6 +4,8 @@ import { ActionError, type ActionAPIContext } from "astro:actions";
 import { z } from "astro/zod";
 import { rateLimit } from "@/lib/cache";
 import { imageInfo, tooLarge } from "@/lib/image";
+import { today } from "@/lib/dates";
+import { effectivePlan, planLimits } from "@/data/plans";
 
 // Los mensajes que zod arma solo (los que no escribimos a mano) también en español: nada en inglés llega a la pantalla.
 z.config(z.locales.es());
@@ -38,6 +40,13 @@ export function db(context: ActionAPIContext) {
 export async function limit(context: ActionAPIContext, name: string, max: number, windowSec: number) {
   if (!(await rateLimit(`${name}:${context.locals.userId}`, max, windowSec)))
     throw new ActionError({ code: "TOO_MANY_REQUESTS", message: "Demasiados intentos. Espera un momento." });
+}
+
+/** Límites del plan que vale hoy en el negocio. La base los aplica igual: esto es para cortar antes con un mensaje claro. */
+export async function limitsOf(sb: ReturnType<typeof db>, businessId: string) {
+  const { data, error } = await sb.from("businesses").select("plan, plan_until").eq("id", businessId).single();
+  check(error);
+  return planLimits[effectivePlan(data!.plan, data!.plan_until, today())];
 }
 
 /** Mensaje claro para los errores de Postgres/PostgREST. */

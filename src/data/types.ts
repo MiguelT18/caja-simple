@@ -21,6 +21,8 @@ export interface Business {
   plan: "Gratis" | "Negocio" | "Sucursales";
   /** Último día pagado (AAAA-MM-DD); sin él, el plan no vence. */
   planUntil?: string;
+  /** El plan es la prueba de 30 días de Negocio (todavía no se pagó). */
+  trial?: boolean;
   /** Rubro: solo cambia textos y secciones de la app (ver docs/modelo-de-datos.md › Rubros). */
   kind: BusinessKind;
   /** Logo o foto del negocio, en branch-images (<negocio>/<negocio>.<ext>). */
@@ -214,8 +216,8 @@ export type Notification = {
   | { kind: "shift_late"; data: { branch: string; shift: string; start: string } }
   | { kind: "low_stock"; data: { product: string; branch: string; stock: number; minStock: number } }
   | { kind: "shift_change"; data: { person: string; business: string; branch: string; from: string | null; to: string } }
-  | { kind: "plan_expiring"; data: { business: string; plan: string; until: string; days: number } }
-  | { kind: "plan_expired"; data: { business: string; plan: string } }
+  | { kind: "plan_expiring"; data: { business: string; plan: string; until: string; days: number; trial?: boolean } }
+  | { kind: "plan_expired"; data: { business: string; plan: string; trial?: boolean } }
   | {
       kind: "reopen_request";
       requestId: string;

@@ -14,6 +14,7 @@ export const toBusiness = (b: Row<"businesses">): Business => ({
   name: b.name,
   ownerId: b.owner_id,
   plan: b.plan,
+  trial: b.trial || undefined,
   kind: b.kind,
   imagePath: b.image_path ?? undefined,
   description: b.description ?? undefined,

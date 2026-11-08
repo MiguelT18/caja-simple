@@ -96,6 +96,7 @@ export type Database = {
           plan: Database["public"]["Enums"]["plan"];
           plan_until: string | null;
           slug: string;
+          trial: boolean;
         };
         ComputedFields: never;
         Insert: {
@@ -111,6 +112,7 @@ export type Database = {
           plan?: Database["public"]["Enums"]["plan"];
           plan_until?: string | null;
           slug: string;
+          trial?: boolean;
         };
         Update: {
           created_at?: string;
@@ -125,6 +127,7 @@ export type Database = {
           plan?: Database["public"]["Enums"]["plan"];
           plan_until?: string | null;
           slug?: string;
+          trial?: boolean;
         };
         Relationships: [
           {

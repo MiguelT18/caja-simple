@@ -20,8 +20,8 @@ Tres planes, con precio en dólares y sin impuestos. El monto final en boliviano
 
 | Plan | Para quién | Incluye | Mensual (US$, sin impuestos) | Anual (US$, 2 meses gratis) |
 | --- | --- | --- | --- | --- |
-| Gratis | Puesto o tienda que recién empieza | 1 sucursal por negocio (negocios ilimitados), empleados ilimitados, ventas, gastos, turnos y cuadre. Historial de 60 días | 0 | — |
-| Negocio | El local que ya depende de la app | Todo lo anterior, con historial completo, reportes por día, semana y mes, exportar a Excel o PDF | 5,50 | 55 |
+| Gratis | Puesto o tienda que recién empieza | 1 sucursal por negocio (negocios ilimitados), hasta 150 productos, empleados ilimitados, ventas, gastos, turnos y cuadre. Historial de 60 días | 0 | — |
+| Negocio | El local que ya depende de la app | Todo lo anterior, con productos sin límite, control de stock, importar productos y combos, historial completo, reportes por día, semana y mes, exportar a Excel o PDF | 5,50 | 55 |
 | Sucursales | Dueño con 2 o más locales | Todo lo de Negocio, más vista consolidada, comparación entre sucursales, permisos por empleado y sucursal, e historial de quién hizo cada cambio | 5,50 + 3,50 por sucursal extra | 55 + 35 por sucursal extra |
 
 ## Precio en bolivianos
@@ -55,6 +55,8 @@ Ejemplo con el tipo de cambio de Bs 11,81 (7 de noviembre de 2026):
 - **Lo básico va en todos los planes.** Registrar ventas y cuadrar la caja funciona en el plan gratis. Si se limita, el empleado vuelve al cuaderno y se pierde al cliente. Lo que se paga es el historial, el análisis y tener más de una sucursal.
 - **No limitar la cantidad de ventas.** Un tope de "X ventas al mes" castiga al negocio justo cuando le va bien y anima a no registrar todo.
 - **Limitar el historial, no las funciones.** Después de dos meses de uso, el dueño quiere comparar con el mes pasado. Ese es el momento natural para pasar a un plan pago.
+- **Limitar lo que crece con el tamaño, no con las ventas.** Un negocio grande con una sola sucursal (un supermercado) no debería quedarse gratis para siempre. Por eso Gratis llega a 150 productos y no incluye control de stock, importar productos ni combos: una tienda de barrio no los necesita, un supermercado sí. Vender mucho nunca cuesta más.
+- **Prueba de 30 días.** Cada negocio nuevo empieza con el plan Negocio por 30 días: prueba el stock, los combos y el historial antes de perderlos. Después baja a Gratis sin borrar nada.
 - **Precio anclado en dólares.** Vercel, Supabase y Upstash se pagan en dólares. Con el precio en US$, una devaluación del boliviano no se come el margen. El precio en dólares se revisa una vez al año.
 - **Plan anual con 2 meses gratis.** Da caja por adelantado y reduce cancelaciones.
 - **Precio fundador.** Los primeros 20–50 negocios pagan 50% durante el primer año a cambio de opiniones. No es de por vida, porque un descuento permanente ata el ingreso aunque suban los costos.
@@ -69,17 +71,22 @@ En la app (`/app/<negocio>/plan`) el único método es el **QR bancario** de mon
 
 ## Límites en la app
 
-La base de datos aplica los límites (migración `supabase/migrations/20261031012616_plan_limits.sql`). `planLimits`, en `src/data/plans.ts`, solo los muestra y tiene que coincidir con ella. Ese mismo archivo repite, para mostrarlos, los precios en dólares sin impuestos de `private.plan_usd`. No se guarda ningún precio fijo en bolivianos: se calcula al mostrarlo y al cobrar.
+La base de datos aplica los límites (migraciones `supabase/migrations/20261031012616_plan_limits.sql` y `20261108170000_free_plan_limits.sql`). `planLimits`, en `src/data/plans.ts`, solo los muestra y tiene que coincidir con ella. Ese mismo archivo repite, para mostrarlos, los precios en dólares sin impuestos de `private.plan_usd`. No se guarda ningún precio fijo en bolivianos: se calcula al mostrarlo y al cobrar.
 
 | Límite | Gratis | Negocio | Sucursales | Dónde se aplica |
 | --- | --- | --- | --- | --- |
 | Sucursales por negocio | 1 | 1 | sin tope (cada extra se cobra) | trigger `branches_check_limit` |
 | Historial de ventas, gastos y cierres a la vista | últimos 60 días | completo | completo | RLS (`private.history_start`) |
 | Reportes por día, semana y mes; exportar | no | sí | sí | solo en la app (`planLimits.reports`): RLS ya filtra los datos |
+| Productos en el catálogo | 150 | sin tope | sin tope | trigger `products_check_limit` |
+| Control de stock (cambiarlo, entradas, mermas, ajustes; que las ventas lo descuenten) | no: el que había queda a la vista, congelado | sí | sí | trigger `inventory_freeze_stock`; `take_stock` y `void_sale` no lo tocan en Gratis |
+| Combos nuevos | no (los que había se siguen vendiendo) | sí | sí | trigger `product_components_check` |
+| Importar o pegar productos de una planilla | no | sí | sí | Action `importProducts` (la base no distingue un alta de una importación; el tope de 150 sí lo aplica) |
 
-- Un negocio nuevo siempre empieza en Gratis. Una persona puede tener los negocios que quiera: cada uno paga su propio plan (migración `20261108130000_charge_by_branches_unlimited_businesses.sql`).
+- **Prueba de 30 días.** Un negocio nuevo empieza en el plan Negocio con `plan_until` a 30 días (hoy incluido) y `businesses.trial = true` (trigger `businesses_start_trial`). `plan_daily` avisa a 7, 3 y 1 día («tu prueba termina…») y al vencer lo pasa a Gratis. Un pago la termina (`activate_plan_charge` pone `trial = false`; pagar Negocio durante la prueba suma desde el día siguiente al vencimiento). **La prueba no ocupa cupo de fundador**: el cupo solo lo da un pago real.
+- Una persona puede tener los negocios que quiera: cada uno paga su propio plan (migración `20261108130000_charge_by_branches_unlimited_businesses.sql`).
 - La vista consolidada, los permisos por empleado y el historial de cambios todavía no existen en la app, así que no hay nada que limitar ahí.
-- **Al bajar de plan no se borra nada.** Las sucursales que sobran siguen funcionando, pero no se pueden agregar otras. El historial de más de 60 días se oculta y vuelve a aparecer al pagar.
+- **Al bajar de plan no se borra nada.** Las sucursales que sobran siguen funcionando, pero no se pueden agregar otras. El historial de más de 60 días se oculta y vuelve a aparecer al pagar. Los productos de más de 150 siguen ahí, pero no se agregan otros. El stock queda congelado (se ve como estaba) y vuelve a moverse al pagar: conviene contarlo de nuevo.
 
 ### Activar un plan tras el pago
 

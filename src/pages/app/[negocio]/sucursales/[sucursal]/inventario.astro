@@ -8,6 +8,7 @@ import Layout from "@/layouts/Layout.astro";
 import { plural } from "@/lib/format";
 import { stamp } from "@/lib/dates";
 import { branchColor, branchContext, shiftBarData, businessHref, isLowStock, stockMoves } from "@/data/queries";
+import { planLimits } from "@/data/plans";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
@@ -23,8 +24,12 @@ const addable = (catalog ?? []).filter((p) => !products.some((x) => x.id === p.i
 
 const lowCount = products.filter(isLowStock).length;
 
-// Entradas, mermas y ajustes: solo de productos con control de stock. La base exige el rol (record_stock_move).
-const tracked = products.filter((p) => p.stock !== null);
+// Entradas, mermas y ajustes: solo de productos con control de stock, y solo en los planes pagos (en Gratis el stock
+// queda congelado: la base no deja cambiarlo). La base exige el rol (record_stock_move).
+const limits = planLimits[business.plan];
+const planHref = `${businessHref(business)}/plan`;
+const tracked = limits.stock ? products.filter((p) => p.stock !== null) : [];
+const frozen = !limits.stock && products.some((p) => p.stock !== null);
 const moves = await stockMoves(Astro.locals.supabase, branch.id);
 const kinds = [
   { value: "entrada", label: "Entrada de mercadería (suma)" },
@@ -64,14 +69,31 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
   </PageHeader>
 
   <div data-region="catalog">
-    <ProductCatalog client:load products={products} categories={categories} businessId={business.id} branchId={branch.id} canEdit={isOwner} addable={addable} />
+    <ProductCatalog client:load products={products} categories={categories} businessId={business.id} branchId={branch.id} canEdit={isOwner} addable={addable} limits={limits} planHref={planHref} />
   </div>
+
+  {
+    frozen && (
+      <p class="notice frozen">
+        El stock que ves está congelado: en el plan Gratis no cambia con las ventas ni se puede corregir.
+        {isOwner ? (
+          <>
+            {" "}<a href={planHref}>El control de stock es del plan Negocio</a>.
+          </>
+        ) : (
+          " El control de stock es de los planes pagos."
+        )}
+      </p>
+    )
+  }
 
   <section class="moves" aria-labelledby="moves-title" data-region="moves">
     <h2 class="section-title" id="moves-title">Movimientos de stock</h2>
     {
       moves.length === 0 ? (
-        <p class="card empty-state">Todavía no hay entradas, mermas ni ajustes. Las ventas descuentan el stock solas.</p>
+        <p class="card empty-state">
+          {limits.stock ? "Todavía no hay entradas, mermas ni ajustes. Las ventas descuentan el stock solas." : "Las entradas, mermas y ajustes de stock son del plan Negocio."}
+        </p>
       ) : (
         <div class="table-wrap card" role="region" aria-label="Tabla de movimientos" tabindex="0">
           <table class="moves-table">
@@ -136,6 +158,17 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
 </Layout>
 
 <style>
+  .frozen {
+    margin-top: 1.25rem;
+  }
+
+  .frozen a {
+    color: inherit;
+    font-weight: var(--font-semibold);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
   .moves {
     margin-top: 2rem;
   }

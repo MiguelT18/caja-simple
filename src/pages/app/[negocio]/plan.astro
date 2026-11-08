@@ -6,8 +6,8 @@ import PeriodSwitch from "@/components/plans/PeriodSwitch.astro";
 import PlanPrice from "@/components/plans/PlanPrice.astro";
 import Layout from "@/layouts/Layout.astro";
 import { businessContext, businessHref, currentQuote, founderPromo, myBusinesses, planCharges } from "@/data/queries";
-import { plans, upgradeUrl, usdLabel, type Period } from "@/data/plans";
-import { longDate, shortDate, stamp } from "@/lib/dates";
+import { plans, untilLabel, upgradeUrl, usdLabel, type Period } from "@/data/plans";
+import { longDate, shortDate, stamp, today } from "@/lib/dates";
 import { plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
@@ -50,7 +50,7 @@ const rateText = (c: (typeof charges)[number]) =>
 ---
 
 <Layout title={`Plan · ${business.name}`} context={{ membership: ctx.membership }}>
-  <PageHeader {...ctx.backdrop} title="Planes" description={`${business.name} está en el plan ${business.plan}${business.planUntil ? `, pagado hasta el ${longDate(business.planUntil).replace(/^\S+ /, "")}` : ""}. Tus empleados entran siempre gratis; pagas por negocio y por sucursal.`} >
+  <PageHeader {...ctx.backdrop} title="Planes" description={`${business.name} está en el plan ${business.plan}${business.planUntil ? ` (${untilLabel(business, today())})` : ""}. Tus empleados entran siempre gratis; pagas por negocio y por sucursal.`} >
     <a slot="back" class="back" href={`${businessHref(business)}/configuracion`}><ArrowLeft size={16} stroke-width={1.75} />Configuración</a>
   </PageHeader>
 

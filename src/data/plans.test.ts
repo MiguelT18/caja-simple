@@ -1,7 +1,7 @@
 // planLimits solo muestra los límites: la base los aplica. Este test avisa si dejan de coincidir.
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { bsTotal, discounted, planLimits, planUsd, usdFor } from "./plans";
+import { bsTotal, daysLeft, discounted, effectivePlan, planLimits, planUsd, TRIAL_DAYS, untilLabel, usdFor } from "./plans";
 
 const dir = new URL("../../supabase/migrations/", import.meta.url);
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
@@ -28,8 +28,39 @@ describe("planLimits coincide con la base", () => {
     expect(planLimits.Negocio.branches).toBe(1);
     expect(planLimits.Sucursales.branches).toBeNull();
   });
+  it("tope de productos, stock congelado y combos en Gratis", () => {
+    const max = Number(latest("private.check_product_limit").match(/>= (\d+) then/)?.[1]);
+    expect(max).toBe(planLimits.Gratis.products);
+    expect(planLimits.Negocio.products).toBeNull();
+    expect(latest("private.freeze_stock")).toMatch(/<> 'Gratis' then\s+return new/);
+    expect(latest("private.take_stock")).toMatch(/effective_plan\(v_item\.business_id\) = 'Gratis'/);
+    expect(latest("private.check_product_component")).toMatch(/= 'Gratis' then\s+raise exception 'Los combos/);
+    expect([planLimits.Gratis.stock, planLimits.Gratis.bulk]).toEqual([false, false]);
+    expect([planLimits.Negocio.stock, planLimits.Negocio.bulk]).toEqual([true, true]);
+  });
+  it("la prueba dura TRIAL_DAYS (hoy + días − 1, como plan_until)", () => {
+    const plus = Number(latest("private.start_trial").match(/private\.today\(\) \+ (\d+)/)?.[1]);
+    expect(plus + 1).toBe(TRIAL_DAYS);
+  });
   it("el aviso de cada cierre va en todos los planes", () => {
     expect(latest("private.on_shift_closed_notify")).not.toMatch(/'Gratis'/);
+  });
+});
+
+describe("effectivePlan", () => {
+  it("un plan vencido cuenta como Gratis; el último día todavía vale", () => {
+    expect(effectivePlan("Negocio", "2026-11-07", "2026-11-08")).toBe("Gratis");
+    expect(effectivePlan("Negocio", "2026-11-08", "2026-11-08")).toBe("Negocio");
+    expect(effectivePlan("Sucursales", null, "2026-11-08")).toBe("Sucursales");
+  });
+});
+
+describe("untilLabel", () => {
+  it("la prueba cuenta los días que quedan, con hoy incluido", () => {
+    expect(daysLeft("2026-12-07", "2026-11-08")).toBe(TRIAL_DAYS);
+    expect(untilLabel({ planUntil: "2026-11-19", trial: true }, "2026-11-08")).toBe("prueba gratis, quedan 12 días");
+    expect(untilLabel({ planUntil: "2026-11-08", trial: true }, "2026-11-08")).toBe("prueba gratis, último día");
+    expect(untilLabel({}, "2026-11-08")).toBeNull();
   });
 });
 

@@ -9,8 +9,8 @@ import PlanCalculator from "../components/PlanCalculator.astro";
 import PeriodSwitch from "../components/plans/PeriodSwitch.astro";
 import PlanPrice from "../components/plans/PlanPrice.astro";
 import { currentQuote, ownedBusinesses } from "@/data/queries";
-import { plans, type Period, type PlanName } from "../data/plans";
-import { longDate } from "@/lib/dates";
+import { plans, untilLabel, type Period, type PlanName } from "../data/plans";
+import { today } from "@/lib/dates";
 
 const signupHref = "/auth/crear-cuenta";
 const signedIn = Boolean(Astro.locals.userId);
@@ -26,7 +26,6 @@ const [quote, mine] = await Promise.all([
 const owned = mine?.owned ?? [];
 const only = owned.length === 1 ? owned[0] : null;
 const planHref = (slug: string) => `/app/${slug}/plan${period === "anual" ? "?periodo=anual" : ""}`;
-const until = (date: string) => longDate(date).replace(/^\S+ /, "");
 
 /** Qué ofrece cada tarjeta: un enlace, o «es tu plan actual» (sin botón). */
 function cta(plan: PlanName, i: number): { href: string; label: string; primary: boolean } | { current: string } {
@@ -43,7 +42,7 @@ function cta(plan: PlanName, i: number): { href: string; label: string; primary:
 }
 
 const steps = [
-  { title: "Empieza gratis", text: "Creas tu cuenta y tu negocio. El plan Gratis no vence." },
+  { title: "Empieza gratis", text: "Creas tu cuenta y tu negocio, que arranca con 30 días del plan Negocio. Después sigue en Gratis, que no vence." },
   { title: "Elige el plan en tu negocio", text: "Cada negocio tiene su propio plan: lo eliges en Configuración › Plan." },
   { title: "Paga por QR", text: "Desde la app de cualquier banco, en bolivianos. Activamos el plan al ver tu comprobante." },
 ];
@@ -140,7 +139,7 @@ const steps = [
                         <strong>{b.name}</strong>
                         <span class="pay-plan">
                           Plan {b.plan}
-                          {b.planUntil && `, pagado hasta el ${until(b.planUntil)}`}
+                          {b.planUntil && `, ${untilLabel(b, today())}`}
                         </span>
                       </span>
                       <a href={planHref(b.slug)} class="btn btn-secondary">

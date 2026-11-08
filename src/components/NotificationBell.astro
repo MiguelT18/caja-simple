@@ -74,15 +74,17 @@ function describe(n: Notification) {
     case "plan_expiring":
       return {
         icon: CalendarClock,
-        title: `Tu plan ${n.data.plan} de ${n.data.business} vence ${n.data.days === 1 ? "mañana" : `en ${n.data.days} días`}`,
-        detail: "Renuévalo para no volver al plan Gratis",
+        title: n.data.trial
+          ? `Tu prueba del plan ${n.data.plan} en ${n.data.business} termina ${n.data.days === 1 ? "mañana" : `en ${n.data.days} días`}`
+          : `Tu plan ${n.data.plan} de ${n.data.business} vence ${n.data.days === 1 ? "mañana" : `en ${n.data.days} días`}`,
+        detail: n.data.trial ? "Paga el plan para seguir con stock, combos e historial completo" : "Renuévalo para no volver al plan Gratis",
         tone: "warning",
       };
     case "plan_expired":
       return {
         icon: CalendarClock,
         title: `${n.data.business} volvió al plan Gratis`,
-        detail: `Venció el plan ${n.data.plan}. Tus datos siguen guardados`,
+        detail: n.data.trial ? `Terminó tu prueba del plan ${n.data.plan}. Tus datos siguen guardados` : `Venció el plan ${n.data.plan}. Tus datos siguen guardados`,
         tone: "warning",
       };
     case "reopen_request":

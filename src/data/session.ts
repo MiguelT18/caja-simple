@@ -64,7 +64,12 @@ export async function loadSession(sb: Supabase, userId: string): Promise<Session
     // El cron baja el plan a Gratis una vez al día; mientras tanto, vencido ya cuenta como Gratis (como en la base).
     const expired = b.plan_until !== null && b.plan_until < today();
     return {
-      business: { ...toBusiness(b), plan: expired ? "Gratis" : b.plan, planUntil: expired ? undefined : (b.plan_until ?? undefined) },
+      business: {
+        ...toBusiness(b),
+        plan: expired ? "Gratis" : b.plan,
+        planUntil: expired ? undefined : (b.plan_until ?? undefined),
+        trial: (!expired && b.trial) || undefined,
+      },
       role: owner ? "dueño" : "empleado",
       branches: branches
         .filter((br) => owner || br.id === employee?.branch_id)

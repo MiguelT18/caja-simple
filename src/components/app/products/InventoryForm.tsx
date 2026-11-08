@@ -8,8 +8,27 @@ import { safeAction, useActionForm, StockFields } from "./form";
 import { refreshRegions } from "@/scripts/refresh";
 import { confirmDialog, toast } from "@/scripts/dialogs";
 
-export function InventoryForm({ businessId, branchId, product, onClose }: { businessId: string; branchId: string; product: Product; onClose: () => void }) {
-  const save = useActionForm((form) => actions.saveInventory(form) as never, onClose, `Precio y stock de «${product.name}» guardados.`);
+export function InventoryForm({
+  businessId,
+  branchId,
+  product,
+  stockLocked = false,
+  planHref,
+  onClose,
+}: {
+  businessId: string;
+  branchId: string;
+  product: Product;
+  /** Plan Gratis: solo el precio se guarda; el stock se ve congelado. */
+  stockLocked?: boolean;
+  planHref?: string;
+  onClose: () => void;
+}) {
+  const save = useActionForm(
+    (form) => actions.saveInventory(form) as never,
+    onClose,
+    stockLocked ? `Precio de «${product.name}» guardado.` : `Precio y stock de «${product.name}» guardados.`,
+  );
 
   async function remove() {
     if (!(await confirmDialog(`¿Dejar de vender «${product.name}» en esta sucursal? Sigue en el catálogo.`, { confirmLabel: "Dejar de vender", danger: true }))) return;
@@ -25,12 +44,12 @@ export function InventoryForm({ businessId, branchId, product, onClose }: { busi
   }
 
   return (
-    <AppDialog title={product.name} description="Precio y stock en esta sucursal." onClose={onClose}>
+    <AppDialog title={product.name} description={stockLocked ? "Precio en esta sucursal." : "Precio y stock en esta sucursal."} onClose={onClose}>
         <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
           <input type="hidden" name="businessId" value={businessId} />
           <input type="hidden" name="branchId" value={branchId} />
           <input type="hidden" name="productId" value={product.id} />
-          <StockFields product={product} errors={save.errors} />
+          <StockFields product={product} errors={save.errors} stockLocked={stockLocked} planHref={planHref} />
           {save.message && (
             <p className="notice notice-error m-0" role="alert">
               {save.message}

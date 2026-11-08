@@ -1,9 +1,10 @@
 import { actions } from "astro:actions";
 import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
-import { Layers, LayoutGrid, List, Package, Plus, Search, TriangleAlert } from "lucide-react";
+import { Layers, LayoutGrid, List, Lock, Package, Plus, Search, TriangleAlert, Upload } from "lucide-react";
 import type { Category, Product } from "@/data/types";
 import type { CatalogEntry } from "@/data/queries";
+import type { PlanLimits } from "@/data/plans";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,9 +55,39 @@ interface Props {
   addable?: { id: string; name: string }[];
   /** En el negocio: sucursales a las que puede entrar lo que se importa. */
   branches?: { id: string; name: string }[];
+  /** Lo que permite el plan del negocio (la base lo aplica igual): sin él, todo permitido. */
+  limits?: Pick<PlanLimits, "products" | "stock" | "bulk">;
+  /** Página del plan, para los enlaces de lo que es de un plan pago. */
+  planHref?: string;
 }
 
-export default function ProductCatalog({ products: initialProducts, categories: initialCategories, businessId, branchId, canEdit, addable = [], branches = [] }: Props) {
+const OPEN: Pick<PlanLimits, "products" | "stock" | "bulk"> = { products: null, stock: true, bulk: true };
+
+/** Botón de algo que es de un plan pago: lleva a la página del plan, con un candado que lo dice (no solo el color). */
+function PaidOnly({ href, icon: Icon, children }: { href: string; icon: typeof Plus; children: React.ReactNode }) {
+  return (
+    <Button asChild variant="outline" className="h-11">
+      <a href={href} title="Disponible en el plan Negocio">
+        <Icon />
+        {children}
+        <Lock className="text-muted-foreground" aria-hidden="true" />
+        <span className="sr-only">(plan Negocio)</span>
+      </a>
+    </Button>
+  );
+}
+
+export default function ProductCatalog({
+  products: initialProducts,
+  categories: initialCategories,
+  businessId,
+  branchId,
+  canEdit,
+  addable = [],
+  branches = [],
+  limits = OPEN,
+  planHref = "#",
+}: Props) {
   const mode = branchId ? "branch" : "business";
   const [products, setProducts] = useState(initialProducts);
   const [categories, setCategories] = useState(initialCategories);
@@ -203,13 +234,24 @@ export default function ProductCatalog({ products: initialProducts, categories: 
                 }
                 counts={counts}
               />
-              <ImportProducts businessId={businessId} branches={branches} />
-              {products.length > 0 && (
-                <Button variant="outline" className="h-11" onClick={() => startCombo()}>
-                  <Layers />
-                  Armar combo
-                </Button>
+              {limits.bulk ? (
+                <ImportProducts businessId={businessId} branches={branches} />
+              ) : (
+                <PaidOnly href={planHref} icon={Upload}>
+                  Importar
+                </PaidOnly>
               )}
+              {products.length > 0 &&
+                (limits.bulk ? (
+                  <Button variant="outline" className="h-11" onClick={() => startCombo()}>
+                    <Layers />
+                    Armar combo
+                  </Button>
+                ) : (
+                  <PaidOnly href={planHref} icon={Layers}>
+                    Armar combo
+                  </PaidOnly>
+                ))}
               <Button className="h-11" onClick={() => setEditing("new")}>
                 <Plus />
                 Agregar producto
@@ -217,7 +259,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
             </>
           )}
           {canEdit && mode === "branch" && addable.length > 0 && (
-            <AddToBranch businessId={businessId} branchId={branchId!} addable={addable} />
+            <AddToBranch businessId={businessId} branchId={branchId!} addable={addable} withStock={limits.stock} />
           )}
           {mode === "branch" && products.length > 0 && (
             <div className="inline-flex rounded-md border bg-card p-0.5" role="group" aria-label="Vista">
@@ -243,6 +285,18 @@ export default function ProductCatalog({ products: initialProducts, categories: 
             </div>
           )}
         </div>
+        {canEdit && mode === "business" && limits.products !== null && (
+          <p className={cn("m-0 text-sm", products.length >= limits.products ? "font-semibold text-[var(--color-text)]" : "text-muted-foreground")}>
+            <span className="num">
+              {products.length} de {limits.products}
+            </span>{" "}
+            productos del plan Gratis.{" "}
+            {products.length >= limits.products ? "Llegaste al tope: " : ""}
+            <a href={planHref} className="underline underline-offset-2">
+              Sin límite en el plan Negocio
+            </a>
+          </p>
+        )}
         {error && (
           <p className="notice notice-error m-0" role="alert">
             {error}
@@ -376,7 +430,7 @@ export default function ProductCatalog({ products: initialProducts, categories: 
         />
       )}
       {editing && typeof editing !== "string" && mode === "branch" && !("soldIn" in editing) && (
-        <InventoryForm businessId={businessId} branchId={branchId!} product={editing} onClose={() => setEditing(null)} />
+        <InventoryForm businessId={businessId} branchId={branchId!} product={editing} stockLocked={!limits.stock} planHref={planHref} onClose={() => setEditing(null)} />
       )}
       {filtered && visible.length > 0 && (
         <p className="mt-3 mb-0 text-sm text-muted-foreground">
