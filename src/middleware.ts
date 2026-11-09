@@ -12,6 +12,11 @@ export const safeNext = (next: string | null) => (next && next.startsWith("/") &
 /** Acciones que solo tocan datos que nunca van a la caché (caja, stock, avisos, seguridad): no la invalidan. */
 const LIVE_ACTIONS = new Set([
   "requestReopen",
+  "savePromotion",
+  "requestStockEntry",
+  "answerStockRequest",
+  "togglePromotion",
+  "deletePromotion",
   "requestJoin",
   "answerReopen",
   "sendFeedback",

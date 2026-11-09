@@ -5,7 +5,7 @@ import type { Supabase } from "@/lib/supabase";
 import { fail } from "./mappers";
 import type { Membership } from "./session";
 import { cents, shiftCash } from "./cash";
-import type { Branch, Business, ClosedShift, Expense, Order, Recorder, Sale, SaleLine, StockMove } from "./types";
+import type { Branch, Business, ClosedShift, Expense, Order, Recorder, Sale, SaleLine, StockMove, StockRequest } from "./types";
 
 /** Nombres de quienes registraron movimientos. RLS solo deja ver a quien comparte negocio. */
 async function recorders(sb: Supabase, ids: (string | null)[]) {
@@ -130,14 +130,14 @@ export async function closesOf(sb: Supabase, branchIds: string[], date: string) 
 export async function saleLines(sb: Supabase, branchId: string, from: string, to: string) {
   const { data, error } = await sb
     .from("sale_items")
-    .select("sale_id, qty, unit_price, products(name), sales!inner(branch_id, business_date)")
+    .select("sale_id, qty, unit_price, discount, products(name), promotions(name), sales!inner(branch_id, business_date)")
     .eq("sales.branch_id", branchId)
     .gte("sales.business_date", from)
     .lte("sales.business_date", to);
   fail(error);
   const map = new Map<string, SaleLine[]>();
   for (const i of data ?? [])
-    map.set(i.sale_id, [...(map.get(i.sale_id) ?? []), { name: i.products?.name ?? "Producto quitado", qty: i.qty, price: Number(i.unit_price) }]);
+    map.set(i.sale_id, [...(map.get(i.sale_id) ?? []), { name: i.products?.name ?? "Producto quitado", qty: i.qty, price: Number(i.unit_price), discount: Number(i.discount), promo: i.promotions?.name ?? null }]);
   return map;
 }
 
@@ -182,12 +182,12 @@ export async function closesBetween(sb: Supabase, branchId: string, from: string
 export async function stockMoves(sb: Supabase, branchId: string) {
   const { data, error } = await sb
     .from("stock_movements")
-    .select("id, kind, qty, reason, recorded_by, occurred_at, products(name)")
+    .select("id, kind, qty, reason, recorded_by, approved_by, occurred_at, products(name)")
     .eq("branch_id", branchId)
     .order("occurred_at", { ascending: false })
     .limit(200);
   fail(error);
-  const people = await recorders(sb, (data ?? []).map((m) => m.recorded_by));
+  const people = await recorders(sb, (data ?? []).flatMap((m) => [m.recorded_by, m.approved_by]));
   return (data ?? []).map(
     (m): StockMove => ({
       id: m.id,
@@ -196,7 +196,31 @@ export async function stockMoves(sb: Supabase, branchId: string) {
       reason: m.reason,
       product: m.products?.name ?? "Producto quitado",
       by: (m.recorded_by && people.get(m.recorded_by)?.firstName) || "—",
+      approvedBy: (m.approved_by && people.get(m.approved_by)?.firstName) || null,
       at: m.occurred_at,
+    }),
+  );
+}
+
+/** Entradas que pidieron las empleadas y esperan a la dueña (RLS: la dueña ve todas; la empleada, las suyas). */
+export async function stockRequests(sb: Supabase, branchId: string, userId: string) {
+  const { data, error } = await sb
+    .from("stock_requests")
+    .select("id, qty, reason, requested_by, created_at, products(name)")
+    .eq("branch_id", branchId)
+    .eq("status", "pendiente")
+    .order("created_at");
+  fail(error);
+  const people = await recorders(sb, (data ?? []).map((r) => r.requested_by));
+  return (data ?? []).map(
+    (r): StockRequest => ({
+      id: r.id,
+      product: r.products?.name ?? "Producto quitado",
+      qty: r.qty,
+      reason: r.reason,
+      by: (r.requested_by && people.get(r.requested_by)?.firstName) || "—",
+      mine: r.requested_by === userId,
+      at: r.created_at,
     }),
   );
 }

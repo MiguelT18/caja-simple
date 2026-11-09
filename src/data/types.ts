@@ -141,6 +141,9 @@ export interface SaleLine {
   name: string;
   qty: number;
   price: number;
+  /** Lo que descontó la promoción en la línea (Bs); el monto es qty * price - discount. */
+  discount: number;
+  promo: string | null;
 }
 
 export interface ClosedShift {
@@ -167,6 +170,19 @@ export interface StockMove {
   reason: string | null;
   product: string;
   by: string;
+  /** Quien aceptó la entrada que pidió una empleada. */
+  approvedBy: string | null;
+  at: string;
+}
+
+/** Una entrada de stock que pidió una empleada y espera a la dueña. */
+export interface StockRequest {
+  id: string;
+  product: string;
+  qty: number;
+  reason: string | null;
+  by: string;
+  mine: boolean;
   at: string;
 }
 
@@ -214,6 +230,7 @@ export type Notification = {
   | { kind: "shift_closed"; data: { branch: string; shift: string; person: string | null; date: string; difference: number } }
   | { kind: "shift_reminder"; data: { branch: string; shift: string; start: string; minutes: number } }
   | { kind: "shift_late"; data: { branch: string; shift: string; start: string } }
+  | { kind: "shift_overdue"; data: { branch: string; shift: string; end: string; person?: string | null } }
   | { kind: "low_stock"; data: { product: string; branch: string; stock: number; minStock: number } }
   | { kind: "shift_change"; data: { person: string; business: string; branch: string; from: string | null; to: string } }
   | { kind: "plan_expiring"; data: { business: string; plan: string; until: string; days: number; trial?: boolean } }
@@ -225,6 +242,14 @@ export type Notification = {
       pending: boolean;
       data: { person: string; branch: string; shift: string; date: string; reason: string | null };
     }
+  | {
+      kind: "stock_request";
+      requestId: string;
+      /** El pedido sigue esperando respuesta de la dueña. */
+      pending: boolean;
+      data: { person: string; product: string; qty: number; branch: string; reason: string | null };
+    }
+  | { kind: "stock_answer"; data: { accepted: boolean; person: string; product: string; qty: number; branch: string } }
   | { kind: "reopen_answer"; data: { accepted: boolean; person: string; branch: string; shift: string; date: string } }
   | { kind: "ownership"; data: { business: string; person: string } }
   | {

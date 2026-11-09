@@ -26,14 +26,17 @@ export const sales = {
       shiftId: uuid,
       payment,
       items: saleItems.min(1, "La venta no tiene productos"),
+      // Cuándo se hizo en el mostrador (también sin conexión); la base la acota al turno abierto.
+      soldAt: z.iso.datetime({ offset: true }).optional(),
     }),
-    handler: async ({ saleId, branchId, shiftId, payment, items }, context) => {
+    handler: async ({ saleId, branchId, shiftId, payment, items, soldAt }, context) => {
       const { data, error } = await db(context).rpc("register_sale", {
         p_sale: saleId,
         p_branch: branchId,
         p_shift: shiftId,
         p_payment: payment,
         p_items: items,
+        p_sold_at: soldAt,
       });
       check(error);
       return { id: data };

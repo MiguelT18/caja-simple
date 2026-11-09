@@ -1,5 +1,5 @@
 ---
-import { PackagePlus, Package } from "@lucide/astro";
+import { Clock, PackagePlus, Package } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
@@ -7,7 +7,7 @@ import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
 import { plural } from "@/lib/format";
 import { stamp } from "@/lib/dates";
-import { branchColor, branchContext, shiftBarData, businessHref, isLowStock, stockMoves } from "@/data/queries";
+import { branchColor, branchContext, shiftBarData, businessHref, isLowStock, stockMoves, stockRequests } from "@/data/queries";
 import { planLimits } from "@/data/plans";
 
 const { negocio, sucursal } = Astro.params;
@@ -30,7 +30,10 @@ const limits = planLimits[business.plan];
 const planHref = `${businessHref(business)}/plan`;
 const tracked = limits.stock ? products.filter((p) => p.stock !== null) : [];
 const frozen = !limits.stock && products.some((p) => p.stock !== null);
-const moves = await stockMoves(Astro.locals.supabase, branch.id);
+const [moves, requests] = await Promise.all([
+  stockMoves(Astro.locals.supabase, branch.id),
+  limits.stock ? stockRequests(Astro.locals.supabase, branch.id, Astro.locals.userId!) : [],
+]);
 const kinds = [
   { value: "entrada", label: "Entrada de mercadería (suma)" },
   ...(isOwner
@@ -54,7 +57,7 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
       tracked.length > 0 && (
         <button type="button" class="btn btn-primary" data-open-dialog="stock-move">
           <PackagePlus size={18} stroke-width={2} />
-          {isOwner ? "Registrar movimiento" : "Registrar entrada"}
+          {isOwner ? "Registrar movimiento" : "Pedir entrada de mercadería"}
         </button>
       )
     }
@@ -87,6 +90,59 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
     )
   }
 
+  <!-- Entradas que pidieron las empleadas: la dueña las acepta (el stock sube) o las rechaza. -->
+  <div data-region="stock-requests">
+    {
+      requests.length > 0 && (
+        <section class="moves" aria-labelledby="requests-title">
+          <h2 class="section-title" id="requests-title">{isOwner ? "Entradas por aprobar" : "Tus pedidos de entrada"}</h2>
+          <ul class="requests card" role="list">
+            {requests.map((r) => (
+              <li>
+                <span class="request-what">
+                  <strong>
+                    {isOwner ? `${r.by} pide sumar ` : "Sumar "}
+                    <span class="num amount-income">+{r.qty}</span> de {r.product}
+                  </strong>
+                  <span class="muted">{[stamp(r.at), r.reason && `«${r.reason}»`].filter(Boolean).join(" · ")}</span>
+                </span>
+                {isOwner ? (
+                  <span class="request-actions">
+                    <form data-action="answerStockRequest" data-success={`Entrada de ${r.product} aceptada: el stock subió ${r.qty}.`}>
+                      <input type="hidden" name="requestId" value={r.id} />
+                      <input type="hidden" name="accept" value="true" />
+                      <button type="submit" class="btn btn-primary" aria-label={`Aceptar: sumar ${r.qty} de ${r.product}, pedido por ${r.by}`}>
+                        Aceptar
+                      </button>
+                    </form>
+                    <form
+                      data-action="answerStockRequest"
+                      data-success="Pedido rechazado."
+                      data-confirm={`¿Rechazar el pedido de ${r.by}? El stock de ${r.product} no cambia.`}
+                      data-confirm-label="Rechazar"
+                      data-danger
+                    >
+                      <input type="hidden" name="requestId" value={r.id} />
+                      <input type="hidden" name="accept" value="false" />
+                      <button type="submit" class="btn btn-secondary" aria-label={`Rechazar el pedido de ${r.by}: ${r.qty} de ${r.product}`}>
+                        Rechazar
+                      </button>
+                    </form>
+                  </span>
+                ) : (
+                  <span class="chip chip-warning">
+                    <Clock size={14} stroke-width={2} />
+                    Esperando respuesta
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+  </div>
+
   <section class="moves" aria-labelledby="moves-title" data-region="moves">
     <h2 class="section-title" id="moves-title">Movimientos de stock</h2>
     {
@@ -116,7 +172,7 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
                   <td>{kindLabel[m.kind]}</td>
                   <td class:list={["right num", m.qty > 0 ? "amount-income" : "amount-expense"]}>{m.qty > 0 ? `+${m.qty}` : `−${Math.abs(m.qty)}`}</td>
                   <td class="muted">{m.reason ?? "—"}</td>
-                  <td class="muted">{m.by}</td>
+                  <td class="muted">{m.approvedBy ? `${m.by} · aceptó ${m.approvedBy}` : m.by}</td>
                 </tr>
               ))}
             </tbody>
@@ -131,22 +187,22 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
     tracked.length > 0 && (
       <Modal
         id="stock-move"
-        title={isOwner ? "Registrar movimiento de stock" : "Registrar entrada de mercadería"}
-        description="Cambia el stock de la sucursal y queda en el registro con tu nombre."
-        action="recordStockMove"
-        submitLabel="Guardar"
+        title={isOwner ? "Registrar movimiento de stock" : "Pedir entrada de mercadería"}
+        description={isOwner ? "Cambia el stock de la sucursal y queda en el registro con tu nombre." : "Quien administra el negocio recibe tu pedido. El stock sube cuando lo acepte."}
+        action={isOwner ? "recordStockMove" : "requestStockEntry"}
+        submitLabel={isOwner ? "Guardar" : "Enviar pedido"}
         hidden={{ branchId: branch.id }}
-        success="Stock actualizado"
+        success={isOwner ? "Stock actualizado" : "Pedido enviado. El stock sube cuando quien administra el negocio lo acepte."}
       >
         <FormInput form="stock-move-form" name="productId" label="Producto" options={tracked.map((p) => ({ value: p.id, label: `${p.name} (hay ${p.stock})` }))} required />
-        {isOwner ? <FormInput form="stock-move-form" name="kind" label="Tipo" options={kinds} required /> : <input type="hidden" name="kind" value="entrada" />}
+        {isOwner && <FormInput form="stock-move-form" name="kind" label="Tipo" options={kinds} required />}
         <FormInput
           form="stock-move-form"
           name="qty"
           type="number"
           inputmode="numeric"
           step="1"
-          label="Cantidad"
+          label={isOwner ? "Cantidad" : "Cantidad que llegó"}
           hint={isOwner ? "En un ajuste, usa un número negativo para restar (ej. −2)." : undefined}
           required
         />
@@ -171,6 +227,39 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
 
   .moves {
     margin-top: 2rem;
+  }
+
+  .requests {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .requests li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .requests li:last-child {
+    border-bottom: 0;
+  }
+
+  .request-what {
+    display: grid;
+    gap: 0.125rem;
+    min-width: 0;
+    font-size: var(--text-sm);
+  }
+
+  .request-actions {
+    display: flex;
+    gap: 0.5rem;
   }
 
   .moves-table {

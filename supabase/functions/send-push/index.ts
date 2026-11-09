@@ -33,6 +33,14 @@ function describe({ kind, data }: Notice) {
       return { title: `Turno ${String(data.shift).toLowerCase()} en ${data.branch}: abre en ${data.minutes === 60 ? "1 hora" : `${data.minutes} minutos`}`, body: `Hora de abrir: ${data.start}` };
     case "shift_late":
       return { title: `Turno ${String(data.shift).toLowerCase()} sin abrir en ${data.branch}`, body: `Debía abrir a las ${data.start}` };
+    case "shift_overdue":
+      return { title: `Turno ${String(data.shift).toLowerCase()} sin cerrar en ${data.branch}`, body: `Debía cerrar a las ${data.end}${data.person ? ` · lo abrió ${data.person}` : ""}` };
+    case "stock_request":
+      return { title: `${data.person} pide sumar ${data.qty} de ${data.product}`, body: [data.branch, data.reason && `«${data.reason}»`].filter(Boolean).join(" · ") };
+    case "stock_answer":
+      return data.accepted
+        ? { title: `${data.person} aceptó tu entrada de ${data.qty} ${data.product}`, body: `${data.branch}: el stock ya subió` }
+        : { title: `${data.person} rechazó tu entrada de ${data.qty} ${data.product}`, body: `${data.branch}: el stock no cambió` };
     case "low_stock":
       return { title: `Stock bajo: ${data.product}`, body: `Quedan ${data.stock} en ${data.branch} (mínimo ${data.minStock})` };
     case "shift_change":

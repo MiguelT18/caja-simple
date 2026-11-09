@@ -41,7 +41,7 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
     }),
     sb
       .from("sale_items")
-      .select("qty, unit_price, products(categories(name)), sales!inner(branch_id, business_date)")
+      .select("qty, unit_price, discount, products(categories(name)), sales!inner(branch_id, business_date)")
       .eq("sales.branch_id", branch.id)
       .eq("sales.business_date", day),
     range ? movements(sb, [branch.id], range.from, range.to) : undefined,
@@ -129,7 +129,7 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
 
   const salesByCategory = () =>
     totalsBy(
-      (soldItems.data ?? []).map((item): [string, number] => [item.products?.categories?.name ?? "Sin categoría", item.qty * Number(item.unit_price)]),
+      (soldItems.data ?? []).map((item): [string, number] => [item.products?.categories?.name ?? "Sin categoría", item.qty * Number(item.unit_price) - Number(item.discount)]),
     );
 
   // El turno abierto es el que se usa al registrar una venta o un gasto.

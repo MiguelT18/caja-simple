@@ -38,6 +38,11 @@ describe("planLimits coincide con la base", () => {
     expect([planLimits.Gratis.stock, planLimits.Gratis.bulk]).toEqual([false, false]);
     expect([planLimits.Negocio.stock, planLimits.Negocio.bulk]).toEqual([true, true]);
   });
+  it("promociones solo en los planes pagos", () => {
+    expect(latest("private.check_promotion_plan")).toMatch(/= 'Gratis' then\s+raise exception 'Las promociones/);
+    expect(latest("private.promo_discount")).toMatch(/effective_plan\(p_business\) <> 'Gratis'/);
+    expect([planLimits.Gratis.promotions, planLimits.Negocio.promotions, planLimits.Sucursales.promotions]).toEqual([false, true, true]);
+  });
   it("la prueba dura TRIAL_DAYS (hoy + días − 1, como plan_until)", () => {
     const plus = Number(latest("private.start_trial").match(/private\.today\(\) \+ (\d+)/)?.[1]);
     expect(plus + 1).toBe(TRIAL_DAYS);

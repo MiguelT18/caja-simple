@@ -52,7 +52,7 @@ const rows = byPeriod(moves.sales, moves.expenses, period).map((r) => ({ ...r, l
 // Lo vendido por producto, sin las ventas anuladas.
 const liveIds = new Set(live.map((s) => s.id));
 const topProducts = totalsBy(
-  [...(loaded?.[1] ?? [])].filter(([id]) => liveIds.has(id)).flatMap(([, items]) => items.map((i): [string, number] => [i.name, i.qty * i.price])),
+  [...(loaded?.[1] ?? [])].filter(([id]) => liveIds.has(id)).flatMap(([, items]) => items.map((i): [string, number] => [i.name, i.qty * i.price - i.discount])),
 ).slice(0, 10);
 
 const rangeText = `del ${shortDate(range.from)} al ${shortDate(range.to)}`;

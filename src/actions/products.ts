@@ -323,6 +323,32 @@ export const products = {
     },
   }),
 
+  /** La empleada pide sumar stock: sube cuando la dueña lo acepta (answerStockRequest). */
+  requestStockEntry: defineAction({
+    accept: "form",
+    input: z.object({
+      branchId: uuid,
+      productId: uuid,
+      qty: z.coerce.number({ error: "Ingresa un número" }).int("Usa un número entero").min(1, "Usa un número mayor que 0").max(100_000),
+      reason: optional.pipe(z.string().max(120, "Máximo 120 caracteres").optional()),
+    }),
+    handler: async ({ branchId, productId, qty, reason }, context) => {
+      const { error } = await db(context).rpc("request_stock_entry", { p_branch: branchId, p_product: productId, p_qty: qty, p_reason: reason });
+      check(error);
+      return { ok: true };
+    },
+  }),
+
+  /** La dueña acepta (el stock sube y queda en el historial) o rechaza el pedido de una empleada. */
+  answerStockRequest: defineAction({
+    accept: "form",
+    input: z.object({ requestId: uuid, accept: z.enum(["true", "false"]).transform((v) => v === "true") }),
+    handler: async ({ requestId, accept }, context) => {
+      check((await db(context).rpc("answer_stock_request", { p_request: requestId, p_accept: accept })).error);
+      return { ok: true };
+    },
+  }),
+
   /** Varios productos del catálogo al inventario de una sucursal de una vez; lo que ya estaba ahí no se toca. */
   addToInventory: defineAction({
     input: z.object({

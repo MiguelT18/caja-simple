@@ -1,5 +1,5 @@
 ---
-import { AlarmClock, ArrowLeftRight, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Crown, Hourglass, PackageMinus, RotateCcw, TriangleAlert, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
+import { AlarmClock, ArrowLeftRight, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Crown, Hourglass, PackageMinus, PackagePlus, RotateCcw, TriangleAlert, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
 import type { HTMLAttributes } from "astro/types";
 import { branchColor, branchImages, inbox, myBusinesses, notificationHref } from "@/data/queries";
 import type { Notification } from "@/data/types";
@@ -11,7 +11,7 @@ type Props = HTMLAttributes<"div">;
 const { class: className, ...rest } = Astro.props;
 const { notifications, unread } = inbox(Astro.locals);
 // Una invitación o un pedido sin responder no se borra: es donde se acepta o se rechaza.
-const removable = (n: Notification) => !((n.kind === "invitation" || n.kind === "reopen_request" || n.kind === "join_request") && n.pending);
+const removable = (n: Notification) => !((n.kind === "invitation" || n.kind === "reopen_request" || n.kind === "join_request" || n.kind === "stock_request") && n.pending);
 // «de hoy», «de ayer» o la fecha del turno.
 const dayOf = (date: string) => (date === today() ? "de hoy" : `del ${shortDate(date)}`);
 const canClear = notifications.some(removable);
@@ -58,6 +58,8 @@ function describe(n: Notification) {
       return { icon: AlarmClock, title: `Turno ${n.data.shift.toLowerCase()} en ${n.data.branch}: abre en ${n.data.minutes === 60 ? "1 hora" : `${n.data.minutes} minutos`}`, detail: `Hora de abrir: ${n.data.start}` };
     case "shift_late":
       return { icon: TriangleAlert, title: `Turno ${n.data.shift.toLowerCase()} sin abrir en ${n.data.branch}`, detail: `Debía abrir a las ${n.data.start}`, tone: "warning" };
+    case "shift_overdue":
+      return { icon: TriangleAlert, title: `Turno ${n.data.shift.toLowerCase()} sin cerrar en ${n.data.branch}`, detail: `Debía cerrar a las ${n.data.end}${n.data.person ? ` · lo abrió ${n.data.person}` : ""}`, tone: "warning" };
     case "low_stock":
       return {
         icon: PackageMinus,
@@ -113,6 +115,17 @@ function describe(n: Notification) {
       return n.data.accepted
         ? { icon: UserCheck, title: `Ya eres parte de ${n.data.business}`, detail: `${n.data.person} aceptó tu pedido para unirte` }
         : { icon: UserX, title: `${n.data.business} no aceptó tu pedido`, detail: `${n.data.person} rechazó tu pedido para unirte` };
+    case "stock_request":
+      return {
+        icon: PackagePlus,
+        title: `${n.data.person} pide sumar ${n.data.qty} de ${n.data.product}`,
+        detail: [n.data.branch, n.data.reason && `«${n.data.reason}»`].filter(Boolean).join(" · "),
+        tone: n.pending ? "warning" : undefined,
+      };
+    case "stock_answer":
+      return n.data.accepted
+        ? { icon: PackagePlus, title: `${n.data.person} aceptó tu entrada de ${n.data.qty} ${n.data.product}`, detail: `${n.data.branch}: el stock ya subió` }
+        : { icon: CircleX, title: `${n.data.person} rechazó tu entrada de ${n.data.qty} ${n.data.product}`, detail: `${n.data.branch}: el stock no cambió` };
     case "reopen_answer":
       return n.data.accepted
         ? { icon: RotateCcw, title: `${n.data.person} reabrió tu turno ${n.data.shift.toLowerCase()}`, detail: `${n.data.branch}: ya puedes seguir vendiendo y ciérralo de nuevo al terminar` }
@@ -245,6 +258,34 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
                           <input type="hidden" name="requestId" value={n.requestId} />
                           <input type="hidden" name="accept" value="false" />
                           <button type="submit" class="btn btn-secondary" aria-label={`Rechazar el pedido de ${n.data.person}`}>
+                            Rechazar
+                          </button>
+                        </form>
+                      </div>
+                    ) : (
+                      <p class="bell-detail">Ya respondiste este pedido.</p>
+                    ))}
+                  {n.kind === "stock_request" &&
+                    (n.pending ? (
+                      <div class="bell-actions">
+                        <form data-action="answerStockRequest" data-reload data-success={`Entrada aceptada: el stock de ${n.data.product} subió ${n.data.qty}.`}>
+                          <input type="hidden" name="requestId" value={n.requestId} />
+                          <input type="hidden" name="accept" value="true" />
+                          <button type="submit" class="btn btn-primary" aria-label={`Aceptar: sumar ${n.data.qty} de ${n.data.product}, pedido por ${n.data.person}`}>
+                            Aceptar
+                          </button>
+                        </form>
+                        <form
+                          data-action="answerStockRequest"
+                          data-reload
+                          data-success="Pedido rechazado."
+                          data-confirm={`¿Rechazar el pedido de ${n.data.person}? El stock de ${n.data.product} no cambia.`}
+                          data-confirm-label="Rechazar"
+                          data-danger
+                        >
+                          <input type="hidden" name="requestId" value={n.requestId} />
+                          <input type="hidden" name="accept" value="false" />
+                          <button type="submit" class="btn btn-secondary" aria-label={`Rechazar el pedido de ${n.data.person}: ${n.data.qty} de ${n.data.product}`}>
                             Rechazar
                           </button>
                         </form>

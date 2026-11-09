@@ -52,7 +52,7 @@ export async function loadSession(sb: Supabase, userId: string): Promise<Session
     });
   const [{ profile, businesses, employments }, inbox, unread] = await Promise.all([
     cached(`s:${userId}`, 600, rows, (r) => [userVersion(userId), ...r.businesses.map((b) => businessVersion(b.id))]),
-    sb.from("notifications").select("*, employee:employees(status), reopen:reopen_requests(status), join:join_requests(status)").order("created_at", { ascending: false }).limit(60),
+    sb.from("notifications").select("*, employee:employees(status), reopen:reopen_requests(status), join:join_requests(status), stock:stock_requests(status)").order("created_at", { ascending: false }).limit(60),
     sb.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
   ]);
   fail(inbox.error);
@@ -95,12 +95,14 @@ export async function loadSession(sb: Supabase, userId: string): Promise<Session
         read: n.read_at !== null,
         data: n.data,
         employeeId: n.employee_id ?? undefined,
-        requestId: n.reopen_request_id ?? n.join_request_id ?? undefined,
+        requestId: n.reopen_request_id ?? n.join_request_id ?? n.stock_request_id ?? undefined,
         pending:
           n.kind === "reopen_request" || n.kind === "reopen_sent"
             ? n.reopen?.status === "pendiente"
             : n.kind === "join_request"
               ? n.join?.status === "pendiente"
+              : n.kind === "stock_request"
+                ? n.stock?.status === "pendiente"
               : n.employee?.status === "invitado",
       }) as unknown as Notification,
   );

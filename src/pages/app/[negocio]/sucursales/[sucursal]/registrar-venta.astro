@@ -3,7 +3,9 @@ import { ChevronUp, Clock, CloudOff, ImagePlus, LayoutGrid, LockOpen, Minus, Not
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, shiftBarData, branchHref, colorAt, isLowStock, openOrders } from "@/data/queries";
+import { branchColor, branchContext, shiftBarData, branchHref, colorAt, isLowStock, openOrders, promotionsToday } from "@/data/queries";
+import { planLimits } from "@/data/plans";
+import { bestDiscount, promoBadge, promoLabel } from "@/lib/promos";
 import { longDate } from "@/lib/dates";
 import { formatBs } from "@/lib/format";
 
@@ -12,9 +14,20 @@ const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx) return Astro.rewrite("/404");
 const { branch, business, categories, products, currentShift: shift, today } = ctx;
 // Pedidos abiertos: solo sirven con turno (cargarlos es para seguir vendiendo o cobrar).
-const orders = shift ? await openOrders(Astro.locals.supabase, branch.id) : [];
-// Va en un <script type="application/json">: «<» escapado para que un nombre no cierre la etiqueta.
+// Promociones de hoy en esta sucursal, por producto: la base aplica el descuento; aquí solo se muestra.
+const [orders, promos] = await Promise.all([
+  shift ? openOrders(Astro.locals.supabase, branch.id) : [],
+  shift && planLimits[business.plan].promotions ? promotionsToday(Astro.locals.supabase, business.id, branch.id, today) : ({} as Awaited<ReturnType<typeof promotionsToday>>),
+]);
+// Van en un <script type="application/json">: «<» escapado para que un nombre no cierre la etiqueta.
 const ordersJson = JSON.stringify(orders).replace(/</g, "\\u003c");
+const promosJson = JSON.stringify(promos).replace(/</g, "\\u003c");
+/** La promoción que se muestra en la card: la que más descuenta en 1 unidad; si ninguna (3x2), la primera. */
+const promoOf = (id: string, price: number | null) => {
+  const list = promos[id];
+  if (!list?.length) return null;
+  return bestDiscount(list, 1, price ?? 0)?.promo ?? list[0];
+};
 // Lo mismo que ofrece la barra del turno (abrir, reabrir o desde cuándo): los botones de aquí abren sus diálogos.
 const bar = shiftBarData(ctx);
 
@@ -100,6 +113,7 @@ const colorOf = (categoryId?: string) => {
         </div>
       </div>
       <script type="application/json" data-orders set:html={ordersJson} />
+      <script type="application/json" data-promos set:html={promosJson} />
       <div class="toolbar" hidden={products.length === 0}>
         <div class="search-row">
           <label class="search">
@@ -155,6 +169,7 @@ const colorOf = (categoryId?: string) => {
         {
           products.map((p) => {
             const price = p.price === null ? "precio al vender" : formatBs(p.price);
+            const promo = promoOf(p.id, p.price);
             return (
               <li data-name={p.name.toLowerCase()} data-barcode={p.barcode ?? ""} data-category={p.categoryId ?? NONE}>
                 <div
@@ -168,7 +183,7 @@ const colorOf = (categoryId?: string) => {
                   data-image={p.image ?? ""}
                   data-color={colorOf(p.categoryId)}
                 >
-                  <button type="button" class="product-add" aria-label={`Agregar ${p.name}, ${price}`} disabled={p.stock === 0 || !shift} data-add />
+                  <button type="button" class="product-add" aria-label={`Agregar ${p.name}, ${price}${promo ? `, promoción: ${promoLabel(promo)}` : ""}`} disabled={p.stock === 0 || !shift} data-add />
 
                   <span class="art" style={`--cat: ${colorOf(p.categoryId)}`}>
                     {p.image && <img class="skeleton" src={p.image} alt="" loading="lazy" decoding="async" data-fallback />}
@@ -194,7 +209,10 @@ const colorOf = (categoryId?: string) => {
 
                   <span class="product-name">{p.name}</span>
                   <span class="product-foot">
-                    <span class="product-price num">{p.price === null ? "Precio al vender" : formatBs(p.price)}</span>
+                    <span class="product-price num">
+                      {p.price === null ? "Precio al vender" : formatBs(p.price)}
+                      {promo && <span class="chip chip-income promo-chip" title={`${promo.name}: ${promoLabel(promo)}`}>{promoBadge(promo)}</span>}
+                    </span>
                     {p.stock !== null && (
                       <span class:list={["product-stock num", { low: isLowStock(p), warn: isLowStock(p) && p.stock > 0 }]} data-stock-label>
                         <TriangleAlert size={14} stroke-width={2} />
@@ -342,11 +360,17 @@ const colorOf = (categoryId?: string) => {
   import { refreshRegions } from "@/scripts/refresh";
   import { shrinkImage } from "@/scripts/shrink-image";
   import { discard as discardQueued, enqueue, flush, queued, type QueuedSale, type SendResult } from "@/scripts/sale-queue";
+  import { bestDiscount, type Promo } from "@/lib/promos";
 
   // Una línea por producto; con precio al vender, una línea por prenda (cada una con su precio).
   // price null: falta escribirlo. stock Infinity: sin control de stock.
   type Line = { productId: string; name: string; price: number | null; open: boolean; stock: number; qty: number; image: string; color: string };
   const cart = new Map<string, Line>();
+  const promos: Record<string, (Promo & { name: string })[]> = JSON.parse(document.querySelector("[data-promos]")?.textContent || "{}");
+  /** El descuento de la promoción en la línea (la misma cuenta que hace la base al registrar). */
+  const promoFor = (productId: string, qty: number, price: number | null) => (price === null ? null : bestDiscount(promos[productId] ?? [], qty, price));
+  const lineAmount = (l: { productId: string; qty: number; price: number | null }) =>
+    l.price === null ? 0 : l.price * l.qty - (promoFor(l.productId, l.qty, l.price)?.discount ?? 0);
   let openLines = 0;
   let totalValue = 0;
 
@@ -538,7 +562,7 @@ const colorOf = (categoryId?: string) => {
   paymentBox.addEventListener("change", showChange);
 
   function showTotal() {
-    totalValue = [...cart.values()].reduce((a, l) => a + (l.price ?? 0) * l.qty, 0);
+    totalValue = Math.round([...cart.values()].reduce((a, l) => a + lineAmount(l), 0) * 100) / 100;
     total.textContent = totalMini.textContent = confirmTotal.textContent = formatBs(totalValue);
     showChange();
   }
@@ -598,7 +622,7 @@ const colorOf = (categoryId?: string) => {
     if (item.price !== null) input.value = String(item.price);
     input.addEventListener("input", () => {
       item.price = Number(input.value) > 0 ? Number(input.value) : null;
-      amountOf.get(item)!.textContent = item.price === null ? "—" : formatBs(item.price * item.qty);
+      amountOf.get(item)!.textContent = item.price === null ? "—" : formatBs(lineAmount(item));
       showTotal();
     });
     return input;
@@ -646,6 +670,8 @@ const colorOf = (categoryId?: string) => {
 
       const info = el("span", "line-info");
       info.append(el("span", "line-name", item.name), item.open ? priceInput(item) : el("span", "line-unit num", `${formatBs(item.price!)} c/u`));
+      const promo = promoFor(item.productId, item.qty, item.price);
+      if (promo) info.append(el("span", "line-promo num", `${promo.promo.name}: −${formatBs(promo.discount)}`));
 
       const qty = el("span", "line-qty");
       qty.append(
@@ -654,7 +680,7 @@ const colorOf = (categoryId?: string) => {
         iconButton(`Agregar un ${item.name}`, "plus", () => step(key, 1), "qty-btn"),
       );
 
-      const amount = el("span", "line-amount num", item.price === null ? "—" : formatBs(item.price * item.qty));
+      const amount = el("span", "line-amount num", item.price === null ? "—" : formatBs(lineAmount(item)));
       amountOf.set(item, amount);
 
       li.append(thumb, info, iconButton(`Quitar ${item.name} de la venta`, "remove", () => remove(key), "line-remove"), qty, amount);
@@ -791,9 +817,9 @@ const colorOf = (categoryId?: string) => {
   });
 
   /** Envía una venta. Sin respuesta del servidor es «offline» (queda en la cola); un rechazo trae su mensaje. */
-  async function send({ saleId, branchId, shiftId, payment, items }: QueuedSale): Promise<SendResult> {
+  async function send({ saleId, branchId, shiftId, payment, items, at }: QueuedSale): Promise<SendResult> {
     try {
-      const { error } = await actions.registerSale({ saleId, branchId, shiftId, payment, items });
+      const { error } = await actions.registerSale({ saleId, branchId, shiftId, payment, items, soldAt: new Date(at).toISOString() });
       return error ? { error: error.message } : "ok";
     } catch {
       return "offline";
@@ -843,7 +869,7 @@ const colorOf = (categoryId?: string) => {
         pill.dataset.order = order.id;
         ordersList.append(pill); // solo las nuevas: mover una pastilla le quitaría el foco
       }
-      const sum = order.items.reduce((a, i) => a + (i.price ?? Number(cardById.get(i.productId)?.dataset.price || 0)) * i.qty, 0);
+      const sum = order.items.reduce((a, i) => a + lineAmount({ ...i, price: i.price ?? Number(cardById.get(i.productId)?.dataset.price || 0) }), 0);
       const total = document.createElement("span");
       total.className = "pill-sum num";
       total.textContent = `· ${formatBs(sum)}`;
@@ -1521,6 +1547,13 @@ const colorOf = (categoryId?: string) => {
     -webkit-line-clamp: 2;
   }
 
+  .promo-chip {
+    margin-inline-start: 0.375rem;
+    vertical-align: middle;
+    font-size: var(--text-xs);
+    letter-spacing: 0;
+  }
+
   .product-price {
     font-size: var(--text-lg);
     font-weight: var(--font-extrabold);
@@ -1694,6 +1727,12 @@ const colorOf = (categoryId?: string) => {
   .cart-lines :global(.line-unit) {
     color: var(--color-text-muted);
     font-size: var(--text-xs);
+  }
+
+  .cart-lines :global(.line-promo) {
+    color: var(--color-income);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
   }
 
   .cart-lines :global(.line-price) {

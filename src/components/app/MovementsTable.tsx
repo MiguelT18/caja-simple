@@ -1,7 +1,7 @@
 import { actions } from "astro:actions";
 import { Fragment, useRef, useState } from "react";
 import { ChevronDown, ImagePlus } from "lucide-react";
-import type { PaymentMethod, ShiftTone } from "@/data/types";
+import type { PaymentMethod, SaleLine, ShiftTone } from "@/data/types";
 import { Button } from "@/components/ui/button";
 import { formatBs, paymentLabel } from "@/lib/format";
 import { confirmDialog, toast } from "@/scripts/dialogs";
@@ -27,7 +27,7 @@ export interface Movement {
   /** Muestra «Anular» (la base decide igual). */
   canVoid?: boolean;
   /** Lo que se vendió: la fila se puede desplegar. */
-  detail?: { name: string; qty: number; price: number }[];
+  detail?: SaleLine[];
   /** Enlace firmado al comprobante (ventas por QR o transferencia). */
   receipt?: string;
   /** QR o transferencia sin comprobante (se cobró sin conexión o falló la subida). */
@@ -187,8 +187,11 @@ export default function MovementsTable({
                         <li key={i} className="flex justify-between gap-4">
                           <span>
                             {d.qty} × {d.name} <span className="text-muted-foreground tabular-nums">a {formatBs(d.price)}</span>
+                            {d.discount > 0 && (
+                              <span className="text-muted-foreground tabular-nums"> · {d.promo ?? "Promoción"} −{formatBs(d.discount)}</span>
+                            )}
                           </span>
-                          <span className="tabular-nums">{formatBs(d.qty * d.price)}</span>
+                          <span className="tabular-nums">{formatBs(d.qty * d.price - d.discount)}</span>
                         </li>
                       ))}
                     </ul>

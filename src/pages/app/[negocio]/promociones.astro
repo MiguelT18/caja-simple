@@ -1,0 +1,37 @@
+---
+import PageHeader from "@/components/PageHeader.astro";
+import PromotionsManager from "@/components/app/PromotionsManager";
+import Layout from "@/layouts/Layout.astro";
+import { businessContext, businessHref, businessPromotions } from "@/data/queries";
+import { planLimits } from "@/data/plans";
+import { today } from "@/lib/dates";
+import { plural } from "@/lib/format";
+
+const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
+if (!ctx) return Astro.rewrite("/404");
+const { business, catalog } = ctx;
+const promotions = await businessPromotions(Astro.locals.supabase, business.id);
+const products = catalog.map((p) => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name, "es"));
+const branches = ctx.membership.branches.map((b) => ({ id: b.id, name: b.name }));
+---
+
+<Layout title={`Promociones · ${business.name}`} context={{ membership: ctx.membership }}>
+  <PageHeader {...ctx.backdrop}
+    title="Promociones"
+    live
+    description={`${promotions.length ? plural(promotions.length, "promoción", "promociones") + ". " : ""}Descuentos para algunos productos, por un tiempo, sin fecha límite o ciertos días. Al vender se aplican solos; si varias valen para el mismo producto, se usa la que más descuenta.`}
+  />
+
+  <div data-region="promotions">
+    <PromotionsManager
+      client:load
+      businessId={business.id}
+      promotions={promotions}
+      products={products}
+      branches={branches}
+      today={today()}
+      canEdit={planLimits[business.plan].promotions}
+      planHref={`${businessHref(business)}/plan`}
+    />
+  </div>
+</Layout>

@@ -1,6 +1,6 @@
 // Ventas sin conexión: se guardan en el dispositivo y se envían al volver la red (registrar-venta.astro).
 // El saleId es el de la venta: register_sale lo ignora si ya llegó, así que reenviar nunca duplica.
-// shortcut: la venta toma la hora del servidor al enviarse, no la del mostrador; agrega `sold_at` si hace falta.
+// La venta lleva su hora (`at`): la base la guarda como occurred_at, acotada al turno abierto, y con ella elige la promoción del día.
 
 export interface QueuedSale {
   saleId: string;
@@ -9,7 +9,7 @@ export interface QueuedSale {
   payment: "efectivo" | "qr" | "transferencia";
   items: { productId: string; qty: number; price?: number }[];
   total: number;
-  /** Cuándo se hizo, en ms: para mostrarla. */
+  /** Cuándo se hizo, en ms: se muestra y se envía como la hora de la venta. */
   at: number;
   /** El servidor la rechazó (por ejemplo, el turno ya se cerró): queda a la vista hasta descartarla. */
   error?: string;

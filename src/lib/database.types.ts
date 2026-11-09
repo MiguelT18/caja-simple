@@ -494,6 +494,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["notification_kind"];
           read_at: string | null;
           reopen_request_id: string | null;
+          stock_request_id: string | null;
           user_id: string;
         };
         ComputedFields: never;
@@ -507,6 +508,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["notification_kind"];
           read_at?: string | null;
           reopen_request_id?: string | null;
+          stock_request_id?: string | null;
           user_id: string;
         };
         Update: {
@@ -519,6 +521,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["notification_kind"];
           read_at?: string | null;
           reopen_request_id?: string | null;
+          stock_request_id?: string | null;
           user_id?: string;
         };
         Relationships: [
@@ -548,6 +551,13 @@ export type Database = {
             columns: ["reopen_request_id"];
             isOneToOne: false;
             referencedRelation: "reopen_requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_stock_request_id_fkey";
+            columns: ["stock_request_id"];
+            isOneToOne: false;
+            referencedRelation: "stock_requests";
             referencedColumns: ["id"];
           },
           {
@@ -813,6 +823,107 @@ export type Database = {
         };
         Relationships: [];
       };
+      promotion_products: {
+        Row: {
+          business_id: string;
+          product_id: string;
+          promotion_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          business_id: string;
+          product_id: string;
+          promotion_id: string;
+        };
+        Update: {
+          business_id?: string;
+          product_id?: string;
+          promotion_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "promotion_products_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "promotion_products_product_id_business_id_fkey";
+            columns: ["product_id", "business_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id", "business_id"];
+          },
+          {
+            foreignKeyName: "promotion_products_promotion_id_business_id_fkey";
+            columns: ["promotion_id", "business_id"];
+            isOneToOne: false;
+            referencedRelation: "promotions";
+            referencedColumns: ["id", "business_id"];
+          },
+        ];
+      };
+      promotions: {
+        Row: {
+          active: boolean;
+          branch_ids: string[] | null;
+          business_id: string;
+          buy: number | null;
+          created_at: string;
+          ends_on: string | null;
+          id: string;
+          kind: Database["public"]["Enums"]["promo_kind"];
+          name: string;
+          pay: number | null;
+          percent: number | null;
+          price: number | null;
+          starts_on: string | null;
+          weekdays: number[] | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          active?: boolean;
+          branch_ids?: string[] | null;
+          business_id: string;
+          buy?: number | null;
+          created_at?: string;
+          ends_on?: string | null;
+          id?: string;
+          kind: Database["public"]["Enums"]["promo_kind"];
+          name: string;
+          pay?: number | null;
+          percent?: number | null;
+          price?: number | null;
+          starts_on?: string | null;
+          weekdays?: number[] | null;
+        };
+        Update: {
+          active?: boolean;
+          branch_ids?: string[] | null;
+          business_id?: string;
+          buy?: number | null;
+          created_at?: string;
+          ends_on?: string | null;
+          id?: string;
+          kind?: Database["public"]["Enums"]["promo_kind"];
+          name?: string;
+          pay?: number | null;
+          percent?: number | null;
+          price?: number | null;
+          starts_on?: string | null;
+          weekdays?: number[] | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "promotions_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       push_subscriptions: {
         Row: {
           auth: string;
@@ -918,8 +1029,10 @@ export type Database = {
       sale_items: {
         Row: {
           components: Json | null;
+          discount: number;
           id: string;
           product_id: string;
+          promotion_id: string | null;
           qty: number;
           sale_id: string;
           unit_price: number;
@@ -927,16 +1040,20 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           components?: Json | null;
+          discount?: number;
           id?: string;
           product_id: string;
+          promotion_id?: string | null;
           qty: number;
           sale_id: string;
           unit_price?: number;
         };
         Update: {
           components?: Json | null;
+          discount?: number;
           id?: string;
           product_id?: string;
+          promotion_id?: string | null;
           qty?: number;
           sale_id?: string;
           unit_price?: number;
@@ -947,6 +1064,13 @@ export type Database = {
             columns: ["product_id"];
             isOneToOne: false;
             referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sale_items_promotion_id_fkey";
+            columns: ["promotion_id"];
+            isOneToOne: false;
+            referencedRelation: "promotions";
             referencedColumns: ["id"];
           },
           {
@@ -1159,6 +1283,7 @@ export type Database = {
       };
       stock_movements: {
         Row: {
+          approved_by: string | null;
           branch_id: string;
           business_id: string;
           id: string;
@@ -1171,6 +1296,7 @@ export type Database = {
         };
         ComputedFields: never;
         Insert: {
+          approved_by?: string | null;
           branch_id: string;
           business_id: string;
           id?: string;
@@ -1182,6 +1308,7 @@ export type Database = {
           recorded_by?: string | null;
         };
         Update: {
+          approved_by?: string | null;
           branch_id?: string;
           business_id?: string;
           id?: string;
@@ -1193,6 +1320,13 @@ export type Database = {
           recorded_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "stock_movements_approved_by_fkey";
+            columns: ["approved_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "stock_movements_branch_id_fkey";
             columns: ["branch_id"];
@@ -1217,6 +1351,85 @@ export type Database = {
           {
             foreignKeyName: "stock_movements_recorded_by_fkey";
             columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      stock_requests: {
+        Row: {
+          branch_id: string;
+          business_id: string;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          id: string;
+          product_id: string;
+          qty: number;
+          reason: string | null;
+          requested_by: string | null;
+          status: Database["public"]["Enums"]["reopen_status"];
+        };
+        ComputedFields: never;
+        Insert: {
+          branch_id: string;
+          business_id: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          product_id: string;
+          qty: number;
+          reason?: string | null;
+          requested_by?: string | null;
+          status?: Database["public"]["Enums"]["reopen_status"];
+        };
+        Update: {
+          branch_id?: string;
+          business_id?: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          product_id?: string;
+          qty?: number;
+          reason?: string | null;
+          requested_by?: string | null;
+          status?: Database["public"]["Enums"]["reopen_status"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_requests_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_requests_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_requests_decided_by_fkey";
+            columns: ["decided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_requests_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_requests_requested_by_fkey";
+            columns: ["requested_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -1268,6 +1481,7 @@ export type Database = {
     Functions: {
       answer_join: { Args: { p_accept: boolean; p_branch?: string; p_job_title?: string; p_request: string; p_shift?: string }; Returns: undefined };
       answer_reopen: { Args: { p_accept: boolean; p_request: string }; Returns: undefined };
+      answer_stock_request: { Args: { p_accept: boolean; p_request: string }; Returns: undefined };
       attach_sale_receipt: { Args: { p_path: string; p_sale: string }; Returns: undefined };
       branch_team: {
         Args: { p_branch: string };
@@ -1327,13 +1541,39 @@ export type Database = {
         Returns: undefined;
       };
       register_sale: {
-        Args: { p_branch: string; p_items: Json; p_payment: Database["public"]["Enums"]["payment_method"]; p_sale: string; p_shift: string };
+        Args: {
+          p_branch: string;
+          p_items: Json;
+          p_payment: Database["public"]["Enums"]["payment_method"];
+          p_sale: string;
+          p_shift: string;
+          p_sold_at?: string;
+        };
         Returns: string;
       };
       reopen_shift: { Args: { p_close: string }; Returns: undefined };
       request_join: { Args: { p_branch?: string; p_business: string; p_message?: string }; Returns: string };
       request_reopen: { Args: { p_close: string; p_reason?: string }; Returns: string };
+      request_stock_entry: { Args: { p_branch: string; p_product: string; p_qty: number; p_reason?: string }; Returns: string };
       respond_invitation: { Args: { p_accept: boolean; p_employee: string }; Returns: undefined };
+      save_promotion: {
+        Args: {
+          p_branch_ids: string[];
+          p_business: string;
+          p_buy: number;
+          p_ends_on: string;
+          p_id: string;
+          p_kind: Database["public"]["Enums"]["promo_kind"];
+          p_name: string;
+          p_pay: number;
+          p_percent: number;
+          p_price: number;
+          p_product_ids: string[];
+          p_starts_on: string;
+          p_weekdays: number[];
+        };
+        Returns: string;
+      };
       search_businesses: {
         Args: { p_kind?: Database["public"]["Enums"]["business_kind"]; p_page?: number; p_query?: string };
         Returns: {
@@ -1385,10 +1625,14 @@ export type Database = {
         | "reopen_sent"
         | "ownership"
         | "join_request"
-        | "join_answer";
+        | "join_answer"
+        | "shift_overdue"
+        | "stock_request"
+        | "stock_answer";
       payment_method: "efectivo" | "qr" | "transferencia";
       plan: "Gratis" | "Negocio" | "Sucursales";
       plan_period: "mensual" | "anual";
+      promo_kind: "percent" | "price" | "bundle";
       reopen_status: "pendiente" | "aceptada" | "rechazada";
       shift_tone: "morning" | "afternoon" | "night";
       stock_move_kind: "entrada" | "merma" | "ajuste";
@@ -1405,12 +1649,12 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"]) | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
@@ -1428,11 +1672,11 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I;
@@ -1449,11 +1693,11 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U;
@@ -1470,11 +1714,11 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
@@ -1483,11 +1727,11 @@ export type Enums<
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
@@ -1519,10 +1763,14 @@ export const Constants = {
         "ownership",
         "join_request",
         "join_answer",
+        "shift_overdue",
+        "stock_request",
+        "stock_answer",
       ],
       payment_method: ["efectivo", "qr", "transferencia"],
       plan: ["Gratis", "Negocio", "Sucursales"],
       plan_period: ["mensual", "anual"],
+      promo_kind: ["percent", "price", "bundle"],
       reopen_status: ["pendiente", "aceptada", "rechazada"],
       shift_tone: ["morning", "afternoon", "night"],
       stock_move_kind: ["entrada", "merma", "ajuste"],

@@ -6,6 +6,7 @@ import { businesses } from "./businesses";
 import { employees } from "./employees";
 import { orders } from "./orders";
 import { products } from "./products";
+import { promotions } from "./promotions";
 import { sales } from "./sales";
 import { shifts } from "./shifts";
 
@@ -16,6 +17,7 @@ export const server = {
     ...sales,
     ...orders,
     ...products,
+    ...promotions,
     ...employees,
     ...account
 };

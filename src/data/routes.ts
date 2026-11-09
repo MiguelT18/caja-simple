@@ -32,12 +32,16 @@ export function notificationHref(n: Notification, memberships: Membership[]): st
   switch (n.kind) {
     case "shift_reminder":
     case "shift_late":
+    case "shift_overdue":
     case "shift_closed":
     case "cash_mismatch":
     case "reopen_request":
     case "reopen_answer":
     case "reopen_sent":
       return inBranch("turnos");
+    case "stock_request":
+    case "stock_answer":
+      return inBranch("inventario");
     case "low_stock":
       return branch ? branchHref(m.business, branch, "inventario") : owner ? `${businessHref(m.business)}/catalogo` : entryHref(m);
     case "shift_change":

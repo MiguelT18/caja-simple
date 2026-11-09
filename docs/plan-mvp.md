@@ -31,7 +31,7 @@ Origen: revisión del código, de las migraciones y de PRODUCT.md del 3 de novie
 ## P1: Para el uso diario (primeras semanas)
 - [x] Historial con rango de fechas en Ventas y Gastos (hoy son 7 días fijos, `src/data/branch.ts:16`), con el detalle de cada venta.
 - [x] Historial de cierres de turno: quién abrió y cerró, diferencia, y una nota que explique el descuadre.
-- [x] Entrada de mercadería y mermas con motivo, más un registro de movimientos de stock. La empleada puede registrar entradas.
+- [x] Entrada de mercadería y mermas con motivo, más un registro de movimientos de stock. La empleada pide entradas y la dueña las acepta (`20261108200000_stock_requests.sql`).
 - [x] Venta con código de barras: la búsqueda de Vender también busca por `barcode`.
 - [x] Traspaso de turno: el siguiente turno parte del monto contado del anterior; reabrir un turno cerrado por error (solo la dueña).
 - [x] Vencimiento del plan: `plan_until`, recordatorios, y volver a Gratis al vencer. Que la caché se invalide al cambiar el plan.
@@ -47,6 +47,7 @@ Origen: revisión del código, de las migraciones y de PRODUCT.md del 3 de novie
 - [x] Borrar la cuenta y exportar los datos propios (`20261104120000_delete_my_account.sql`; falta aplicarla).
 - [x] Importar productos por CSV o pegando filas de una planilla (nombre, código de barras, categoría y, si se quiere, precio, stock y mínimo), con plantilla para descargar; lo importado puede entrar directo al inventario de las sucursales elegidas.
 - [x] Agregar varios productos del catálogo a una sucursal de una vez, con precio y stock en la misma tabla.
+- [x] Promociones con descuento (porcentaje, precio especial o lleva N paga M), por fechas, sin fecha límite o ciertos días, en todas o algunas sucursales; solo en los planes pagos (`20261108190000_promotions.sql`, `/app/[negocio]/promociones`).
 - [x] Alta rápida: «Guardar y agregar otro» y lectura del código de barras con la cámara (Chrome/Edge en Android; en iPhone, todavía no).
 
 ## P3: Funciones de los planes pagos (Negocio y Sucursales)

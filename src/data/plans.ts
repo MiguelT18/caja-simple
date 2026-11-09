@@ -15,14 +15,16 @@ export interface PlanLimits {
   stock: boolean;
   /** Importar o pegar productos de una planilla, y armar combos. */
   bulk: boolean;
+  /** Crear y aplicar promociones con descuento. */
+  promotions: boolean;
 }
 
 // Lo que la app aplica de cada plan; null = sin tope. La base es la que manda (migraciones plan_limits y
-// free_plan_limits; bulk de importar, en la Action importProducts): esto solo lo muestra y tiene que coincidir.
+// free_plan_limits, promotions; bulk de importar, en la Action importProducts): esto solo lo muestra y tiene que coincidir.
 export const planLimits: Record<PlanName, PlanLimits> = {
-  Gratis: { branches: 1, historyDays: 60, reports: false, products: 150, stock: false, bulk: false },
-  Negocio: { branches: 1, historyDays: null, reports: true, products: null, stock: true, bulk: true },
-  Sucursales: { branches: null, historyDays: null, reports: true, products: null, stock: true, bulk: true },
+  Gratis: { branches: 1, historyDays: 60, reports: false, products: 150, stock: false, bulk: false, promotions: false },
+  Negocio: { branches: 1, historyDays: null, reports: true, products: null, stock: true, bulk: true, promotions: true },
+  Sucursales: { branches: null, historyDays: null, reports: true, products: null, stock: true, bulk: true, promotions: true },
 };
 
 /** Días que dura la prueba del plan Negocio de un negocio nuevo (private.start_trial). */
@@ -131,6 +133,7 @@ export const plans: Plan[] = [
       "Productos sin límite",
       "Control de stock con avisos de stock bajo",
       "Importa productos desde Excel y arma combos",
+      "Promociones: descuentos, 2x1 o precios por fecha o día",
       "Historial completo, sin límite de días",
       "Reportes por día, semana y mes",
       "Exporta a Excel o imprime en PDF",

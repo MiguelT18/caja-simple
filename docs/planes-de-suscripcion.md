@@ -71,7 +71,7 @@ En la app (`/app/<negocio>/plan`) el único método es el **QR bancario** de mon
 
 ## Límites en la app
 
-La base de datos aplica los límites (migraciones `supabase/migrations/20261031012616_plan_limits.sql` y `20261108170000_free_plan_limits.sql`). `planLimits`, en `src/data/plans.ts`, solo los muestra y tiene que coincidir con ella. Ese mismo archivo repite, para mostrarlos, los precios en dólares sin impuestos de `private.plan_usd`. No se guarda ningún precio fijo en bolivianos: se calcula al mostrarlo y al cobrar.
+La base de datos aplica los límites (migraciones `supabase/migrations/20261031012616_plan_limits.sql` `20261108170000_free_plan_limits.sql` y `20261108190000_promotions.sql`). `planLimits`, en `src/data/plans.ts`, solo los muestra y tiene que coincidir con ella. Ese mismo archivo repite, para mostrarlos, los precios en dólares sin impuestos de `private.plan_usd`. No se guarda ningún precio fijo en bolivianos: se calcula al mostrarlo y al cobrar.
 
 | Límite | Gratis | Negocio | Sucursales | Dónde se aplica |
 | --- | --- | --- | --- | --- |
@@ -81,6 +81,7 @@ La base de datos aplica los límites (migraciones `supabase/migrations/202610310
 | Productos en el catálogo | 150 | sin tope | sin tope | trigger `products_check_limit` |
 | Control de stock (cambiarlo, entradas, mermas, ajustes; que las ventas lo descuenten) | no: el que había queda a la vista, congelado | sí | sí | trigger `inventory_freeze_stock`; `take_stock` y `void_sale` no lo tocan en Gratis |
 | Combos nuevos | no (los que había se siguen vendiendo) | sí | sí | trigger `product_components_check` |
+| Promociones con descuento | no (las que había se ven, pero no se aplican) | sí | sí | trigger `promotions_check_plan`; `promo_discount` devuelve 0 en Gratis |
 | Importar o pegar productos de una planilla | no | sí | sí | Action `importProducts` (la base no distingue un alta de una importación; el tope de 150 sí lo aplica) |
 
 - **Prueba de 30 días.** Un negocio nuevo empieza en el plan Negocio con `plan_until` a 30 días (hoy incluido) y `businesses.trial = true` (trigger `businesses_start_trial`). `plan_daily` avisa a 7, 3 y 1 día («tu prueba termina…») y al vencer lo pasa a Gratis. Un pago la termina (`activate_plan_charge` pone `trial = false`; pagar Negocio durante la prueba suma desde el día siguiente al vencimiento). **La prueba no ocupa cupo de fundador**: el cupo solo lo da un pago real.
