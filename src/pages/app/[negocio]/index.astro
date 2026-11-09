@@ -22,7 +22,8 @@ import {
   weekdayRange,
 } from "@/data/queries";
 import { planLimits } from "@/data/plans";
-import { formatBs, plural } from "@/lib/format";
+import { formatBs, paymentLabel, plural } from "@/lib/format";
+import { ago } from "@/scripts/live-core";
 import { longDate, today } from "@/lib/dates";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
@@ -73,6 +74,9 @@ const ticket = (revenue: number, sales: number) => (sales ? revenue / sales : 0)
 const firstBranch = branchSummary[0]?.branch;
 // Con menos ventas que esto, un «más vendido» o una hora pico no dicen nada: se pide más datos en vez de mostrar cifras.
 const MIN_SALES = 5;
+// En vivo (src/scripts/live.ts): canal del negocio y nombres de sucursal para el anuncio.
+const branchNames = Object.fromEntries(branchSummary.map((b) => [b.branch.id, b.branch.name]));
+const now = Date.now();
 const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.length - 1];
 ---
 
@@ -92,20 +96,28 @@ const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.
     {...steps}
   />
 
-  <section class="kpis" aria-label="Totales de hoy en todas las sucursales">
+  <div class="live-bar" data-live-topic={`negocio:${business.id}`} data-branch-names={JSON.stringify(branchNames)}>
+    <p class="chip chip-neutral live-status" data-live-status>
+      <Clock size={14} stroke-width={2} />
+      <span data-live-text>Actualizado {ago(0)}</span>
+    </p>
+    <p class="sr-only" aria-live="polite" data-live-announce></p>
+  </div>
+
+  <section class="kpis" aria-label="Totales de hoy en todas las sucursales" data-region="kpis">
     <div class="kpi">
       <p class="kpi-label">Ventas</p>
-      <p class="kpi-value num amount-income">{formatBs(salesTotal, "+")}</p>
+      <p class="kpi-value num amount-income" data-live="sales" data-amount={salesTotal} data-sign="+">{formatBs(salesTotal, "+")}</p>
       <p class="kpi-note">{plural(salesCount, "venta", "ventas")}</p>
     </div>
     <div class="kpi">
       <p class="kpi-label">Gastos</p>
-      <p class="kpi-value num amount-expense">{formatBs(expensesTotal, "−")}</p>
+      <p class="kpi-value num amount-expense" data-live="expenses" data-amount={expensesTotal} data-sign="−">{formatBs(expensesTotal, "−")}</p>
       <p class="kpi-note">{branchSummary.length === 1 ? "Salidas de la caja" : "Entre todas las sucursales"}</p>
     </div>
     <div class="kpi">
       <p class="kpi-label">Saldo del día</p>
-      <p class:list={["kpi-value num", { "amount-expense": balance < 0 }]}>{formatBs(balance)}</p>
+      <p class:list={["kpi-value num", { "amount-expense": balance < 0 }]} data-live="balance" data-amount={balance}>{formatBs(balance)}</p>
       <p class="kpi-note">Ventas menos gastos</p>
     </div>
   </section>
@@ -113,7 +125,7 @@ const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.
   {/* Con una sola sucursal el gráfico repetiría las cifras de arriba. */}
   {
     rows.length > 1 && (
-      <section class="card chart-card" aria-labelledby="compare-title">
+      <section class="card chart-card" aria-labelledby="compare-title" data-region="compare">
         <h2 id="compare-title" class="card-title">Ventas y gastos por sucursal</h2>
         <BarCompareChart client:visible rows={rows} />
       </section>
@@ -124,7 +136,7 @@ const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.
     <h2>{branchSummary.length === 1 ? "Tu sucursal hoy" : "Sucursales hoy"}</h2>
     <a href={`${businessHref(business)}/sucursales`} class="shelf-link">Ver sucursales</a>
   </div>
-  <ul class="branch-list" role="list">
+  <ul class="branch-list" role="list" data-region="branches">
     {
       branchSummary.map((b, i) => (
         <li class="branch-row" style={`--branch: var(--color-branch-${(i % 6) + 1})`}>
@@ -134,8 +146,8 @@ const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.
             </span>
             <span class="branch-name">{b.branch.name}</span>
           </a>
-          <span class="num amount-income"><span class="sr-only">Ventas: </span>{formatBs(b.sales, "+")}</span>
-          <span class="num amount-expense"><span class="sr-only">Gastos: </span>{formatBs(b.expenses, "−")}</span>
+          <span class="num amount-income"><span class="sr-only">Ventas: </span><span data-live={`sales-${b.branch.id}`} data-amount={b.sales} data-sign="+">{formatBs(b.sales, "+")}</span></span>
+          <span class="num amount-expense"><span class="sr-only">Gastos: </span><span data-live={`expenses-${b.branch.id}`} data-amount={b.expenses} data-sign="−">{formatBs(b.expenses, "−")}</span></span>
           <span class="status">
             {b.cash === "cuadra" && (
               <span class="chip chip-income">
@@ -172,6 +184,35 @@ const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.
       ))
     }
   </ul>
+
+  <section class="recent" aria-labelledby="recent-title" data-region="recent">
+    <div class="shelf-head">
+      <h2 id="recent-title">Últimas ventas de hoy</h2>
+    </div>
+    {
+      ctx.recentSales.length === 0 ? (
+        <p class="recent-empty">Todavía no hay ventas hoy.</p>
+      ) : (
+        <ul class="recent-list" role="list">
+          {ctx.recentSales.map((sale) => (
+            <li class="recent-row">
+              <span class="recent-branch">{ctx.branchById(sale.branchId)?.name}</span>
+              {sale.voided === null ? (
+                <span class="num amount-income">{formatBs(sale.total, "+")}</span>
+              ) : (
+                <span class="num recent-voided">
+                  <s>{formatBs(sale.voided, "+")}</s> Anulada
+                </span>
+              )}
+              <span class="recent-meta">
+                {paymentLabel[sale.payment]} · <time datetime={sale.at} data-ago={Date.parse(sale.at)}>{ago(now - Date.parse(sale.at))}</time>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
 
   <section class="stats" aria-labelledby="stats-title" data-region="stats">
     <div class="shelf-head stats-head">
@@ -377,6 +418,69 @@ const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.
 
 <script>
   import { onRegions, refreshRegions } from "@/scripts/refresh";
+  import { ago } from "@/scripts/live-core";
+  import { watchLive } from "@/scripts/live";
+  import { formatBs } from "@/lib/format";
+
+  // En vivo: cuando se vende, gasta o abre/cierra un turno en cualquier sucursal, se cambian las regiones de la página.
+  const bar = document.querySelector<HTMLElement>("[data-live-topic]");
+  if (bar) {
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const chip = bar.querySelector<HTMLElement>("[data-live-status]")!;
+    const text = bar.querySelector<HTMLElement>("[data-live-text]")!;
+    const announce = bar.querySelector<HTMLElement>("[data-live-announce]")!;
+    const icons = { live: '<span class="live-dot" aria-hidden="true"></span>', idle: chip.querySelector("svg")!.outerHTML };
+    let last = { live: false, updatedAt: Date.now() };
+
+    const paint = () => {
+      chip.classList.toggle("chip-live", last.live);
+      chip.classList.toggle("chip-neutral", !last.live);
+      chip.firstElementChild!.outerHTML = last.live ? icons.live : icons.idle;
+      text.textContent = last.live ? "En vivo" : `Actualizado ${ago(Date.now() - last.updatedAt)}`;
+      for (const el of document.querySelectorAll<HTMLElement>("[data-ago]")) el.textContent = ago(Date.now() - Number(el.dataset.ago));
+    };
+    setInterval(paint, 30_000);
+
+    // Montos antes de actualizar: lo que cambió cuenta hasta el valor nuevo y se resalta un momento.
+    let before = new Map<string, number>();
+    const amounts = () => new Map([...document.querySelectorAll<HTMLElement>("[data-live]")].map((el) => [el.dataset.live!, Number(el.dataset.amount)]));
+    const tween = (el: HTMLElement, from: number, to: number) => {
+      const sign = el.dataset.sign as "+" | "−" | undefined;
+      const start = performance.now();
+      const tick = (t: number) => {
+        const k = Math.min(1, (t - start) / 400);
+        el.textContent = formatBs(from + (to - from) * (1 - (1 - k) ** 3), sign);
+        if (k < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    };
+
+    watchLive({
+      topic: bar.dataset.liveTopic!,
+      regions: ["kpis", "compare", "branches", "recent", "stats"],
+      names: JSON.parse(bar.dataset.branchNames ?? "{}"),
+      onStatus: (status) => {
+        last = status;
+        paint();
+      },
+      onAnnounce: (message) => {
+        // Vaciar y volver a poner: el lector repite el aviso aunque sea igual al anterior.
+        announce.textContent = "";
+        setTimeout(() => (announce.textContent = message), 50);
+      },
+      beforeRefresh: () => (before = amounts()),
+      afterRefresh: () => {
+        for (const el of document.querySelectorAll<HTMLElement>("[data-live]")) {
+          const from = before.get(el.dataset.live!);
+          const to = Number(el.dataset.amount);
+          if (from === undefined || from === to) continue;
+          el.classList.add("is-changed");
+          setTimeout(() => el.classList.remove("is-changed"), 1500);
+          if (!reduceMotion) tween(el, from, to);
+        }
+      },
+    });
+  }
 
   // El período cambia solo la sección de estadísticas: sin navegar, así el panel no salta ni se vuelve esqueleto.
   onRegions((root) => {
@@ -396,6 +500,80 @@ const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.
 </script>
 
 <style>
+  .live-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+  }
+
+  .live-status {
+    margin: 0;
+  }
+
+  /* Lo que acaba de cambiar: un fondo suave que se va solo. */
+  :global([data-live]) {
+    border-radius: 0.25rem;
+    transition: background-color 600ms;
+  }
+
+  :global([data-live].is-changed) {
+    background: var(--color-primary-soft);
+    transition: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global([data-live]) {
+      transition: none;
+    }
+  }
+
+  .recent-empty {
+    margin: 0;
+    color: var(--color-text-muted);
+  }
+
+  .recent-list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .recent-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(9rem, auto);
+    align-items: baseline;
+    gap: 0.25rem 1rem;
+    padding: 0.625rem 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .recent-branch {
+    overflow: hidden;
+    font-weight: var(--font-semibold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .recent-voided {
+    color: var(--color-text-muted);
+  }
+
+  .recent-meta {
+    color: var(--color-text-muted);
+    text-align: right;
+  }
+
+  @media (max-width: 640px) {
+    .recent-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .recent-meta {
+      grid-column: 1 / -1;
+      text-align: left;
+    }
+  }
+
   .chart-card {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

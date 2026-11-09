@@ -124,6 +124,8 @@ export interface Sale {
   branchId: string;
   date: string; // AAAA-MM-DD, día del negocio
   time: string; // HH:MM, hora de Bolivia
+  /** Momento exacto (ISO), para «hace X min». */
+  at: string;
   shiftId: string;
   recordedBy: Recorder;
   recordedById: string | null;

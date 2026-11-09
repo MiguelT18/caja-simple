@@ -111,6 +111,8 @@ export async function businessContext(locals: App.Locals, businessSlug: string) 
     shifts,
     branchById: (id: string) => m.branches.find((b) => b.id === id),
     shiftById: (id?: string) => shifts.find((s) => s.id === id),
+    // Últimas ventas de hoy (ya vienen de la más nueva a la más vieja), para el resumen en vivo.
+    recentSales: moves.sales.filter((s) => s.date === day).slice(0, 5),
     salesTotal: sum(branchSummary.map((b) => b.sales)),
     expensesTotal: sum(branchSummary.map((b) => b.expenses)),
   };
