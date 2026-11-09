@@ -1,0 +1,77 @@
+---
+// Turno noche (ejemplo): cerrar el turno con el arqueo, como en Turnos. Pasos: ver demo-play.ts.
+// La cuenta es la de la barra del turno: apertura + ventas en efectivo − gastos (los Bs 30,50 de la tarde).
+import { CircleCheck } from "@lucide/astro";
+import MiniDemo from "./MiniDemo.astro";
+import { formatBs } from "@/lib/format";
+
+const till = { opening: 200, cashSales: 760.5, expenses: 30.5 };
+const expected = till.opening + till.cashSales - till.expenses;
+//              idle, tipear, cerrar, contado, diferencia, cuadra
+const steps = [500, 1000, 600, 1000, 500, 900];
+---
+
+<MiniDemo
+  title="Cuadre de caja"
+  label="Ejemplo de cuadre de caja"
+  summary={`Ejemplo: esperado en caja ${formatBs(expected)}, contado ${formatBs(expected)}, diferencia ${formatBs(0)}. La caja cuadra.`}
+  steps={steps}
+>
+  <dl class="lines">
+    <div><dt>Apertura</dt><dd class="num">{formatBs(till.opening)}</dd></div>
+    <div><dt>Ventas en efectivo</dt><dd class="num amount-income">{formatBs(till.cashSales, "+")}</dd></div>
+    <div><dt>Gastos</dt><dd class="num amount-expense">{formatBs(till.expenses, "−")}</dd></div>
+    <div class="expected"><dt>Esperado en caja</dt><dd class="num">{formatBs(expected)}</dd></div>
+  </dl>
+
+  <div class="stack result">
+    <div class="count" data-at="0" data-until="3">
+      <span class="fake-label">Dinero contado en caja (Bs)</span>
+      <span class="fake-input num" data-tap="1"><span data-demo-type="1">930,00</span></span>
+      <span class="btn btn-secondary btn-block fake-btn" data-tap="2">Cerrar turno</span>
+    </div>
+    <div class="done">
+      <dl class="lines">
+        <div data-at="3"><dt>Contado</dt><dd class="num" data-demo-count={`${expected}@3`}>{formatBs(expected)}</dd></div>
+        <div data-at="4"><dt>Diferencia</dt><dd class="num">{formatBs(0)}</dd></div>
+      </dl>
+      <p class="status-ok" data-at="5"><CircleCheck size={18} stroke-width={2} />La caja cuadra</p>
+    </div>
+  </div>
+</MiniDemo>
+
+<style>
+  .expected {
+    margin-top: 0.25rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--color-border);
+    font-weight: var(--font-semibold);
+  }
+
+  .expected dt {
+    color: var(--color-text);
+  }
+
+  .result {
+    margin-top: 1rem;
+  }
+
+  .count,
+  .done {
+    display: grid;
+    gap: 0.5rem;
+    align-content: start;
+  }
+
+  .count .fake-label {
+    margin: 0;
+  }
+
+  .fake-input {
+    position: relative;
+  }
+
+  .done .status-ok {
+    margin-top: 0.25rem;
+  }
+</style>

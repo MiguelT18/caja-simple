@@ -1,4 +1,5 @@
 import { formatBs } from "@/lib/format";
+import { mountDemo } from "./demo-play";
 import { SKY_END, SKY_START, skyPoint } from "./sky";
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -13,11 +14,23 @@ const LIT_TOP = 0.25;
 const LIT_LINE = 0.65;
 const shifts = [...document.querySelectorAll<HTMLElement>(".day .shift")];
 if ("IntersectionObserver" in window) {
+  // La tarjeta de cada turno se opera sola la primera vez que se enciende, y se pausa si el turno se apaga a medias.
+  // Con movimiento reducido no se arma: queda el estado final del HTML.
+  const demos = new Map<Element, { wake(): void }>();
+  if (!reduceMotion) {
+    for (const shift of shifts) {
+      const card = shift.querySelector<HTMLElement>("[data-demo]");
+      if (card) demos.set(shift, mountDemo(card, () => shift.classList.contains("is-lit")));
+    }
+  }
   const observer = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         entry.target.classList.toggle("is-lit", entry.isIntersecting);
-        if (entry.isIntersecting) entry.target.classList.add("is-seen");
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-seen");
+          demos.get(entry.target)?.wake();
+        }
       }
     },
     { rootMargin: `-${LIT_TOP * 100}% 0px -${(1 - LIT_LINE) * 100}% 0px` },

@@ -80,7 +80,10 @@ export function mountDemo(card: HTMLElement, live: () => boolean) {
       shownStep = step;
     }
     for (const c of counts) c.el.textContent = formatBs(countAt(c.keys, c.from, step, progress), c.sign);
-    for (const t of types) t.el.textContent = step < t.step ? "" : step > t.step ? t.text : typedAt(t.text, progress);
+    for (const t of types) {
+      t.el.textContent = step < t.step ? "" : step > t.step ? t.text : typedAt(t.text, progress);
+      t.el.classList.toggle("is-typing", step === t.step);
+    }
   };
 
   const frame = (now: number) => {

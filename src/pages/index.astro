@@ -2,12 +2,15 @@
 // Con la sesión en la petición, las acciones cambian: sin sesión invitan a crear cuenta; con ella, vuelven a la app.
 export const prerender = false;
 
-import { ArrowRight, Check, CircleCheck, Moon, Store, Sun, Sunset, TriangleAlert, Users } from "@lucide/astro";
+import { ArrowRight, Check, Moon, Store, Sun, Sunset, Users } from "@lucide/astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import DaySky from "../components/landing/DaySky.astro";
 import BranchesGlance from "../components/landing/BranchesGlance.astro";
 import Practical from "../components/landing/Practical.astro";
 import Faq from "../components/landing/Faq.astro";
+import DemoSale from "../components/landing/DemoSale.astro";
+import DemoExpense from "../components/landing/DemoExpense.astro";
+import DemoClose from "../components/landing/DemoClose.astro";
 
 const signupHref = "/auth/crear-cuenta";
 const loginHref = "/auth/iniciar-sesion";
@@ -125,18 +128,7 @@ const accountSample = [
               <h3>Abres el local y registras cada venta</h3>
               <p>Eliges los productos, ves el total y listo. Más rápido que anotarlo en papel.</p>
             </div>
-            <figure class="demo mini" aria-label="Ejemplo de venta registrada">
-              <figcaption class="demo-head">
-                <span class="demo-title">Venta 08:42</span>
-                <span class="sample">Ejemplo</span>
-              </figcaption>
-              <ul class="lines" role="list">
-                <li><span>Pan de batalla <span class="qty num">×10</span></span><span class="num">Bs 5,00</span></li>
-                <li><span>Leche 1 L <span class="qty num">×2</span></span><span class="num">Bs 14,00</span></li>
-                <li><span>Mantequilla 200 g <span class="qty num">×1</span></span><span class="num">Bs 12,50</span></li>
-              </ul>
-              <p class="lines-total"><span>Total</span><span class="num amount-income">+Bs 31,50</span></p>
-            </figure>
+            <DemoSale />
           </li>
 
           <li class="shift" style="--shift: var(--color-shift-afternoon); --shift-soft: var(--color-shift-afternoon-soft)">
@@ -146,17 +138,7 @@ const accountSample = [
               <h3>Anotas los gastos y cuidas el stock</h3>
               <p>Cada salida de dinero queda registrada, y te avisa cuando un producto se está acabando.</p>
             </div>
-            <figure class="demo mini" aria-label="Ejemplo de gastos y aviso de stock">
-              <figcaption class="demo-head">
-                <span class="demo-title">Gastos del turno</span>
-                <span class="sample">Ejemplo</span>
-              </figcaption>
-              <ul class="lines" role="list">
-                <li><span>Garrafa de gas</span><span class="num amount-expense">−Bs 22,50</span></li>
-                <li><span>Bolsas</span><span class="num amount-expense">−Bs 8,00</span></li>
-              </ul>
-              <p class="stock-alert"><TriangleAlert size={16} stroke-width={2} />Leche 1 L: quedan 3</p>
-            </figure>
+            <DemoExpense />
           </li>
 
           <li class="shift" style="--shift: var(--color-shift-night); --shift-soft: var(--color-shift-night-soft)">
@@ -166,18 +148,7 @@ const accountSample = [
               <h3>Cierras el turno y sabes si la caja cuadra</h3>
               <p>Cuentas el efectivo, lo comparas con lo esperado y ves la diferencia al instante.</p>
             </div>
-            <figure class="demo mini" aria-label="Ejemplo de cuadre de caja">
-              <figcaption class="demo-head">
-                <span class="demo-title">Cuadre de caja</span>
-                <span class="sample">Ejemplo</span>
-              </figcaption>
-              <dl class="lines">
-                <div><dt>Esperado</dt><dd class="num">Bs 930,00</dd></div>
-                <div><dt>Contado</dt><dd class="num">Bs 930,00</dd></div>
-                <div><dt>Diferencia</dt><dd class="num">Bs 0,00</dd></div>
-              </dl>
-              <p class="status-ok"><CircleCheck size={18} stroke-width={2} />La caja cuadra</p>
-            </figure>
+            <DemoClose />
           </li>
         </ol>
       </div>
@@ -386,22 +357,18 @@ const accountSample = [
   }
 
   .till div,
-  .day-shifts li,
-  .lines li,
-  .lines div {
+  .day-shifts li {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
   }
 
-  .till dt,
-  .lines dt {
+  .till dt {
     color: var(--color-text-muted);
   }
 
-  .till dd,
-  .lines dd {
+  .till dd {
     margin: 0;
   }
 
@@ -429,8 +396,7 @@ const accountSample = [
     font-weight: var(--font-semibold);
   }
 
-  .day-shifts,
-  .lines {
+  .day-shifts {
     margin: 0;
     padding: 0;
     list-style: none;
@@ -472,26 +438,6 @@ const accountSample = [
     background: var(--bar);
   }
 
-  .status-ok,
-  .stock-alert {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 1.25rem 0 0;
-    padding: 0.625rem 0.875rem;
-    border-radius: 0.5rem;
-    font-weight: var(--font-semibold);
-  }
-
-  .status-ok {
-    background: var(--color-income-soft);
-    color: var(--color-income);
-  }
-
-  .stock-alert {
-    background: var(--color-warning-soft);
-    color: var(--color-warning);
-  }
   /* Un día en el local */
   .day {
     padding-block: var(--section-gap);
@@ -605,37 +551,16 @@ const accountSample = [
     color: var(--color-text-muted);
   }
 
-  .mini {
-    padding: 1.25rem;
-    font-size: var(--text-sm);
-    line-height: var(--text-sm-lh);
+  .shift :global(.mini) {
     transition: box-shadow 600ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* Con el turno encendido, la pieza toma su color en el borde superior. */
-  .shift:not(.is-armed) .mini,
-  .shift.is-lit .mini {
+  .shift:not(.is-armed) :global(.mini),
+  .shift.is-lit :global(.mini) {
     box-shadow:
       inset 0 3px 0 var(--shift),
       var(--shadow-md);
-  }
-
-  .lines {
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .qty {
-    color: var(--color-text-muted);
-  }
-
-  .lines-total {
-    display: flex;
-    justify-content: space-between;
-    margin: 1rem 0 0;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--color-border);
-    font-weight: var(--font-semibold);
   }
 
   /* La franja del cielo de los turnos queda fija bajo la barra mientras pasan los turnos por debajo. */
@@ -868,7 +793,7 @@ const accountSample = [
     .shift-rail {
       grid-row: span 2;
     }
-    .mini {
+    .shift :global(.mini) {
       grid-column: 2;
       max-width: 26rem;
     }
@@ -893,7 +818,7 @@ const accountSample = [
     }
     .day-card,
     .switcher,
-    .mini {
+    .shift :global(.mini) {
       max-width: none;
     }
     .day-card {
@@ -931,7 +856,7 @@ const accountSample = [
 
   @media (prefers-reduced-motion: reduce) {
     .shift-dot,
-    .mini,
+    .shift :global(.mini),
     .shift-rail::before {
       transition: none;
     }
@@ -962,28 +887,6 @@ const accountSample = [
     }
     .day-sky {
       transition: top 300ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    /* Cada pieza de turno se «escribe» línea por línea la primera vez que su turno se enciende. */
-    .shift .mini :is(.lines > *, .lines-total, .status-ok, .stock-alert) {
-      transition:
-        opacity 500ms cubic-bezier(0.16, 1, 0.3, 1),
-        translate 500ms cubic-bezier(0.16, 1, 0.3, 1);
-      transition-delay: calc(150ms + var(--i, 0) * 110ms);
-    }
-    .shift .mini .lines > :nth-child(2) {
-      --i: 1;
-    }
-    .shift .mini .lines > :nth-child(3) {
-      --i: 2;
-    }
-    .shift .mini :is(.lines-total, .status-ok, .stock-alert) {
-      --i: 3;
-    }
-    .shift.is-armed:not(.is-seen) .mini :is(.lines > *, .lines-total, .status-ok, .stock-alert) {
-      opacity: 0;
-      translate: 0 0.5rem;
-      transition-delay: 0s;
     }
   }
 

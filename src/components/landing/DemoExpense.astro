@@ -1,0 +1,67 @@
+---
+// Turno tarde (ejemplo): registrar un gasto como en Gastos, y el aviso de stock bajo. Pasos: ver demo-play.ts.
+// Los dos gastos (Bs 30,50) son los que descuenta el cuadre de la noche.
+import { Plus, TriangleAlert } from "@lucide/astro";
+import MiniDemo from "./MiniDemo.astro";
+import { formatBs } from "@/lib/format";
+
+const gas = 22.5;
+const bags = 8;
+//              idle, registrar, hoja, concepto, monto, guardar, en la lista, aviso
+const steps = [500, 600, 450, 1100, 600, 600, 800, 900];
+---
+
+<MiniDemo
+  title="Gastos del turno"
+  label="Ejemplo de gastos y aviso de stock"
+  summary={`Ejemplo: gastos del turno, Garrafa de gas ${formatBs(gas, "−")} y Bolsas ${formatBs(bags, "−")}, total ${formatBs(gas + bags, "−")}. Aviso de stock: Leche 1 L, quedan 3.`}
+  steps={steps}
+>
+  <span class="btn btn-primary fake-btn add" data-tap="1"><Plus size={18} stroke-width={2} />Registrar gasto</span>
+
+  <ul class="lines" role="list">
+    <li data-at="6"><span>Garrafa de gas</span><span class="num amount-expense">{formatBs(gas, "−")}</span></li>
+    <li><span>Bolsas</span><span class="num amount-expense">{formatBs(bags, "−")}</span></li>
+  </ul>
+  <p class="lines-total">
+    <span>Total</span><span class="num amount-expense" data-demo-count={`${gas + bags}@6`} data-from={bags} data-sign="−">{formatBs(gas + bags, "−")}</span>
+  </p>
+
+  <p class="stock-alert" data-at="7"><TriangleAlert size={16} stroke-width={2} />Leche 1 L: quedan 3</p>
+
+  <div class="sheet" data-at="2" data-until="6">
+    <p class="sheet-title">Registrar gasto</p>
+    <div class="fields">
+      <div>
+        <span class="fake-label">Concepto</span>
+        <span class="fake-input"><span data-demo-type="3">Garrafa de gas</span></span>
+      </div>
+      <div>
+        <span class="fake-label">Monto (Bs)</span>
+        <span class="fake-input num"><span data-demo-type="4">22,50</span></span>
+      </div>
+    </div>
+    <span class="btn btn-primary btn-block fake-btn" data-tap="5">Guardar gasto</span>
+  </div>
+</MiniDemo>
+
+<style>
+  .add {
+    margin-bottom: 1rem;
+  }
+
+  .stock-alert {
+    margin-top: 1rem;
+  }
+
+  .fields {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .fake-input {
+    white-space: nowrap;
+    overflow: hidden;
+  }
+</style>
