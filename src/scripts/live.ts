@@ -63,7 +63,9 @@ export function watchLive(o: Options) {
   });
 
   // Respaldo: cada minuto, solo mientras Realtime no está y la pestaña se ve.
+  // Solo al cambiar de estado: realtime-js reintenta cada pocos segundos y cada error reiniciaría la cuenta del minuto.
   const setLive = (value: boolean) => {
+    if (value === live && (live || poll)) return;
     live = value;
     clearInterval(poll);
     poll = live ? undefined : setInterval(() => !document.hidden && refresh(), POLL);
@@ -97,6 +99,8 @@ export function watchLive(o: Options) {
       params: { apikey: first.apikey },
       accessToken: async () => (await getToken()).token,
     });
+    // Sin esto el canal puede unirse antes de que llegue el token, como anónimo, y la base lo rechaza.
+    await client.setAuth();
     const channel = client.channel(o.topic, { config: { private: true } });
     channel.on("broadcast", { event: "*" }, ({ event, payload }) => {
       batch.push({ table: event, op: String(payload?.op ?? ""), branch: String(payload?.branch ?? "") });
