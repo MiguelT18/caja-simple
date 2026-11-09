@@ -130,13 +130,13 @@ Es opcional: sin `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, o si Redis
 
 ## En vivo (Realtime)
 
-El resumen del negocio (`/app/[negocio]`) se actualiza solo cuando cambian ventas, gastos o turnos de cualquier sucursal (`20261109191358_business_live.sql`).
+El resumen del negocio (`/app/[negocio]`) y el de cada sucursal (`/app/[negocio]/sucursales/[sucursal]`) se actualizan solos cuando cambian ventas, gastos o turnos (`20261109191358_business_live.sql`). Las dos páginas usan `LiveStatus.astro` (indicador, anuncio y montos `data-live` que cuentan y se resaltan); la de la sucursal escucha el mismo canal del negocio y descarta los avisos de otras sucursales (`branch`).
 
-- **Aviso, no datos:** los triggers `*_broadcast` en `sales`, `expenses` y `shift_closes` (`private.broadcast_till`) mandan por Realtime Broadcast al canal privado `negocio:<id>` solo `{ branch, op }` y la tabla como evento. Si el aviso falla, la escritura se guarda igual. Al recibirlo, el navegador agrupa 1,5 s y llama a `refreshRegions(…, { keepFocus: true })`: los números los arma el servidor, con RLS, como siempre. Nunca se leen tablas desde el navegador.
+- **Aviso, no datos:** los triggers `*_broadcast` en `sales`, `expenses` y `shift_closes` (`private.broadcast_till`) mandan por Realtime Broadcast al canal privado `negocio:<id>` solo `{ branch, op }` y la tabla como evento. Si el aviso falla, la escritura se guarda igual. Al recibirlo, el navegador agrupa 1 s y llama a `refreshRegions(…, { keepFocus: true })`: los números los arma el servidor, con RLS, como siempre. Nunca se leen tablas desde el navegador.
 - **Quién escucha:** la política «Avisos en vivo: solo quien administra el negocio» en `realtime.messages` usa `private.watch_topic(topic)` = la dueña (`is_owner`) con `mfa_ok()`. No hay política de insert: ningún cliente emite en el canal. En el panel, Realtime › Settings tiene apagado «Allow public access».
 - **Token:** `GET /api/realtime-token` devuelve solo el access token de la sesión (y la URL y la clave pública), con `no-store`. El refresh token se queda en las cookies; la sesión la renueva solo el servidor. `src/scripts/live.ts` pide otro token 60 s antes de que venza.
 - **Respaldo:** sin conexión a Realtime (o si no conecta en 10 s), consulta cada 60 s con la pestaña visible, y el indicador dice «Actualizado hace X min» en vez de «En vivo». Con la pestaña oculta no hace nada; al volver, actualiza una vez si llegó un aviso o pasó más de un minuto.
-- **Reutilizable:** `watchLive({ topic, regions, names, … })` sirve para otras páginas (sucursal, empleados) marcando sus regiones con `data-region`.
+- **Reutilizable:** `<LiveStatus topic names regions branch? />` en cualquier página de la dueña, marcando sus regiones con `data-region`. Un aviso que llega durante una actualización la repite al terminar.
 - **Caché:** lo que se refresca (ventas, gastos, cierres, movimientos, `business_stats`) nunca sale de Redis, así que las `LIVE_ACTIONS` no necesitan invalidar nada para que el resumen en vivo sea correcto.
 
 ## Tu cuenta (`/app/cuenta`)
