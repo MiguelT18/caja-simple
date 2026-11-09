@@ -6,8 +6,10 @@
 /**
  * Cambia las regiones `names` (todas, si no se pasan) por las de `url` (por defecto, esta misma página).
  * Sin regiones o sin red, recarga: nunca queda peor que antes.
+ * Con `keepFocus` (avisos en vivo, que nadie pidió con un clic): el foco vuelve al mismo control de la región nueva
+ * y, si no estaba en una región, no se toca.
  */
-export async function refreshRegions(names?: string[], url = location.href) {
+export async function refreshRegions(names?: string[], url = location.href, { keepFocus = false } = {}) {
   dropPrerendered();
   const selector = (name: string) => `[data-region="${CSS.escape(name)}"]`;
   const current = [...document.querySelectorAll<HTMLElement>("[data-region]")].filter((el) => !names || names.includes(el.dataset.region!));
@@ -24,15 +26,18 @@ export async function refreshRegions(names?: string[], url = location.href) {
 
   const focusedId = document.activeElement?.id;
   const swapped: HTMLElement[] = [];
+  let refocus: HTMLElement | undefined;
   for (const now of current) {
     const next = fresh.querySelector<HTMLElement>(selector(now.dataset.region!));
     if (!next) {
       now.remove(); // ya no corresponde (p. ej., la barra del turno al cerrarlo)
       continue;
     }
+    const at = keepFocus && document.activeElement && now.contains(document.activeElement) ? [...now.querySelectorAll(FOCUSABLE)].indexOf(document.activeElement) : -1;
     keepIslands(now, next);
     now.replaceWith(next);
     swapped.push(next);
+    if (at >= 0) refocus = next.querySelectorAll<HTMLElement>(FOCUSABLE)[at];
   }
   // Una región que antes no estaba (la barra del turno al abrirlo) va detrás del elemento con id que la precede.
   for (const next of fresh.querySelectorAll<HTMLElement>("[data-region]")) {
@@ -44,6 +49,11 @@ export async function refreshRegions(names?: string[], url = location.href) {
     swapped.push(next);
   }
 
+  if (keepFocus) {
+    refocus?.focus({ preventScroll: true });
+    document.dispatchEvent(new CustomEvent("regions:swapped", { detail: { regions: swapped } }));
+    return;
+  }
   // El foco vuelve al mismo control si sigue existiendo; si no, a la primera región (sin perderse en el <body>).
   if (!document.activeElement || document.activeElement === document.body) {
     const target = (focusedId && document.getElementById(focusedId)) || swapped[0];
@@ -52,6 +62,8 @@ export async function refreshRegions(names?: string[], url = location.href) {
   }
   document.dispatchEvent(new CustomEvent("regions:swapped", { detail: { regions: swapped } }));
 }
+
+const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]";
 
 /** Pone en `next` las islas ya hidratadas de `now` (misma posición y componente), con los props nuevos. */
 function keepIslands(now: HTMLElement, next: HTMLElement) {
