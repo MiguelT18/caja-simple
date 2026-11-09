@@ -48,6 +48,7 @@ Origen: revisión del código, de las migraciones y de PRODUCT.md del 3 de novie
 - [x] Importar productos por CSV o pegando filas de una planilla (nombre, código de barras, categoría y, si se quiere, precio, stock y mínimo), con plantilla para descargar; lo importado puede entrar directo al inventario de las sucursales elegidas.
 - [x] Agregar varios productos del catálogo a una sucursal de una vez, con precio y stock en la misma tabla.
 - [x] Promociones con descuento (porcentaje, precio especial o lleva N paga M), por fechas, sin fecha límite o ciertos días, en todas o algunas sucursales; solo en los planes pagos (`20261108190000_promotions.sql`, `/app/[negocio]/promociones`).
+- [x] Resumen del negocio en vivo: ventas, gastos y turnos de cualquier sucursal llegan sin recargar (Realtime Broadcast como aviso, canal privado por negocio), con indicador «En vivo» y últimas ventas del día (`20261109191358_business_live.sql`; falta aplicarla y apagar «Allow public access» en Realtime).
 - [x] Alta rápida: «Guardar y agregar otro» y lectura del código de barras con la cámara (Chrome/Edge en Android; en iPhone, todavía no).
 
 ## P3: Funciones de los planes pagos (Negocio y Sucursales)

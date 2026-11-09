@@ -128,6 +128,17 @@ Es opcional: sin `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, o si Redis
 - Lo que cambie fuera de las Actions (panel de Supabase, triggers sobre datos guardados) se ve al vencer el TTL. La excepción es el plan: el trigger `businesses_bump_cache` sube `v:b:<negocio>` por el REST de Upstash (`pg_net`) cada vez que cambian `plan` o `plan_until`. La URL y el token están en Vault (`upstash_url`, `upstash_token`); si faltan, se espera al TTL.
 - **Límite de intentos** (`rateLimit`, claves `rl:`, ventana fija): Supabase Auth ve la IP de Vercel y no la de la persona, así que el límite va aquí. Entrar: 10 por IP cada 5 min y 10 por correo cada 15 min. Crear cuenta: 5 por IP por hora. Código de 2FA (`/api/auth/verify`, `verifyTotp`, `disableTotp`): 5 por persona cada 5 min, con un solo cupo compartido. `searchPeople`: 30 por minuto. Sin Redis deja pasar todo.
 
+## En vivo (Realtime)
+
+El resumen del negocio (`/app/[negocio]`) se actualiza solo cuando cambian ventas, gastos o turnos de cualquier sucursal (`20261109191358_business_live.sql`).
+
+- **Aviso, no datos:** los triggers `*_broadcast` en `sales`, `expenses` y `shift_closes` (`private.broadcast_till`) mandan por Realtime Broadcast al canal privado `negocio:<id>` solo `{ branch, op }` y la tabla como evento. Si el aviso falla, la escritura se guarda igual. Al recibirlo, el navegador agrupa 1,5 s y llama a `refreshRegions(…, { keepFocus: true })`: los números los arma el servidor, con RLS, como siempre. Nunca se leen tablas desde el navegador.
+- **Quién escucha:** la política «Avisos en vivo: solo quien administra el negocio» en `realtime.messages` usa `private.watch_topic(topic)` = la dueña (`is_owner`) con `mfa_ok()`. No hay política de insert: ningún cliente emite en el canal. En el panel, Realtime › Settings tiene apagado «Allow public access».
+- **Token:** `GET /api/realtime-token` devuelve solo el access token de la sesión (y la URL y la clave pública), con `no-store`. El refresh token se queda en las cookies; la sesión la renueva solo el servidor. `src/scripts/live.ts` pide otro token 60 s antes de que venza.
+- **Respaldo:** sin conexión a Realtime (o si no conecta en 10 s), consulta cada 60 s con la pestaña visible, y el indicador dice «Actualizado hace X min» en vez de «En vivo». Con la pestaña oculta no hace nada; al volver, actualiza una vez si llegó un aviso o pasó más de un minuto.
+- **Reutilizable:** `watchLive({ topic, regions, names, … })` sirve para otras páginas (sucursal, empleados) marcando sus regiones con `data-region`.
+- **Caché:** lo que se refresca (ventas, gastos, cierres, movimientos, `business_stats`) nunca sale de Redis, así que las `LIVE_ACTIONS` no necesitan invalidar nada para que el resumen en vivo sea correcto.
+
 ## Tu cuenta (`/app/cuenta`)
 
 - **Perfil:** la persona edita `first_name`, `last_name` y `avatar_url` (grant por columna). El correo sale de `auth.users` y no se edita desde la app. Si quita su foto, quedan las iniciales.
