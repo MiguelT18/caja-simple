@@ -6,11 +6,14 @@ export function parseCsv(text: string): string[][] {
   const src = text.replace(/^﻿/, "");
   const firstLine = src.slice(0, src.search(/\r?\n|$/));
   const times = (c: string) => firstLine.split(c).length - 1;
-  const sep = ["\t", ";", ","].reduce((best, c) => (times(c) > times(best) ? c : best), ",");
+  // En un empate gana el tabulador: «7,50⇥10» pegado de Excel es un precio con coma, no dos columnas.
+  // Sin separador en la primera línea, la coma (CSV de una columna).
+  const sep = ["\t", ";", ","].reduce((best, c) => (times(c) > times(best) ? c : best), "\t");
+  const fallback = times(sep) === 0 ? "," : sep;
   // «;» y tabulador valen los dos a la vez: se pega una planilla (tabuladores) y se corrige a mano escribiendo «;»,
   // porque en un cuadro de texto la tecla Tab mueve el foco. La coma solo separa en un CSV que la usa en toda la línea
   // del encabezado, así «7,50» sigue siendo un precio.
-  const isSep = (c: string) => (sep === "," ? c === "," : c === "\t" || c === ";");
+  const isSep = (c: string) => (fallback === "," ? c === "," : c === "\t" || c === ";");
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -164,4 +167,48 @@ export function productsFromCsv(text: string, options: ImportOptions = {}): { ro
     });
   });
   return { rows, errors };
+}
+
+/** Una fila de la tabla de importar: el texto de cada celda, por la clave de su columna (`importColumns`). */
+export type GridRow = Record<string, string>;
+
+/**
+ * Filas de la tabla → planilla con encabezado, para leerla con `productsFromCsv` (las mismas reglas que un CSV).
+ * Las filas vacías se saltan; `lines[i]` dice a qué fila de la tabla corresponde la fila i + 2 de la planilla
+ * (la 1 es el encabezado), para llevar cada error a su fila.
+ */
+export function gridToCsv(columns: Column[], grid: GridRow[]): { text: string; lines: number[] } {
+  const cell = (v: string) => (/[;\t"\r\n]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v);
+  const lines: number[] = [];
+  const body: string[] = [];
+  grid.forEach((row, i) => {
+    if (!columns.some((c) => (row[c.key] ?? "").trim())) return;
+    lines.push(i);
+    body.push(columns.map((c) => cell(row[c.key] ?? "")).join(";"));
+  });
+  return { text: [columns.map((c) => c.label).join(";"), ...body].join("\n"), lines };
+}
+
+/**
+ * Celdas pegadas o de un CSV → filas de la tabla. Con encabezado, cada columna va a la suya por el nombre; sin él,
+ * en el orden de `columns`, empezando en la columna `from`.
+ */
+export function cellsToGrid(table: string[][], columns: Column[], from = 0): GridRow[] {
+  const labels = columns.map((c) => plain(c.label));
+  const head = (table[0] ?? []).map(plain);
+  const byName = head.some((h) => ALIASES.name.includes(h));
+  const keyOf = (h: string) => {
+    const i = labels.indexOf(h);
+    if (i >= 0) return columns[i].key;
+    return Object.entries(ALIASES).find(([key, names]) => names.includes(h) && columns.some((c) => c.key === key))?.[0];
+  };
+  const keys = byName ? head.map(keyOf) : columns.slice(from).map((c) => c.key);
+  return table.slice(byName ? 1 : 0).map((cells) => {
+    const row: GridRow = {};
+    cells.forEach((v, i) => {
+      const key = keys[i];
+      if (key) row[key] = v.trim();
+    });
+    return row;
+  });
 }

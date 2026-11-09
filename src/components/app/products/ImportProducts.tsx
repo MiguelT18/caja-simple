@@ -1,18 +1,22 @@
 import { actions } from "astro:actions";
-import { useMemo, useState } from "react";
-import { ClipboardPaste, Download, FileUp, TriangleAlert } from "lucide-react";
+import { useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { CircleCheck, Download, FileUp, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { AppDialog } from "../AppDialog";
-import { importColumns, productsFromCsv, type ImportOptions } from "@/lib/csv";
-import { formatBs, toCsv } from "@/lib/format";
+import { cellsToGrid, gridToCsv, importColumns, parseCsv, productsFromCsv, type GridRow, type ImportOptions } from "@/lib/csv";
+import { toCsv } from "@/lib/format";
 import { toast } from "@/scripts/dialogs";
 import { refreshRegions } from "@/scripts/refresh";
-import { Field, FilePicker, safeAction } from "./form";
+import { FilePicker, safeAction } from "./form";
 
 const SHOWN_ERRORS = 8;
-const SHOWN_ROWS = 5;
 const MAX_ROWS = 500;
+const START_ROWS = 3;
+const emptyRows = (n: number): GridRow[] => Array.from({ length: n }, () => ({}));
+
+/** Encabezado visible de cada columna (las claves de la planilla van en minúscula). */
+const headerOf = (label: string) => (label === "precio" ? "Precio (Bs)" : label[0].toUpperCase() + label.slice(1));
 const SAMPLE = "Ejemplo, bórrala:";
 
 type Branch = { id: string; name: string };
@@ -49,8 +53,10 @@ function downloadTemplate(options: ImportOptions) {
  */
 export function ImportProducts({ businessId, branches }: { businessId: string; branches: Branch[] }) {
   const [open, setOpen] = useState(false);
-  const [source, setSource] = useState<"paste" | "file">("paste");
-  const [text, setText] = useState("");
+  // La tabla: una fila por producto, una celda por columna. Las celdas se guardan por la clave de su columna, así
+  // marcar o desmarcar «código de barras» no mueve lo ya escrito.
+  const [grid, setGrid] = useState<GridRow[]>(() => emptyRows(START_ROWS));
+  const tableRef = useRef<HTMLTableElement>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   // Con una sola sucursal, lo importado queda listo para vender ahí sin tener que marcarla.
@@ -69,15 +75,24 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
     [withBarcode, withCategory, perBranch, chosenKey],
   );
   const columns = importColumns(options);
-  const placeholder = sampleRows(options)
-    .map((cells) => cells.join("; ").replace(/(; )+$/, ""))
-    .join("\n");
+  const examples = sampleRows(options)[0];
 
-  const { rows, errors } = useMemo(() => {
+  // Se valida con las mismas reglas que un CSV; cada error vuelve a su fila de la tabla.
+  const { rows, errors, rowErrors, filled } = useMemo(() => {
+    const { text, lines } = gridToCsv(columns, grid);
     const parsed = productsFromCsv(text, options);
+    const rowErrors = new Map<number, string>();
+    const errors = parsed.errors.map((e) =>
+      e.replace(/^Fila (\d+): (.*)$/, (_, n: string, problem: string) => {
+        const at = lines[Number(n) - 2];
+        rowErrors.set(at, problem[0].toUpperCase() + problem.slice(1));
+        return `Fila ${at + 1}: ${problem}`;
+      }),
+    );
     // Las filas de ejemplo de la plantilla nunca entran al catálogo, aunque se hayan olvidado de borrarlas.
-    return { rows: parsed.rows.filter((r) => !r.name.startsWith(SAMPLE)), errors: parsed.errors };
-  }, [text, options]);
+    return { rows: parsed.rows.filter((r) => !r.name.startsWith(SAMPLE)), errors, rowErrors, filled: new Set(lines) };
+    // `columns` sale de `options`.
+  }, [grid, options]);
 
   const hasStock = rows.some((r) => r.stock !== undefined || r.stockByBranch);
   const hasPriceOrStock = hasStock || rows.some((r) => r.price !== undefined);
@@ -86,17 +101,74 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
 
   const [fileName, setFileName] = useState("");
   function reset() {
-    setText("");
+    setGrid(emptyRows(START_ROWS));
     setMessage("");
     setFileName("");
   }
 
+  const focusCell = (row: number, col: number) =>
+    requestAnimationFrame(() => tableRef.current?.querySelector<HTMLInputElement>(`[data-cell="${row}:${col}"]`)?.focus());
+
+  function setCell(row: number, key: string, value: string) {
+    setMessage("");
+    setGrid((g) => g.map((r, i) => (i === row ? { ...r, [key]: value } : r)));
+  }
+
+  function addRow() {
+    setGrid((g) => [...g, {}]);
+    focusCell(grid.length, 0);
+  }
+
+  function removeRow(row: number) {
+    setGrid((g) => (g.length === 1 ? emptyRows(1) : g.filter((_, i) => i !== row)));
+    focusCell(Math.max(0, Math.min(row, grid.length - 2)), 0);
+  }
+
+  /** Las filas de un CSV o lo pegado entran a la tabla; con encabezado, las columnas opcionales se marcan solas. */
+  function load(table: string[][], at: { row: number; col: number }) {
+    const head = table[0]?.map((h) => h.trim().toLowerCase()) ?? [];
+    const hasHeader = head.includes("nombre") || head.includes("producto");
+    if (hasHeader && head.some((h) => h.startsWith("código") || h.startsWith("codigo") || h === "barcode")) setWithBarcode(true);
+    if (hasHeader && head.some((h) => h.startsWith("categor"))) setWithCategory(true);
+    // Con encabezado, cada columna va a la suya (también las opcionales, que se acaban de marcar); sin él, por posición.
+    const all = importColumns({ barcode: true, category: true, branches: options.branches });
+    const incoming = cellsToGrid(table, hasHeader ? all : columns, hasHeader ? 0 : at.col);
+    setMessage("");
+    setGrid((g) => {
+      const next = [...g];
+      incoming.forEach((cells, i) => (next[at.row + i] = { ...next[at.row + i], ...cells }));
+      return next.length > at.row + incoming.length ? next : [...next, {}];
+    });
+  }
+
   async function read(file?: File) {
-    reset();
+    setMessage("");
     if (!file) return;
     setFileName(file.name);
     if (file.size > 1_000_000) return setMessage("El archivo pesa más de 1 MB. Divídelo en partes.");
-    setText(await file.text());
+    const table = parseCsv(await file.text());
+    setGrid([]);
+    load(table, { row: 0, col: 0 });
+  }
+
+  // Pegar varias celdas (de Excel, Sheets o un CSV): se reparten desde la celda donde se pega, hacia la derecha y abajo.
+  function paste(event: ClipboardEvent<HTMLInputElement>, row: number, col: number) {
+    const text = event.clipboardData.getData("text/plain");
+    if (!/[\t\n;]/.test(text.trim())) return;
+    event.preventDefault();
+    load(parseCsv(text), { row, col });
+  }
+
+  // Flechas arriba/abajo y Enter: a la misma columna de la fila de al lado (Enter en la última agrega una).
+  function move(event: KeyboardEvent<HTMLInputElement>, row: number, col: number) {
+    if (event.key === "ArrowDown" || event.key === "Enter") {
+      event.preventDefault();
+      if (row === grid.length - 1) setGrid((g) => [...g, {}]);
+      focusCell(row + 1, col);
+    } else if (event.key === "ArrowUp" && row > 0) {
+      event.preventDefault();
+      focusCell(row - 1, col);
+    }
   }
 
   async function submit() {
@@ -114,7 +186,7 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
   }
 
   const toggleBranch = (id: string, on: boolean) => setBranchIds((list) => (on ? [...list, id] : list.filter((b) => b !== id)));
-  const stockOf = (r: (typeof rows)[number]) => (r.stockByBranch ? chosen.map((b) => r.stockByBranch![b.id] ?? "—").join(" / ") : (r.stock ?? "—"));
+  const numeric = (key: string) => key !== "name" && key !== "category";
 
   return (
     <>
@@ -182,123 +254,132 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
             </fieldset>
           )}
 
-          {/* Celular: el selector a todo el ancho (dos mitades de 44 px) y la plantilla debajo. */}
-          <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="grid grid-cols-2 rounded-full border p-0.5 sm:inline-grid" role="group" aria-label="Cómo cargarlos">
-              {([
-                ["paste", "Pegar o escribir", ClipboardPaste],
-                ["file", "Subir archivo", FileUp],
-              ] as const).map(([value, label, Icon]) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={source === value}
-                  onClick={() => {
-                    setSource(value);
-                    reset();
-                  }}
-                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold whitespace-nowrap text-[var(--color-text-muted)] aria-pressed:bg-[var(--color-text)] aria-pressed:text-[var(--color-surface)] sm:min-h-9"
-                >
-                  <Icon className="size-4" aria-hidden="true" />
-                  {label}
-                </button>
-              ))}
-            </div>
-            <Button variant="ghost" type="button" className="max-sm:h-11 max-sm:border max-sm:bg-[var(--color-surface)]" onClick={() => downloadTemplate(options)}>
-              <Download />
-              Descargar plantilla
-            </Button>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            <span className="font-semibold">Columnas opcionales:</span>
+            <label className="inline-flex min-h-11 items-center gap-2 sm:min-h-0">
+              <input type="checkbox" className="size-5 accent-[var(--color-primary)]" checked={withBarcode} onChange={(e) => setWithBarcode(e.target.checked)} />
+              Código de barras
+            </label>
+            <label className="inline-flex min-h-11 items-center gap-2 sm:min-h-0">
+              <input type="checkbox" className="size-5 accent-[var(--color-primary)]" checked={withCategory} onChange={(e) => setWithCategory(e.target.checked)} />
+              Categoría
+            </label>
           </div>
 
-          <div className="grid min-w-0 gap-2 rounded-lg bg-[var(--color-surface-muted)] p-3 text-sm">
-            <p className="m-0 font-semibold">Columnas, en este orden</p>
-            <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label="Orden de las columnas">
-              {columns.map((c, i) => (
-                <li key={c.key} className="rounded-full bg-[var(--color-surface)] px-2.5 py-0.5 text-xs font-semibold">
-                  <span className="num text-[var(--color-text-muted)]">{i + 1}.</span> {c.label}
-                </li>
-              ))}
-            </ol>
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              <label className="inline-flex min-h-11 items-center gap-2 sm:min-h-0">
-                <input type="checkbox" className="size-5 accent-[var(--color-primary)]" checked={withBarcode} onChange={(e) => setWithBarcode(e.target.checked)} />
-                Con código de barras
-              </label>
-              <label className="inline-flex min-h-11 items-center gap-2 sm:min-h-0">
-                <input type="checkbox" className="size-5 accent-[var(--color-primary)]" checked={withCategory} onChange={(e) => setWithCategory(e.target.checked)} />
-                Con categoría
-              </label>
-            </div>
-            <p className="field-hint m-0">
-              Las columnas vacías del final se pueden omitir. Si la primera fila trae encabezados (como la plantilla), las columnas se leen por su nombre, en
-              cualquier orden.
+          <div className="grid min-w-0 gap-2">
+            <p id="import-grid-hint" className="field-hint m-0">
+              Escribe un producto por fila, o pega celdas copiadas de Excel o Google Sheets en la primera casilla: se reparten solas. Solo el nombre es
+              obligatorio; sin precio se cobra al vender y sin stock no se controla. Enter o las flechas pasan de fila.
             </p>
+            <div className="max-h-[22rem] overflow-auto rounded-lg border">
+              <table ref={tableRef} className="w-full min-w-[36rem] border-collapse text-left text-sm" aria-describedby="import-grid-hint">
+                <caption className="sr-only">Productos para importar: una fila por producto</caption>
+                <thead className="sticky top-0 z-10 bg-[var(--color-surface-muted)]">
+                  <tr>
+                    <th scope="col" className="w-10 px-2 py-2 text-center font-semibold text-[var(--color-text-muted)]">
+                      <span className="sr-only">Fila</span>#
+                    </th>
+                    {columns.map((c) => (
+                      <th key={c.key} scope="col" className={`px-2 py-2 font-semibold ${numeric(c.key) ? "text-right" : ""}`}>
+                        {headerOf(c.label)}
+                        {c.key === "name" && (
+                          <span aria-hidden="true" className="text-[var(--color-expense)]">
+                            {" "}*
+                          </span>
+                        )}
+                      </th>
+                    ))}
+                    <th scope="col" className="w-10 px-2 py-2">
+                      <span className="sr-only">Estado y quitar</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grid.map((row, ri) => {
+                    const problem = rowErrors.get(ri);
+                    const ok = filled.has(ri) && !problem;
+                    return (
+                      <tr key={ri} className={`border-t ${problem ? "bg-[var(--color-warning-soft)]" : ""}`}>
+                        <th scope="row" className="num px-2 text-center font-normal text-[var(--color-text-muted)]">
+                          {ri + 1}
+                        </th>
+                        {columns.map((c, ci) => (
+                          <td key={c.key} className="p-1">
+                            <input
+                              data-cell={`${ri}:${ci}`}
+                              className={`input h-10 min-w-0 px-2 text-base ${numeric(c.key) ? "num text-right" : ""} ${c.key === "name" ? "min-w-40" : "min-w-24"}`}
+                              inputMode={c.key === "price" ? "decimal" : numeric(c.key) ? "numeric" : undefined}
+                              aria-label={`${headerOf(c.label)}, fila ${ri + 1}`}
+                              aria-invalid={problem ? true : undefined}
+                              aria-describedby={problem ? `import-row-${ri}-error` : undefined}
+                              placeholder={ri === 0 && examples[ci] ? `Ej.: ${examples[ci]}` : undefined}
+                              value={row[c.key] ?? ""}
+                              onChange={(e) => setCell(ri, c.key, e.target.value)}
+                              onPaste={(e) => paste(e, ri, ci)}
+                              onKeyDown={(e) => move(e, ri, ci)}
+                            />
+                          </td>
+                        ))}
+                        <td className="px-1">
+                          <div className="flex items-center justify-end gap-1">
+                            {ok && <CircleCheck className="size-4 text-[var(--color-income)]" aria-label={`Fila ${ri + 1} lista`} />}
+                            {problem && <TriangleAlert className="size-4 text-[var(--color-warning)]" aria-hidden="true" />}
+                            <button
+                              type="button"
+                              className="icon-btn size-9"
+                              aria-label={`Quitar la fila ${ri + 1}`}
+                              onClick={() => removeRow(ri)}
+                            >
+                              <Trash2 className="size-4" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {grid.map((_, ri) =>
+              rowErrors.has(ri) ? (
+                <p key={ri} id={`import-row-${ri}-error`} className="sr-only">
+                  {rowErrors.get(ri)}
+                </p>
+              ) : null,
+            )}
+            <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <Button variant="outline" type="button" className="h-11" onClick={addRow}>
+                <Plus />
+                Agregar fila
+              </Button>
+              <div className="sm:ml-auto sm:min-w-64">
+                <FilePicker
+                  id="import-file"
+                  accept=".csv,text/csv"
+                  icon={<FileUp />}
+                  label="Subir un CSV"
+                  hint="Se carga en la tabla para revisarlo."
+                  fileName={fileName}
+                  onChange={(e) => read(e.target.files?.[0])}
+                />
+              </div>
+              <Button variant="ghost" type="button" className="max-sm:h-11 max-sm:border max-sm:bg-[var(--color-surface)]" onClick={() => downloadTemplate(options)}>
+                <Download />
+                Plantilla CSV
+              </Button>
+            </div>
           </div>
-
-          {source === "paste" ? (
-            <Field id="import-paste" label="Filas" hint="Una fila por línea y las columnas separadas con punto y coma (;). También puedes pegar filas copiadas de Excel o Google Sheets.">
-              <textarea
-                id="import-paste"
-                className="input min-h-36 font-mono text-base"
-                rows={6}
-                spellCheck={false}
-                value={text}
-                placeholder={placeholder}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  setMessage("");
-                }}
-              />
-            </Field>
-          ) : (
-            <Field id="import-file" label="Archivo CSV">
-              <FilePicker
-                id="import-file"
-                accept=".csv,text/csv"
-                icon={<FileUp />}
-                label="Elegir archivo CSV"
-                hint="Desde Excel: Guardar como › CSV."
-                fileName={fileName}
-                onChange={(e) => read(e.target.files?.[0])}
-              />
-            </Field>
-          )}
 
           <div aria-live="polite" className="grid min-w-0 gap-3 text-sm">
-            {rows.length > 0 && (
-              <div className="grid min-w-0 gap-2">
-                <p className="m-0">
-                  <strong>{rows.length}</strong> {rows.length === 1 ? "producto listo" : "productos listos"} para importar
-                  {rows.length > SHOWN_ROWS ? `. Los primeros ${SHOWN_ROWS}:` : ":"}
-                </p>
-                <p className="m-0 text-xs text-[var(--color-text-muted)] sm:hidden">Desliza la tabla para ver todas las columnas.</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[26rem] text-left">
-                    <thead className="text-[var(--color-text-muted)]">
-                      <tr className="border-b">
-                        <th className="py-1.5 pr-3 font-semibold">Nombre</th>
-                        {withBarcode && <th className="py-1.5 pr-3 font-semibold">Código</th>}
-                        {withCategory && <th className="py-1.5 pr-3 font-semibold">Categoría</th>}
-                        <th className="py-1.5 pr-3 text-right font-semibold">Precio</th>
-                        <th className="py-1.5 text-right font-semibold">{perBranch ? `Stock (${chosen.map((b) => b.name).join(" / ")})` : "Stock"}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.slice(0, SHOWN_ROWS).map((r, i) => (
-                        <tr key={i}>
-                          <td className="max-w-48 truncate py-1.5 pr-3">{r.name}</td>
-                          {withBarcode && <td className="num py-1.5 pr-3">{r.barcode ?? "—"}</td>}
-                          {withCategory && <td className="py-1.5 pr-3 text-[var(--color-text-muted)]">{r.category ?? "—"}</td>}
-                          <td className="num py-1.5 pr-3 text-right">{r.price === undefined ? "Al vender" : formatBs(r.price)}</td>
-                          <td className="num py-1.5 text-right">{stockOf(r)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {rows.length > SHOWN_ROWS && <p className="m-0 text-[var(--color-text-muted)]">Y {rows.length - SHOWN_ROWS} más.</p>}
-              </div>
-            )}
+            <p className="m-0">
+              {rows.length ? (
+                <>
+                  <strong>{rows.length}</strong> {rows.length === 1 ? "producto listo" : "productos listos"} para importar.
+                </>
+              ) : (
+                "Todavía no hay productos listos."
+              )}
+            </p>
             {chosen.length > 1 && stockMode === "same" && hasStock && (
               <p className="notice m-0 flex gap-2 bg-[var(--color-warning-soft)] text-[var(--color-warning)]">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
