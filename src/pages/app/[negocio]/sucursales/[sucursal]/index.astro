@@ -5,6 +5,7 @@ import ShiftChip from "@/components/ShiftChip.astro";
 import DonutChart from "@/components/app/charts/DonutChart";
 import WeekChart from "@/components/app/charts/WeekChart";
 import MovementsTable from "@/components/app/MovementsTable";
+import LiveStatus from "@/components/app/LiveStatus.astro";
 import Layout from "@/layouts/Layout.astro";
 import { branchColor, branchContext, headerBackdrop, shiftBarData, branchHref, isLowStock, orderLabels, receiptUrls } from "@/data/queries";
 import { differenceLabel, formatBs, plural, shiftHours } from "@/lib/format";
@@ -62,26 +63,33 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
     </span>
   </PageHeader>
 
-  <section class="kpis" aria-label="Totales de hoy">
+  <LiveStatus
+    topic={`negocio:${ctx.business.id}`}
+    names={{ [branch.id]: branch.name }}
+    branch={branch.id}
+    regions={["shift-bar", "kpis", "shifts", "charts", "activity"]}
+  />
+
+  <section class="kpis" aria-label="Totales de hoy" data-region="kpis">
     <div class="kpi">
       <p class="kpi-label">Ventas</p>
-      <p class="kpi-value num amount-income">{formatBs(salesTotal, "+")}</p>
+      <p class="kpi-value num amount-income" data-live="sales" data-amount={salesTotal} data-sign="+">{formatBs(salesTotal, "+")}</p>
       <p class="kpi-note">{plural(sales.length, "venta", "ventas")}</p>
     </div>
     <div class="kpi">
       <p class="kpi-label">Gastos</p>
-      <p class="kpi-value num amount-expense">{formatBs(expensesTotal, "−")}</p>
+      <p class="kpi-value num amount-expense" data-live="expenses" data-amount={expensesTotal} data-sign="−">{formatBs(expensesTotal, "−")}</p>
       <p class="kpi-note">{plural(expenses.length, "gasto", "gastos")}</p>
     </div>
     <div class="kpi">
       <p class="kpi-label">Saldo del día</p>
-      <p class:list={["kpi-value num", { "amount-expense": balance < 0 }]}>{formatBs(balance)}</p>
+      <p class:list={["kpi-value num", { "amount-expense": balance < 0 }]} data-live="balance" data-amount={balance}>{formatBs(balance)}</p>
       <p class="kpi-note">Ventas menos gastos</p>
     </div>
   </section>
 
   <h2 class="section-title" id="shifts-title">Caja por turno</h2>
-  <section class="shift-grid" aria-labelledby="shifts-title">
+  <section class="shift-grid" aria-labelledby="shifts-title" data-region="shifts">
     {
       shifts.map((shift) => {
         const t = shiftTotals(shift.id);
@@ -97,15 +105,15 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
             <dl class="rows">
               <div>
                 <dt>Ventas</dt>
-                <dd class="num amount-income">{formatBs(t.sales, "+")}</dd>
+                <dd class="num amount-income" data-live={`sales-${shift.id}`} data-amount={t.sales} data-sign="+">{formatBs(t.sales, "+")}</dd>
               </div>
               <div>
                 <dt>Gastos</dt>
-                <dd class="num amount-expense">{formatBs(t.expenses, "−")}</dd>
+                <dd class="num amount-expense" data-live={`expenses-${shift.id}`} data-amount={t.expenses} data-sign="−">{formatBs(t.expenses, "−")}</dd>
               </div>
               <div>
                 <dt>Esperado en caja</dt>
-                <dd class="num">{formatBs(t.expected)}</dd>
+                <dd class="num" data-live={`expected-${shift.id}`} data-amount={t.expected}>{formatBs(t.expected)}</dd>
               </div>
             </dl>
             {t.close.status === "pendiente" ? (
@@ -135,7 +143,7 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
     }
   </section>
 
-  <div class="chart-grid">
+  <div class="chart-grid" data-region="charts">
     <section class="card chart-card" aria-labelledby="week-title">
       <div class="chart-head">
         <h2 id="week-title" class="card-title">Últimos 7 días</h2>
@@ -152,7 +160,7 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
     </section>
   </div>
 
-  <div class="split">
+  <div class="split" data-region="activity">
     <section>
       <div class="shelf-head">
         <h2>Movimientos de hoy</h2>
