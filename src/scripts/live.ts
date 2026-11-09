@@ -13,6 +13,8 @@ interface Options {
   regions: string[];
   /** id de sucursal → nombre, para el anuncio. */
   names: Record<string, string>;
+  /** Solo los avisos de esta sucursal (el canal es del negocio entero). */
+  branch?: string;
   /** Cambió el estado de la conexión o se actualizó la página. */
   onStatus: (status: LiveStatus) => void;
   /** Texto para aria-live, ya agrupado. */
@@ -22,7 +24,7 @@ interface Options {
   afterRefresh?: () => void;
 }
 
-const WAIT = 1500;
+const WAIT = 1000;
 const POLL = 60_000;
 const CONNECT_TIMEOUT = 10_000;
 
@@ -42,8 +44,14 @@ export function watchLive(o: Options) {
 
   const status = () => o.onStatus({ live, updatedAt });
 
-  const refresh = async (text = "") => {
-    if (busy) return;
+  // Un aviso que llega mientras se actualiza no se pierde: al terminar se actualiza otra vez (la página que se pidió
+  // pudo armarse antes de ese cambio).
+  let again = "";
+  const refresh = async (text = ""): Promise<void> => {
+    if (busy) {
+      again = text || again || " ";
+      return;
+    }
     busy = true;
     try {
       o.beforeRefresh?.();
@@ -54,6 +62,11 @@ export function watchLive(o: Options) {
     } finally {
       busy = false;
       status();
+    }
+    if (again) {
+      const next = again.trim();
+      again = "";
+      return refresh(next);
     }
   };
 
@@ -103,6 +116,7 @@ export function watchLive(o: Options) {
     await client.setAuth();
     const channel = client.channel(o.topic, { config: { private: true } });
     channel.on("broadcast", { event: "*" }, ({ event, payload }) => {
+      if (o.branch && payload?.branch !== o.branch) return;
       batch.push({ table: event, op: String(payload?.op ?? ""), branch: String(payload?.branch ?? "") });
     });
     const timeout = setTimeout(() => setLive(false), CONNECT_TIMEOUT);
