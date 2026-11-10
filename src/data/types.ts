@@ -56,6 +56,8 @@ export interface Shift {
   // Si es menor que start, el turno termina al día siguiente.
   end: string;
   tone: ShiftTone;
+  /** Días ISO (1 = lunes … 7 = domingo) en que trabaja; null = todos. */
+  weekdays: number[] | null;
   /** Turno quitado: ya no se usa, pero las ventas viejas lo siguen nombrando. */
   archived?: boolean;
 }

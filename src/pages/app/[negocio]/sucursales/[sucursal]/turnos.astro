@@ -1,6 +1,7 @@
 ---
-import { CircleCheck, Hourglass, LockOpen, MessageSquareText, Pencil, Plus, RotateCcw, Trash, TriangleAlert } from "@lucide/astro";
+import { CalendarX2, CircleCheck, Hourglass, LockOpen, MessageSquareText, Pencil, Plus, RotateCcw, Trash, TriangleAlert } from "@lucide/astro";
 import Avatar from "@/components/Avatar.astro";
+import ClosuresCalendar from "@/components/app/ClosuresCalendar";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import FormInput from "@/components/app/FormInput.astro";
@@ -10,11 +11,12 @@ import Layout from "@/layouts/Layout.astro";
 import { branchColor, branchContext, businessHref, closesBetween, shiftBarData, fullName } from "@/data/queries";
 import { differenceLabel, formatBs, overnight, shiftHours } from "@/lib/format";
 import { addDays, inShiftWindow, longDate, openFrom, parseRange, shortDate, stamp } from "@/lib/dates";
+import { DAY_NAMES } from "@/lib/schedule";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx) return Astro.rewrite("/404");
-const { branch, currentShift, employees, lastCount, reopenPending, role, shiftById, shiftTotals, shifts, today } = ctx;
+const { branch, closedNow, closures, currentShift, employees, hours, lastCount, reopenPending, role, shiftById, shiftTotals, shifts, today } = ctx;
 const isOwner = role === "dueño";
 // El turno de quien trabaja aquí: solo ese puede abrir (la base lo exige, private.check_shift_schedule).
 const myShiftId = ctx.membership.employee?.shiftId;
@@ -31,6 +33,10 @@ const tones = [
   { value: "afternoon", label: "Tarde" },
   { value: "night", label: "Noche" },
 ];
+const DAYS = DAY_NAMES.map((d, i) => ({ dow: i + 1, short: "LMXJVSD"[i], long: d.replace(/s$/, "") }));
+/** «Lun a vie», «Lun, mié, vie» o null si son todos los días. */
+const daysLabel = (weekdays: number[] | null) =>
+  !weekdays ? null : weekdays.map((d) => DAY_NAMES[d - 1].slice(0, 3)).join(", ").replace(/^./, (c) => c.toUpperCase());
 ---
 
 <Layout title={`Turnos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
@@ -64,6 +70,8 @@ const tones = [
         // Fuera de horario la empleada ve el formulario igual: la base lo rechaza (check_shift_schedule) y el error sale en un aviso flotante. La dueña lo abre confirmándolo.
         const onSchedule = inShiftWindow(shift);
         const schedule = `${openFrom(shift)} a ${shift.end}`;
+        // Días hábiles (horario semanal, días del turno y cierres): la empleada no lo abre; la dueña lo confirma.
+        const closed = closedNow(shift);
         return (
           <article class:list={["card shift", { live: t.close.status === "en-curso" }]} aria-labelledby={`shift-${shift.id}-title`}>
             <header class="shift-head">
@@ -71,6 +79,7 @@ const tones = [
               <ShiftChip shift={shift} />
               <span class="hours num">
                 {shiftHours(shift, true)}
+                {daysLabel(shift.weekdays) && <span> · {daysLabel(shift.weekdays)}</span>}
               </span>
               {t.close.status === "en-curso" && (
                 <span class="live-label">
@@ -79,7 +88,7 @@ const tones = [
                 </span>
               )}
               {t.close.status === "cerrado" && <span class="chip chip-neutral">Cerrado</span>}
-              {t.close.status === "pendiente" && <span class="chip chip-neutral">Sin abrir hoy</span>}
+              {t.close.status === "pendiente" && <span class="chip chip-neutral">{closed ? "Hoy no abre" : "Sin abrir hoy"}</span>}
               {isOwner && (
                 <button type="button" class="icon-btn" data-open-dialog={`shift-${shift.id}`} aria-label={`Editar turno ${shift.name}`}>
                   <Pencil size={16} stroke-width={1.75} />
@@ -151,6 +160,11 @@ const tones = [
             {t.close.status === "pendiente" &&
               (currentShift ? (
                 <p class="muted">Cierra el turno {currentShift.name.toLowerCase()} antes de abrir este.</p>
+              ) : closed && !isOwner ? (
+                <p class="status chip-neutral">
+                  <CalendarX2 size={16} stroke-width={2} />
+                  <span>{closed}. Hoy no se abre.</span>
+                </p>
               ) : !isOwner && shift.id !== myShiftId ? (
                 <p class="status chip-neutral">
                   <LockOpen size={16} stroke-width={2} />
@@ -169,13 +183,14 @@ const tones = [
                             ? `Vas a abrir el turno ${shift.name.toLowerCase()} a tu nombre, en lugar de ${staff.map((e) => e.firstName).join(", ").replace(/, ([^,]*)$/, " y $1")}.`
                             : `Vas a abrir el turno ${shift.name.toLowerCase()} a tu nombre.`,
                           !onSchedule && `Estás fuera de su horario (se abre de ${schedule}).`,
+                          closed && `Hoy no es día hábil (${closed.charAt(0).toLowerCase() + closed.slice(1)}).`,
                           "Las ventas y los gastos que se registren contarán en este turno. ¿Abrirlo?",
                         ]
                           .filter(Boolean)
                           .join(" ")
                       : undefined
                   }
-                  data-confirm-label={onSchedule ? "Abrir turno" : "Abrir fuera de horario"}
+                  data-confirm-label={onSchedule && !closed ? "Abrir turno" : "Abrir fuera de horario"}
                   novalidate
                 >
                   <input type="hidden" name="branchId" value={branch.id} />
@@ -190,6 +205,7 @@ const tones = [
                     label="Dinero en caja al abrir (Bs)"
                     value={lastCount ? String(lastCount.counted) : undefined}
                     hint={[
+                      closed && `${closed}.`,
                       !onSchedule && !isOwner && `Se abre de ${schedule}.`,
                       lastCount && `Lo contado al cerrar ${lastCount.shiftName ? `el turno ${lastCount.shiftName.toLowerCase()}` : "el último turno"}. Cámbialo si no es lo que hay.`,
                       overnight(shift) && "Lo que vendas pasada la medianoche cuenta para hoy.",
@@ -289,6 +305,60 @@ const tones = [
         );
       })
     }
+  </section>
+
+  <section class="days" aria-labelledby="days-title" data-region="calendar">
+    <h2 class="section-title" id="days-title">Días y horario</h2>
+    <p class="muted">Los días que no se trabaja, no se abre la caja ni llegan avisos para abrir el turno.</p>
+
+    <div class="card week">
+      <h3 class="label">Horario de la semana</h3>
+      {
+        isOwner ? (
+          <form id="branch-hours" class="week-form" data-action="saveBranchHours" data-success="Horario guardado" novalidate>
+            <input type="hidden" name="branchId" value={branch.id} />
+            {DAYS.map((d) => {
+              const h = hours.find((x) => x.dow === d.dow);
+              return (
+                <fieldset class="week-day">
+                  <legend class="sr-only">{d.long}</legend>
+                  <label class="opens">
+                    <input type="checkbox" name="opens" value={d.dow} checked={!h || h.open !== null} />
+                    <span>{d.long}</span>
+                  </label>
+                  <label class="time">
+                    <span class="sr-only">{d.long}: abre a las</span>
+                    <input class="input" type="time" name="open" value={h?.open ?? ""} />
+                  </label>
+                  <span class="muted" aria-hidden="true">a</span>
+                  <label class="time">
+                    <span class="sr-only">{d.long}: cierra a las</span>
+                    <input class="input" type="time" name="close" value={h?.close ?? ""} />
+                  </label>
+                </fieldset>
+              );
+            })}
+            <p class="field-hint">Desmarca los días que no abre. Sin horas, abre todo el día. Un turno no abre si empieza fuera de ese horario.</p>
+            <p class="notice notice-error" role="alert" data-form-notice />
+            <button type="submit" class="btn btn-secondary">Guardar horario</button>
+          </form>
+        ) : (
+          <dl class="week-list">
+            {DAYS.map((d) => {
+              const h = hours.find((x) => x.dow === d.dow);
+              return (
+                <div>
+                  <dt>{d.long}</dt>
+                  <dd class="num">{!h ? "Todo el día" : h.open === null ? "Cerrado" : `${h.open} a ${h.close}`}</dd>
+                </div>
+              );
+            })}
+          </dl>
+        )
+      }
+    </div>
+
+    <ClosuresCalendar client:load branchId={branch.id} today={today} isOwner={isOwner} shifts={shifts} hours={hours} closures={closures} />
   </section>
 
   <section class="history" aria-labelledby="history-title">
@@ -416,6 +486,19 @@ const tones = [
               hint="Define el color y el ícono del turno."
               options={tones.map((t) => ({ ...t, selected: t.value === (shift?.tone ?? "morning") }))}
             />
+            <fieldset class="field weekdays">
+              <legend class="field-label">Días que trabaja</legend>
+              <div class="weekday-row">
+                {DAYS.map((d) => (
+                  <label class="weekday" title={d.long}>
+                    <input type="checkbox" name="weekdays" value={d.dow} form={`${id}-form`} checked={!shift?.weekdays || shift.weekdays.includes(d.dow)} aria-label={d.long} />
+                    <span aria-hidden="true">{d.short}</span>
+                  </label>
+                ))}
+              </div>
+              <p class="field-hint">Desmarca los días que este turno no abre (por ejemplo, la tarde del sábado).</p>
+              <p class="field-error" id={`${id}-form-weekdays-error`} />
+            </fieldset>
             {shift && (
               <form
                 slot="after"
@@ -443,6 +526,109 @@ const tones = [
 </Layout>
 
 <style>
+  .days {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .week {
+    padding: 1.25rem;
+  }
+
+  .week-form {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .week-day {
+    display: grid;
+    grid-template-columns: minmax(7rem, 1fr) minmax(0, 8rem) auto minmax(0, 8rem);
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .opens {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    gap: 0.75rem;
+    text-transform: capitalize;
+  }
+
+  .opens input,
+  .weekday input {
+    width: 1.25rem;
+    height: 1.25rem;
+    accent-color: var(--color-primary);
+  }
+
+  /* Día cerrado: las horas no cuentan (se ven atenuadas, el texto del día dice si abre por la casilla). */
+  .week-day:has(.opens input:not(:checked)) .time {
+    opacity: 0.45;
+  }
+
+  .week-form .btn {
+    justify-self: start;
+  }
+
+  .week-list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .week-list div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .week-list dt {
+    color: var(--color-text-muted);
+    text-transform: capitalize;
+  }
+
+  .week-list dd {
+    margin: 0;
+  }
+
+  .weekdays {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .weekday-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .weekday {
+    display: grid;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    place-items: center;
+    gap: 0.125rem;
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  @media (max-width: 480px) {
+    .week-day {
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    }
+
+    .opens {
+      grid-column: 1 / -1;
+    }
+  }
+
   .history {
     margin-top: 2rem;
   }

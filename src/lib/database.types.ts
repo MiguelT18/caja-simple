@@ -43,6 +43,78 @@ export type Database = {
         };
         Relationships: [];
       };
+      branch_closures: {
+        Row: {
+          branch_id: string;
+          created_at: string;
+          day: string;
+          end_time: string | null;
+          id: string;
+          note: string | null;
+          shift_ids: string[] | null;
+          start_time: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          branch_id: string;
+          created_at?: string;
+          day: string;
+          end_time?: string | null;
+          id?: string;
+          note?: string | null;
+          shift_ids?: string[] | null;
+          start_time?: string | null;
+        };
+        Update: {
+          branch_id?: string;
+          created_at?: string;
+          day?: string;
+          end_time?: string | null;
+          id?: string;
+          note?: string | null;
+          shift_ids?: string[] | null;
+          start_time?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "branch_closures_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      branch_hours: {
+        Row: {
+          branch_id: string;
+          close_time: string | null;
+          dow: number;
+          open_time: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          branch_id: string;
+          close_time?: string | null;
+          dow: number;
+          open_time?: string | null;
+        };
+        Update: {
+          branch_id?: string;
+          close_time?: string | null;
+          dow?: number;
+          open_time?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "branch_hours_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       branches: {
         Row: {
           address: string;
@@ -1249,6 +1321,7 @@ export type Database = {
           name: string;
           start_time: string;
           tone: Database["public"]["Enums"]["shift_tone"];
+          weekdays: number[] | null;
         };
         ComputedFields: never;
         Insert: {
@@ -1260,6 +1333,7 @@ export type Database = {
           name: string;
           start_time: string;
           tone: Database["public"]["Enums"]["shift_tone"];
+          weekdays?: number[] | null;
         };
         Update: {
           archived_at?: string | null;
@@ -1270,6 +1344,7 @@ export type Database = {
           name?: string;
           start_time?: string;
           tone?: Database["public"]["Enums"]["shift_tone"];
+          weekdays?: number[] | null;
         };
         Relationships: [
           {

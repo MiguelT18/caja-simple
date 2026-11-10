@@ -32,7 +32,9 @@ erDiagram
 | Persona | — | nombre, correo, foto. Es la cuenta: un solo acceso para todos sus negocios. Se edita en `/app/cuenta`. |
 | Negocio | su dueña (Persona) | nombre, slug, plan (Gratis / Negocio / Sucursales), descripción (obligatoria al crear; los de antes la agregan al volver a guardar), en Buscar (`listed`, apagado por defecto). |
 | Sucursal | Negocio | nombre, slug, dirección. |
-| Turno | Sucursal | nombre, inicio, fin, tono (mañana / tarde / noche), archivado. Cada sucursal define los suyos. Si el fin es menor que el inicio, termina al día siguiente. |
+| Turno | Sucursal | nombre, inicio, fin, tono (mañana / tarde / noche), días de la semana (`weekdays`, null = todos), archivado. Cada sucursal define los suyos. Si el fin es menor que el inicio, termina al día siguiente. |
+| Horario semanal | Sucursal | día ISO, abre, cierra (`branch_hours`). Sin fila: abre todo el día; con las horas vacías: ese día no abre. |
+| Cierre de fecha | Sucursal | día, y todo el día, un rango de horas o algunos turnos; motivo (`branch_closures`). Para feriados. |
 | Producto | Negocio | nombre, categoría, código de barras, imagen. Es el **catálogo del negocio**: se define una sola vez. |
 | Categoría | Negocio | nombre. Agrupa los productos del catálogo. |
 | Promoción | Negocio | `promotions` con sus productos en `promotion_products`. Tres tipos (`kind`): `percent` (un % menos), `price` (precio especial por unidad) y `bundle` (lleva `buy`, paga `pay`). Vale en `branch_ids` (null = todas), los días ISO de `weekdays` (null = todos) y entre `starts_on` y `ends_on` (null = sin límite); `active` la pausa. La ve todo el negocio; la escribe la dueña, solo en planes pagos (trigger `promotions_check_plan`), con `save_promotion`, que guarda la promoción y sus productos en una sola transacción. Se administra en `/app/[negocio]/promociones`. |
@@ -50,6 +52,7 @@ erDiagram
 ## Reglas
 
 - El producto es del negocio; el precio, el stock y el mínimo son de cada sucursal.
+- **Días hábiles:** un turno no abre el día D (fecha de caja) si hay un cierre ese día que lo alcanza (todo el día, su hora de inicio cae en el rango, o está entre los turnos elegidos), si su hora de inicio cae fuera del horario semanal de ese día (o ese día no abre), o si su `weekdays` no incluye ese día. Se compara la hora de **inicio**, no la superposición. `private.shift_closed_reason` da el motivo; `check_shift_schedule` lo exige a la empleada (la dueña abre igual, confirmándolo en Turnos) y `shift_reminders` no manda recordatorios ni «sin abrir» ese día. `closedReason()` en `src/lib/schedule.ts` repite la cuenta para la pantalla. Se editan en Turnos › Días y horario (`saveBranchHours`, `addClosure`, `deleteClosure`); solo la dueña (RLS).
 - Los turnos son de cada sucursal: dos sucursales del mismo negocio pueden tener horarios distintos. Se eligen al crear el negocio o la sucursal (los tres de siempre, o una copia de otra sucursal) y se editan en Turnos.
 - Un turno no se borra: se archiva (`archived_at`), así las ventas viejas siguen mostrando su nombre. La sucursal conserva al menos un turno activo.
 - Un turno tiene a lo sumo un cierre en curso, y una sucursal a lo sumo una caja abierta: el turno siguiente no se abre (ni se reabre otro) hasta cerrar el que sigue en curso, tampoco la dueña (`private.one_open_per_branch` y el índice `shift_closes_one_open_per_branch_idx`). Lo vendido pasada la medianoche en un turno nocturno cuenta para el día en que se abrió el turno (`business_date` del cierre).

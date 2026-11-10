@@ -6,6 +6,12 @@ import { movements } from "@/data/shared";
 import { formatBs } from "@/lib/format";
 import { check, db, money, name, optional, time, tone, uuid } from "./shared";
 
+/** Días ISO marcados en el formulario; los 7 (o ninguno marcado: el formulario lo impide) = null, todos los días. */
+const weekdays = z
+  .array(z.coerce.number().int().min(1).max(7))
+  .min(1, "Elige al menos un día")
+  .transform((d) => (new Set(d).size >= 7 ? null : [...new Set(d)].sort()));
+
 const note = optional.pipe(z.string().max(300, "Máximo 300 caracteres").optional());
 
 export const shifts = {
@@ -18,14 +24,88 @@ export const shifts = {
       start: time,
       end: time,
       tone,
+      weekdays,
     }).refine((s) => s.start !== s.end, { message: "La hora de fin no puede ser igual a la de inicio", path: ["end"] }),
-    handler: async ({ branchId, id, name, start, end, tone }, context) => {
+    handler: async ({ branchId, id, name, start, end, tone, weekdays }, context) => {
       const sb = db(context);
-      const fields = { name, start_time: start, end_time: end, tone };
+      const fields = { name, start_time: start, end_time: end, tone, weekdays };
       const { error } = id
         ? await sb.from("shifts").update(fields).eq("id", id).select("id").single()
         : await sb.from("shifts").insert({ branch_id: branchId, ...fields }).select("id").single();
       check(error, `Ya hay un turno llamado «${name}» en esta sucursal.`);
+      return { ok: true };
+    },
+  }),
+
+  /**
+   * Horario semanal de la sucursal: una fila por día. «opens» trae los días que abre; un día que abre sin horas abre
+   * todo el día (sin fila). Reemplaza el horario entero.
+   */
+  saveBranchHours: defineAction({
+    accept: "form",
+    input: z
+      .object({
+        branchId: uuid,
+        opens: z.array(z.coerce.number().int().min(1).max(7)).default([]),
+        open: z.array(z.string().nullish()).length(7),
+        close: z.array(z.string().nullish()).length(7),
+      })
+      .transform(({ branchId, opens, open, close }, ctx) => {
+        const rows = [];
+        for (let i = 0; i < 7; i++) {
+          const dow = i + 1;
+          const from = open[i] || null;
+          const to = close[i] || null;
+          if (!opens.includes(dow)) rows.push({ branch_id: branchId, dow, open_time: null, close_time: null });
+          else if (from || to) {
+            if (!from || !to || !/^\d{2}:\d{2}$/.test(from) || !/^\d{2}:\d{2}$/.test(to) || to <= from) {
+              ctx.addIssue({ code: "custom", message: "La hora de cierre tiene que ser después de la de apertura", path: ["close"] });
+              return z.NEVER;
+            }
+            rows.push({ branch_id: branchId, dow, open_time: from, close_time: to });
+          }
+        }
+        return { branchId, rows };
+      }),
+    handler: async ({ branchId, rows }, context) => {
+      const sb = db(context);
+      check((await sb.from("branch_hours").delete().eq("branch_id", branchId)).error);
+      if (rows.length) check((await sb.from("branch_hours").insert(rows)).error);
+      return { ok: true };
+    },
+  }),
+
+  /** Cierre de una fecha (feriado): todo el día, de tal hora a tal hora o solo algunos turnos. Solo la dueña (RLS). */
+  addClosure: defineAction({
+    input: z
+      .object({
+        branchId: uuid,
+        day: z.iso.date({ error: "Fecha no válida" }),
+        start: time.nullable().default(null),
+        end: time.nullable().default(null),
+        shiftIds: z.array(uuid).min(1, "Elige al menos un turno").nullable().default(null),
+        note: z.string().trim().max(80, "Máximo 80 caracteres").nullable().default(null),
+      })
+      .refine((c) => (c.start === null) === (c.end === null) && (c.start === null || c.end! > c.start), {
+        message: "La hora de fin tiene que ser después de la de inicio",
+        path: ["end"],
+      })
+      .refine((c) => c.start === null || c.shiftIds === null, { message: "Elige horas o turnos, no las dos cosas", path: ["shiftIds"] }),
+    handler: async ({ branchId, day, start, end, shiftIds, note }, context) => {
+      const { error } = await db(context)
+        .from("branch_closures")
+        .insert({ branch_id: branchId, day, start_time: start, end_time: end, shift_ids: shiftIds, note: note || null })
+        .select("id")
+        .single();
+      check(error);
+      return { ok: true };
+    },
+  }),
+
+  deleteClosure: defineAction({
+    input: z.object({ id: uuid }),
+    handler: async ({ id }, context) => {
+      check((await db(context).from("branch_closures").delete().eq("id", id).select("id").single()).error);
       return { ok: true };
     },
   }),

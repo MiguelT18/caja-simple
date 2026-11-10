@@ -1,6 +1,7 @@
 // Datos de una página de sucursal y de su barra del turno.
 import { businessVersion, cached } from "@/lib/cache";
-import { inShiftWindow, lastWeek, minutesUntilOpen, openFrom, today } from "@/lib/dates";
+import { addDays, inShiftWindow, lastWeek, minutesUntilOpen, openFrom, today } from "@/lib/dates";
+import { closedReason, shiftDate, type BranchHours, type Closure } from "@/lib/schedule";
 import { cents, comboStock, shiftCash, sum, totalsBy } from "./cash";
 import { COMBO_PARTS, EMPLOYEE_COLUMNS, fail, toCatalogProduct, toEmployee, toShift } from "./mappers";
 import { branchHref } from "./routes";
@@ -24,11 +25,22 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
       sb.from("shifts").select("*").eq("branch_id", branch.id).order("start_time"),
       sb.from("employees").select(EMPLOYEE_COLUMNS).eq("branch_id", branch.id).order("created_at"),
       sb.from("categories").select("id, name").eq("business_id", m.business.id).order("name"),
-    ]).then(([shifts, staff, categories]) => {
+      sb.from("branch_hours").select("dow, open_time, close_time").eq("branch_id", branch.id),
+      // Desde ayer: un turno nocturno abierto pasada la medianoche es del día anterior.
+      sb.from("branch_closures").select("*").eq("branch_id", branch.id).gte("day", addDays(day, -1)).order("day").order("created_at"),
+    ]).then(([shifts, staff, categories, hours, closures]) => {
       fail(shifts.error);
       fail(staff.error);
       fail(categories.error);
-      return { shifts: shifts.data ?? [], staff: staff.data ?? [], categories: categories.data ?? [] };
+      fail(hours.error);
+      fail(closures.error);
+      return {
+        shifts: shifts.data ?? [],
+        staff: staff.data ?? [],
+        categories: categories.data ?? [],
+        hours: hours.data ?? [],
+        closures: closures.data ?? [],
+      };
     });
   const [rows, inventory, [closes, moves], soldItems, history, previous, backdrop, reopenRows] = await Promise.all([
     cached(`br:${locals.userId}:${branch.id}`, 600, slow, () => [businessVersion(m.business.id)]),
@@ -71,6 +83,19 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
   for (const p of products) if (p.components) p.stock = comboStock(p.components, (id) => stockHere.get(id));
   const categories: Category[] = categoryRows.data ?? [];
   const staff = (staffRows.data ?? []).map(toEmployee);
+  const hhmm = (t: string | null) => t && t.slice(0, 5);
+  // `?? []`: lo guardado en la caché antes de los días hábiles no los trae.
+  const hours: BranchHours[] = (rows.hours ?? []).map((h) => ({ dow: h.dow, open: hhmm(h.open_time), close: hhmm(h.close_time) }));
+  const closures: Closure[] = (rows.closures ?? []).map((c) => ({
+    id: c.id,
+    day: c.day,
+    start: hhmm(c.start_time),
+    end: hhmm(c.end_time),
+    shiftIds: c.shift_ids,
+    note: c.note,
+  }));
+  /** Por qué el turno no trabaja si se abre ahora (días hábiles), o null. La base decide igual. */
+  const closedNow = (s: (typeof shifts)[number]) => closedReason(s, shiftDate(s), hours, closures);
 
   const sales = moves.sales.filter((s) => s.date === day);
   const expenses = moves.expenses.filter((g) => g.date === day);
@@ -143,6 +168,9 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
     branch,
     today: day,
     shifts,
+    hours,
+    closures,
+    closedNow,
     currentShift,
     products,
     categories,
@@ -177,7 +205,7 @@ export function shiftBarData(ctx: NonNullable<Awaited<ReturnType<typeof branchCo
     // se cerró hoy, se reabre (la dueña directo; la empleada lo pide y la dueña decide). Fuera de horario, desde cuándo.
     // La base decide igual (horario y turno propio): su error sale en un toast.
     const own = ctx.role !== "dueño" ? ctx.shifts.find((s) => s.id === ctx.membership.employee?.shiftId) : undefined;
-    const candidates = own ? [own] : ctx.shifts;
+    const candidates = (own ? [own] : ctx.shifts).filter((s) => !ctx.closedNow(s));
     const now = candidates.find((s) => inShiftWindow(s));
     if (!now) {
       const next = [...candidates].sort((a, b) => minutesUntilOpen(a) - minutesUntilOpen(b)).at(0);

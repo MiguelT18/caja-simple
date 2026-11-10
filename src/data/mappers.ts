@@ -37,6 +37,7 @@ export const toShift = (s: Row<"shifts">): Shift => ({
   start: s.start_time.slice(0, 5),
   end: s.end_time.slice(0, 5),
   tone: s.tone,
+  weekdays: s.weekdays,
   archived: s.archived_at !== null,
 });
 
