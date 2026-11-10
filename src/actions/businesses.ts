@@ -27,42 +27,49 @@ async function storePhotos(sb: ReturnType<typeof db>, slug: string, logo?: File,
 }
 
 /** Une las filas de «Tu equipo» y las valida antes de crear nada; los errores van al aviso del formulario. */
-export function invitesFrom(input: { inviteEmail: string[]; inviteJob: string[]; inviteShift: string[] }, shiftNames: string[]) {
+export function invitesFrom(
+  input: { invitePerson: string[]; invitePersonId: string[]; inviteJob: string[]; inviteShift: string[] },
+  shiftNames: string[],
+) {
   const fail = (message: string): never => {
     throw new ActionError({ code: "BAD_REQUEST", message });
   };
   const seen = new Set<string>();
-  return input.inviteEmail.map((raw, i) => {
-    const email = raw.toLowerCase();
+  return input.invitePerson.map((person, i) => {
+    // Elegida entre las sugerencias por su nombre: se invita por la cuenta. Si no, lo escrito tiene que ser un correo.
+    const personId = uuid.safeParse(input.invitePersonId[i]).success ? input.invitePersonId[i] : null;
+    const email = personId ? "" : person.toLowerCase();
     const job = input.inviteJob[i] ?? "";
     const shift = input.inviteShift[i] ?? "";
     const who = `Persona ${i + 1}`;
-    if (!z.email().safeParse(email).success) fail(`${who}: escribe su correo completo.`);
-    if (seen.has(email)) fail(`Invitaste dos veces a ${email}.`);
+    if (!personId && !z.email().safeParse(email).success) fail(`${who}: elígela de la lista o escribe su correo completo.`);
+    if (seen.has(personId ?? email)) fail(`Invitaste dos veces a ${person}.`);
     if (!job) fail(`${who}: escribe el puesto.`);
     if (job.length > 60) fail(`${who}: el puesto es muy largo (máximo 60 caracteres).`);
     if (!shiftNames.includes(shift)) fail(`${who}: elige uno de los turnos de la sucursal.`);
-    seen.add(email);
-    return { email, job, shift };
+    seen.add(personId ?? email);
+    return { personId, email, job, shift };
   });
 }
 
-// Como storePhotos: el negocio ya existe, una invitación que falla se vuelve a mandar desde Empleados.
+// Como storePhotos: el negocio ya existe, una invitación que falla se vuelve a mandar desde Empleados. Una por una:
+// la base rechaza algunas (invitarte a ti misma) y no tienen que arrastrar a las demás.
 // shortcut: el fallo solo queda en el log, no se avisa en la página (se redirige); si pasa seguido, devolverlo en la respuesta.
 async function inviteTeam(sb: ReturnType<typeof db>, slug: string, invites: ReturnType<typeof invitesFrom>) {
   if (!invites.length) return;
   const { data: business } = await sb.from("businesses").select("id, branches(id, shifts(id, name))").eq("slug", slug).single();
   const branch = business?.branches[0];
   if (!business || !branch) return;
-  const rows = invites.map((v) => ({
-    business_id: business.id,
-    branch_id: branch.id,
-    shift_id: branch.shifts.find((s) => s.name === v.shift)!.id,
-    email: v.email,
-    job_title: v.job,
-  }));
-  const { error } = await sb.from("employees").insert(rows);
-  if (error) console.error(JSON.stringify({ level: "error", source: "createBusiness.invites", code: error.code, message: error.message }));
+  for (const v of invites) {
+    const { error } = await sb.from("employees").insert({
+      business_id: business.id,
+      branch_id: branch.id,
+      shift_id: branch.shifts.find((s) => s.name === v.shift)!.id,
+      ...(v.personId ? { person_id: v.personId, email: "" } : { email: v.email }),
+      job_title: v.job,
+    });
+    if (error) console.error(JSON.stringify({ level: "error", source: "createBusiness.invites", code: error.code, message: error.message }));
+  }
 }
 
 export const businesses = {
@@ -77,8 +84,10 @@ export const businesses = {
       image: imageFile,
       branchImage: imageFile,
       ...shiftList,
-      // Equipo opcional del primer negocio: correo, puesto y el nombre del turno (los turnos aún no tienen id).
-      inviteEmail: z.array(z.string().trim()).max(10, "Invita hasta 10 personas por ahora; el resto, desde Empleados.").default([]),
+      // Equipo opcional del primer negocio: lo escrito (nombre o correo), la cuenta elegida entre las sugerencias, el
+      // puesto y el nombre del turno (los turnos aún no tienen id).
+      invitePerson: z.array(z.string().trim()).max(10, "Invita hasta 10 personas por ahora; el resto, desde Empleados.").default([]),
+      invitePersonId: z.array(z.string().trim()).default([]),
       inviteJob: z.array(z.string().trim()).default([]),
       inviteShift: z.array(z.string().trim()).default([]),
     }),

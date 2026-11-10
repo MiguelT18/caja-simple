@@ -6,6 +6,7 @@ import BusinessProfileFields from "./BusinessProfileFields.astro";
 import FormInput from "./FormInput.astro";
 import PhotoField from "./PhotoField.astro";
 import MediaCard from "./MediaCard.astro";
+import PeopleSuggest from "./PeopleSuggest.astro";
 import ShiftsEditor from "./ShiftsEditor.astro";
 import { businessKinds } from "@/data/kinds";
 import { defaultShifts } from "@/data/queries";
@@ -91,7 +92,7 @@ const next = ["Agrega tus productos con precio y stock", "Abre el primer turno y
           <span class="step-n" aria-hidden="true">3</span>
           <div>
             <h2 id="step-team">Tu equipo <span class="optional">Opcional</span></h2>
-            <p>A cada persona le llega la invitación por correo y entra cuando la acepta.</p>
+            <p>Búscala por su nombre o su correo. Le llega la invitación a sus avisos (o por correo, si no tiene cuenta) y entra cuando la acepta.</p>
           </div>
         </header>
         <div class="step-body team" data-team>
@@ -110,8 +111,10 @@ const next = ["Agrega tus productos con precio y stock", "Abre el primer turno y
                 </button>
               </div>
               <div class="field email">
-                <label class="field-label" for="team-__i__-email">Correo</label>
-                <input class="input" id="team-__i__-email" name="inviteEmail" type="email" placeholder="ana@gmail.com" required autocapitalize="none" spellcheck="false" autocomplete="off" />
+                <label class="field-label" for="team-__i__-person">Nombre o correo</label>
+                <input class="input" id="team-__i__-person" name="invitePerson" placeholder="Ej.: Ana Pérez o ana@gmail.com" required autocapitalize="none" spellcheck="false" autocomplete="off" />
+                <!-- La cuenta elegida entre las sugerencias encontradas por nombre (vacío si se invita por correo). -->
+                <input type="hidden" name="invitePersonId" />
               </div>
               <div class="field">
                 <label class="field-label" for="team-__i__-job">Puesto</label>
@@ -123,6 +126,7 @@ const next = ["Agrega tus productos con precio y stock", "Abre el primer turno y
               </div>
             </li>
           </template>
+          <PeopleSuggest />
           <button type="button" class="btn btn-secondary add-person" data-team-add>
             <Plus size={18} stroke-width={2} />
             Invitar a alguien
@@ -191,6 +195,8 @@ const next = ["Agrega tus productos con precio y stock", "Abre el primer turno y
 </script>
 
 <script>
+  import { peopleSearch } from "@/scripts/people-search";
+
   // «Tu equipo»: filas de invitación. El turno se elige entre los que tiene ahora el editor de turnos (por su nombre:
   // todavía no existen en la base) y se actualiza cuando esos cambian.
   const team = document.querySelector<HTMLElement>("[data-team]");
@@ -233,9 +239,11 @@ const next = ["Agrega tus productos con precio y stock", "Abre el primer turno y
       }
       const row = fragment.querySelector<HTMLElement>("[data-team-row]")!;
       rows.append(row);
+      const person = row.querySelector<HTMLInputElement>('[name="invitePerson"]')!;
+      peopleSearch(person, row.querySelector<HTMLInputElement>('[name="invitePersonId"]')!);
       syncShifts();
       renumber();
-      row.querySelector<HTMLInputElement>('[name="inviteEmail"]')!.focus();
+      person.focus();
     });
 
     rows.addEventListener("click", (event) => {
