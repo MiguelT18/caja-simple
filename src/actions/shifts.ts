@@ -38,6 +38,20 @@ export const shifts = {
     },
   }),
 
+  /** Orden de los turnos de una sucursal, arrastrándolos en Turnos. RLS deja solo a la dueña. */
+  reorderShifts: defineAction({
+    input: z.object({ branchId: uuid, ids: z.array(uuid).min(1).max(50) }),
+    handler: async ({ branchId, ids }, context) => {
+      const sb = db(context);
+      // shortcut: una actualización por turno (son pocos); si una falla, el orden queda a medias hasta el próximo arrastre.
+      const results = await Promise.all(
+        ids.map((id, position) => sb.from("shifts").update({ position }).eq("id", id).eq("branch_id", branchId).select("id").single()),
+      );
+      for (const { error } of results) check(error);
+      return { ok: true };
+    },
+  }),
+
   /**
    * Horario semanal de la sucursal: una fila por día. «opens» trae los días que abre; un día que abre sin horas abre
    * todo el día (sin fila). Reemplaza el horario entero.

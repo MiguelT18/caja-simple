@@ -168,12 +168,13 @@ const toneLabels = { morning: "Mañana", afternoon: "Tarde", night: "Noche" };
     --tone-soft: var(--color-shift-night-soft);
   }
 
-  /* La tarjeta que se arrastra flota sobre las demás. */
+  /* La tarjeta que se arrastra flota sobre las demás (sortable.ts la mueve con transform). */
   .shift-row.dragging {
     position: relative;
     z-index: 1;
     background: var(--color-surface);
     box-shadow: var(--shadow-md);
+    transition: box-shadow 150ms;
   }
 
   .drag {
@@ -305,6 +306,7 @@ const toneLabels = { morning: "Mañana", afternoon: "Tarde", night: "Noche" };
 <script>
   import { toneOf } from "@/lib/dates";
   import { confirmDialog } from "@/scripts/dialogs";
+  import { sortable } from "@/scripts/sortable";
 
   const toneLabels = { morning: "Mañana", afternoon: "Tarde", night: "Noche" };
 
@@ -380,64 +382,13 @@ const toneLabels = { morning: "Mañana", afternoon: "Tarde", night: "Noche" };
       const name = row.querySelector<HTMLInputElement>("[name=shiftName]")!.value || "Turno";
       status.textContent = `${name}: posición ${[...rows.children].indexOf(row) + 1} de ${rows.children.length}.`;
     };
-    // El contenedor que se desplaza (el diálogo, el panel de la app o la página), para seguir al arrastrar cerca del borde.
-    const scrollerOf = (el: Element) => {
-      for (let node = el.parentElement; node; node = node.parentElement) {
-        const overflow = getComputedStyle(node).overflowY;
-        if ((overflow === "auto" || overflow === "scroll") && node.scrollHeight > node.clientHeight) return node;
-      }
-      return document.scrollingElement as HTMLElement;
-    };
-
-    editor.addEventListener("pointerdown", (event) => {
-      const handle = (event.target as Element).closest<HTMLElement>("[data-drag]");
-      if (!handle || event.button !== 0) return;
-      event.preventDefault();
-      const row = handle.closest<HTMLElement>("[data-row]")!;
-      const scroller = scrollerOf(row);
-      // En el documento y no con setPointerCapture: mover la fila en el DOM suelta la captura del asa.
-      row.classList.add("dragging");
-      const move = (e: PointerEvent) => {
-        const edge = 48;
-        const box = scroller === document.scrollingElement ? { top: 0, bottom: innerHeight } : scroller.getBoundingClientRect();
-        if (e.clientY < box.top + edge) scroller.scrollBy(0, -12);
-        else if (e.clientY > box.bottom - edge) scroller.scrollBy(0, 12);
-        const before = [...rows.children].find((r) => {
-          if (r === row) return false;
-          const b = r.getBoundingClientRect();
-          return e.clientY < b.top + b.height / 2;
-        }) ?? null;
-        if (before !== row.nextElementSibling && before !== row) {
-          rows.insertBefore(row, before);
-          renumber();
-          edited = true;
-        }
-      };
-      const end = () => {
-        row.classList.remove("dragging");
-        document.removeEventListener("pointermove", move);
-        document.removeEventListener("pointerup", end);
-        document.removeEventListener("pointercancel", end);
-        announce(row);
-      };
-      document.addEventListener("pointermove", move);
-      document.addEventListener("pointerup", end);
-      document.addEventListener("pointercancel", end);
-    });
-
-    editor.addEventListener("keydown", (event) => {
-      const handle = (event.target as Element).closest<HTMLElement>("[data-drag]");
-      if (!handle || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
-      event.preventDefault();
-      const row = handle.closest<HTMLElement>("[data-row]")!;
-      const target = event.key === "ArrowUp" ? row.previousElementSibling : row.nextElementSibling?.nextElementSibling ?? null;
-      if (event.key === "ArrowUp" && !target) return;
-      if (event.key === "ArrowDown" && !row.nextElementSibling) return;
-      rows.insertBefore(row, target);
-      renumber();
-      edited = true;
-      handle.focus();
-      announce(row);
+    sortable(rows, {
+      item: "[data-row]",
+      onChange: () => {
+        renumber();
+        edited = true;
+      },
+      onDrop: (row) => announce(row),
     });
 
     editor.addEventListener("input", (event) => {
