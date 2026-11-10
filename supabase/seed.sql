@@ -11,7 +11,7 @@
 -- turnos ni vender en días pasados, y así el stock de hoy no se mueve.
 
 -- Vault: a dónde llama la base para los avisos push e invitaciones (sin Edge Runtime en local, no salen).
-select vault.create_secret('http://host.docker.internal:54321', 'project_url');
+select vault.create_secret('http://host.docker.internal:44321', 'project_url');
 select vault.create_secret('local-dev-secret', 'push_webhook_secret');
 
 -- Cuentas ----------------------------------------------------------------------------------------------------------
@@ -118,6 +118,8 @@ from public.businesses b
 join public.branches br on br.business_id = b.id and br.slug = 'ejemplo-centro'
 join public.shifts s on s.branch_id = br.id and s.name = 'Mañana'
 where b.slug = 'ejemplo-tienda';
+-- La base da de alta a toda empleada como «invitado» (tiene que aceptar): aquí ya aceptó.
+update public.employees set status = 'activo' where email = 'empleada@ejemplo.test';
 
 -- Historial: la última semana de Ejemplo Tienda (hoy queda libre para abrir turno y vender) -------------------------
 set session_replication_role = replica;

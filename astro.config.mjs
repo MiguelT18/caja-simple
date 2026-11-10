@@ -25,6 +25,10 @@ const localDatabaseOnly = {
             'pon sus claves en .env.development.local (ver .env.example). Solo si de verdad hace falta: ALLOW_PROD_DB=1.',
         );
       }
+      // La caché de .env es la de producción: con la base local, la sesión de una cuenta local quedaría guardada allá.
+      if (env.UPSTASH_REDIS_REST_URL && env.ALLOW_PROD_DB !== '1') {
+        throw new Error('astro dev usaría el Redis de PRODUCCIÓN: deja UPSTASH_REDIS_REST_URL= y UPSTASH_REDIS_REST_TOKEN= vacías en .env.development.local.');
+      }
     },
   },
 };

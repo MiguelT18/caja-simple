@@ -29,7 +29,7 @@ pnpm test                # vitest: funciones puras (src/**/*.test.ts) y que plan
 Supabase: **se desarrolla y se prueba contra la base local** (Docker); la de producción solo recibe migraciones ya probadas. `astro dev` se niega a arrancar contra producción (guardia en `astro.config.mjs`; el motivo queda en `.astro/dev.log`).
 
 ```sh
-pnpm db:start        # levanta Supabase local (la primera vez baja las imágenes). Studio: http://127.0.0.1:54323 · correos: :54324
+pnpm db:start        # levanta Supabase local (la primera vez baja las imágenes). Studio: http://127.0.0.1:44323 · correos: :44324
 pnpm db:status       # URL y claves locales: van en .env.development.local (ver .env.example)
 pnpm db:reset        # base local desde cero: todas las migraciones + supabase/seed.sql (cuentas *@ejemplo.test, clave ejemplo123)
 pnpm db:types        # tipos desde la base local → src/lib/database.types.ts
