@@ -1,0 +1,235 @@
+---
+// «Color del negocio»: una muestra por color de la paleta (src/data/brand.ts), con su nombre escrito. Al elegir, la
+// página toma el color en vivo (botones, menú, encabezado) para verlo antes de guardar. Con un logo recién elegido en
+// el mismo formulario (PhotoField name="image"), sugiere el color más parecido; nunca lo cambia solo.
+import { Check, Sparkles } from "@lucide/astro";
+import { brandColor, brandColors, brandStyle } from "@/data/brand";
+
+interface Props {
+  form: string;
+  value?: string;
+}
+
+const { form, value = "ambar" } = Astro.props;
+const styles = JSON.stringify(Object.fromEntries(brandColors.map((c) => [c.key, brandStyle(c.key)])));
+const labels = JSON.stringify(Object.fromEntries(brandColors.map((c) => [c.key, c.label])));
+---
+
+<fieldset class="brand-field" data-brand-field data-form={form} data-styles={styles} data-labels={labels}>
+  <legend class="field-label">Color del negocio</legend>
+  <p class="field-hint" id={`${form}-color-hint`}>El acento de tu negocio en la app: botones, menú y encabezados. Lo ves en vivo al elegirlo.</p>
+  <div class="swatches">
+    {
+      brandColors.map((c) => (
+        <label class="swatch" style={`--swatch: ${brandColor(c.key)}`}>
+          <input type="radio" name="color" value={c.key} form={form} checked={c.key === value} aria-describedby={`${form}-color-hint`} />
+          <span class="dot" aria-hidden="true">
+            <Check size={16} stroke-width={3} />
+          </span>
+          <span class="name">{c.label}</span>
+        </label>
+      ))
+    }
+  </div>
+  <p class="suggestion" data-suggestion hidden aria-live="polite">
+    <Sparkles size={16} stroke-width={1.75} />
+    <span>Tu logo es <strong data-suggestion-name></strong>.</span>
+    <button type="button" class="use" data-suggestion-use>Usar este color</button>
+  </p>
+</fieldset>
+
+<script>
+  import { dominantColor, nearestBrand } from "@/lib/logo-color";
+
+  for (const field of document.querySelectorAll<HTMLElement>("[data-brand-field]")) {
+    const styles: Record<string, string> = JSON.parse(field.dataset.styles!);
+    const labels: Record<string, string> = JSON.parse(field.dataset.labels!);
+    const radios = [...field.querySelectorAll<HTMLInputElement>('input[name="color"]')];
+
+    // Vista previa: el acento de toda la página. Si no se guarda, al recargar vuelve el de antes.
+    const apply = (key: string) => {
+      for (const decl of styles[key].split("; ")) {
+        const at = decl.indexOf(":");
+        document.body.style.setProperty(decl.slice(0, at).trim(), decl.slice(at + 1).trim());
+      }
+    };
+    field.addEventListener("change", (event) => {
+      const radio = event.target as HTMLInputElement;
+      if (radio.name === "color") apply(radio.value);
+      hideIfChosen();
+    });
+
+    // Sugerencia desde el logo: solo con una foto elegida ahora (blob:), que se puede leer en un canvas.
+    const suggestion = field.querySelector<HTMLElement>("[data-suggestion]")!;
+    const nameEl = field.querySelector<HTMLElement>("[data-suggestion-name]")!;
+    let suggested = "";
+    const hideIfChosen = () => {
+      suggestion.hidden = !suggested || radios.find((r) => r.checked)?.value === suggested;
+    };
+    field.querySelector("[data-suggestion-use]")!.addEventListener("click", () => {
+      const radio = radios.find((r) => r.value === suggested);
+      if (!radio) return;
+      radio.checked = true;
+      radio.dispatchEvent(new Event("change", { bubbles: true }));
+      radio.focus();
+    });
+
+    const form = document.getElementById(field.dataset.form!);
+    const logo = form?.querySelector<HTMLImageElement>('[data-photo-field]:has([name="image"]) [data-photo-preview]');
+    if (logo) {
+      const read = async () => {
+        suggested = "";
+        if (!logo.hidden && logo.src.startsWith("blob:")) {
+          try {
+            await logo.decode();
+            const canvas = Object.assign(document.createElement("canvas"), { width: 32, height: 32 });
+            const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+            ctx.drawImage(logo, 0, 0, 32, 32);
+            const rgb = dominantColor(ctx.getImageData(0, 0, 32, 32).data);
+            if (rgb) suggested = nearestBrand(rgb);
+          } catch {
+            // Sin poder leerla, no hay sugerencia.
+          }
+        }
+        nameEl.textContent = suggested ? labels[suggested].toLowerCase() : "";
+        hideIfChosen();
+      };
+      new MutationObserver(read).observe(logo, { attributes: true, attributeFilter: ["src", "hidden"] });
+    }
+  }
+</script>
+
+<style>
+  .brand-field {
+    display: grid;
+    gap: 0.5rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .brand-field legend {
+    padding: 0;
+    margin-bottom: 0.25rem;
+  }
+
+  .brand-field .field-hint {
+    margin: 0;
+  }
+
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+    gap: 0.5rem;
+  }
+
+  .swatch {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 0.375rem;
+    padding: 0.625rem 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 150ms;
+  }
+
+  .swatch:hover {
+    background: var(--color-surface-hover);
+  }
+
+  /* El radio real queda encima de la muestra, invisible: teclado, lector de pantalla y formulario funcionan solos. */
+  .swatch input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .dot {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--swatch);
+    color: var(--color-on-primary);
+    box-shadow: 0 0 0 2px var(--color-surface);
+    transition: box-shadow 150ms, transform 150ms;
+  }
+
+  .dot :global(svg) {
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+
+  .name {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+  }
+
+  /* El elegido: anillo del mismo color, el check y el nombre en negrita (no solo el color lo dice). */
+  .swatch:has(input:checked) .dot {
+    box-shadow:
+      0 0 0 2px var(--color-surface),
+      0 0 0 4px var(--swatch);
+  }
+
+  .swatch:has(input:checked) .dot :global(svg) {
+    opacity: 1;
+  }
+
+  .swatch:has(input:checked) .name {
+    color: var(--color-text);
+    font-weight: var(--font-bold);
+  }
+
+  .swatch:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .swatch:active .dot {
+      transform: scale(0.94);
+    }
+  }
+
+  .suggestion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.5rem;
+    margin: 0.25rem 0 0;
+    font-size: var(--text-sm);
+  }
+
+  .suggestion[hidden] {
+    display: none;
+  }
+
+  .suggestion :global(svg) {
+    color: var(--color-primary);
+  }
+
+  .use {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 999px;
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    font-weight: var(--font-bold);
+    cursor: pointer;
+  }
+
+  .use:hover {
+    border-color: var(--color-text);
+  }
+</style>

@@ -1,13 +1,15 @@
 // Negocio y sucursales.
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
+import { brandKeys } from "@/data/brand";
 import { defaultShifts } from "@/data/session";
 import { check, confirmName, db, freeSlug, imageFile, kind, limit, name, removeBusinessPhotos, shiftList, shiftsFrom, slugify, storeImage, uuid, uploadLimit } from "./shared";
 
-// Descripción del negocio (obligatoria) y si aparece en Buscar. La casilla sin marcar no llega: queda en false.
+// Descripción del negocio (obligatoria), si aparece en Buscar (la casilla sin marcar no llega: queda en false) y su color.
 const profile = {
   description: z.string({ error: "Cuenta en una o dos frases a qué se dedica tu negocio" }).trim().min(10, "Cuenta en una o dos frases a qué se dedica tu negocio").max(400, "Usa 400 caracteres o menos"),
   listed: z.coerce.boolean().default(false),
+  color: z.enum(brandKeys, { error: "Elige uno de los colores" }).default("ambar"),
 };
 
 // El negocio ya existe: si una foto no sube, se entra igual (reintentar crearía otro) y se agrega en Configuración.
@@ -114,6 +116,8 @@ export const businesses = {
           p_listed: input.listed,
         });
         if (!error) {
+          // create_business no recibe el color: se guarda aparte (ámbar es el default de la columna).
+          if (input.color !== "ambar") check((await sb.from("businesses").update({ color: input.color }).eq("slug", slug)).error);
           await storePhotos(sb, slug, input.image, input.branchImage);
           await inviteTeam(sb, slug, invites);
           return { slug };
@@ -169,11 +173,11 @@ export const businesses = {
   saveBusiness: defineAction({
     accept: "form",
     input: z.object({ id: uuid, name: name(80, "Ingresa el nombre del negocio"), kind, ...profile, image: imageFile, removeImage: z.coerce.boolean().default(false) }),
-    handler: async ({ id, name, kind, description, listed, image, removeImage }, context) => {
+    handler: async ({ id, name, kind, description, listed, color, image, removeImage }, context) => {
       await uploadLimit(context, image);
       const sb = db(context);
       // El slug no cambia: los enlaces guardados siguen funcionando.
-      const { data, error } = await sb.from("businesses").update({ name, kind, description, listed }).eq("id", id).select("id, image_path").single();
+      const { data, error } = await sb.from("businesses").update({ name, kind, description, listed, color }).eq("id", id).select("id, image_path").single();
       check(error);
       await storeImage(sb, "businesses", id, data!, image, removeImage);
       return { id };

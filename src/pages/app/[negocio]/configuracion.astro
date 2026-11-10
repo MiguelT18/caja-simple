@@ -3,6 +3,7 @@ import { ArrowRight, ChevronRight, CircleCheck, CircleMinus, Gem, MapPin, Pencil
 import Avatar from "@/components/Avatar.astro";
 import PageHeader from "@/components/PageHeader.astro";
 import BranchDialogs from "@/components/app/BranchDialogs.astro";
+import BrandColorField from "@/components/app/BrandColorField.astro";
 import BusinessProfileFields from "@/components/app/BusinessProfileFields.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
@@ -93,7 +94,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
       <section id="negocio" class="section" tabindex="-1" aria-labelledby="business-title">
         <header class="section-head">
           <h2 id="business-title">Negocio</h2>
-          <p>Cómo se llama, a qué se dedica y su logo.</p>
+          <p>Cómo se llama, a qué se dedica, su logo y su color.</p>
         </header>
         {!business.description && (
           <p class="notice">
@@ -123,6 +124,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
               <p class="notice kind-effect" aria-live="polite" data-kind-effect></p>
             </div>
           </div>
+          <BrandColorField form="business-form" value={business.color} />
           <BusinessProfileFields form="business-form" description={business.description} listed={business.listed} />
           <div class="slug-row">
             <span class="slug-label">Dirección en la app</span>

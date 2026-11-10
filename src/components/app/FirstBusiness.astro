@@ -2,6 +2,7 @@
 // «Tus negocios» sin ninguno: crear el primero con todo lo que necesita (logo, rubro, descripción, sucursal con foto y
 // turnos). A la derecha, cómo se va a ver y lo que viene después. El diálogo de «Crear negocio» queda corto a propósito.
 import { Plus, Shirt, Store, Trash, UserPlus, UtensilsCrossed } from "@lucide/astro";
+import BrandColorField from "./BrandColorField.astro";
 import BusinessProfileFields from "./BusinessProfileFields.astro";
 import FormInput from "./FormInput.astro";
 import PhotoField from "./PhotoField.astro";
@@ -65,6 +66,7 @@ const next = ["Agrega tus productos con precio y stock", "Abre el primer turno y
               </fieldset>
             </div>
           </div>
+          <BrandColorField form={form} />
           <BusinessProfileFields form={form} />
         </div>
       </section>

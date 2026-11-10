@@ -7,6 +7,7 @@ import FormInput from "@/components/app/FormInput.astro";
 import MediaCard from "@/components/app/MediaCard.astro";
 import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
+import { brandColor } from "@/data/brand";
 import { kindOptions } from "@/data/kinds";
 import { businessImages, currentUser, entryHref, myBusinesses } from "@/data/queries";
 import { boliviaNow } from "@/lib/dates";
@@ -65,6 +66,7 @@ const monogram = (name: string) =>
                   href={entryHref(m)}
                   title={m.business.name}
                   monogram={monogram(m.business.name)}
+                  color={brandColor(m.business.color)}
                   image={logos.get(m.business.id)}
                   subtitle={
                     m.role === "dueño"

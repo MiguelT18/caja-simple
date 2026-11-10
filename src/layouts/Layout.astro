@@ -7,6 +7,7 @@ import PageSkeleton from '../components/app/PageSkeleton.astro';
 import ShiftBar from '../components/app/ShiftBar.astro';
 import type { Branch } from '../data/types';
 import { currentUser, type Membership, type ShiftBarData } from '../data/queries';
+import { brandStyle } from '../data/brand';
 
 interface Props {
 	title: string;
@@ -21,7 +22,8 @@ const { title, context } = Astro.props;
 	<head>
 		<BaseHead title={title} />
 	</head>
-	<body class="app-surface">
+	<!-- Dentro de un negocio, su color es el acento (src/data/brand.ts); fuera, el ámbar. -->
+	<body class="app-surface" style={context ? brandStyle(context.membership.business.color) : undefined}>
 		<!-- Antes que las imágenes: una foto que no carga (enlace vencido, sin conexión) se oculta y queda el fondo
 		     o el ícono de su contenedor, nunca el ícono de imagen rota. Inline para no perder errores tempranos. -->
 		<script is:inline>
