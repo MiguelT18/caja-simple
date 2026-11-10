@@ -1,11 +1,10 @@
 ---
 /*
- * Indicador «En vivo» y el script que actualiza la página con los avisos del negocio (src/scripts/live.ts).
+ * El script que actualiza la página con los avisos del negocio (src/scripts/live.ts) y el anuncio para lectores de
+ * pantalla. Sin indicador visible: un «En vivo» hacía pensar que la sucursal estaba abierta.
  * Los montos marcados con data-live="<clave>" data-amount data-sign cuentan hasta el valor nuevo y se resaltan;
  * los <time data-ago> se reescriben cada 30 s. Con `branch`, solo cuentan los avisos de esa sucursal.
  */
-import { Clock } from "@lucide/astro";
-import { ago } from "@/scripts/live-core";
 
 interface Props {
   /** «negocio:<id>». */
@@ -20,11 +19,7 @@ interface Props {
 const { topic, names, regions, branch } = Astro.props;
 ---
 
-<div class="live-bar" data-live-topic={topic} data-branch-names={JSON.stringify(names)} data-live-regions={regions.join(",")} data-live-branch={branch}>
-  <p class="chip chip-neutral live-status" data-live-status>
-    <Clock size={14} stroke-width={2} />
-    <span data-live-text>Actualizado {ago(0)}</span>
-  </p>
+<div data-live-topic={topic} data-branch-names={JSON.stringify(names)} data-live-regions={regions.join(",")} data-live-branch={branch}>
   <p class="sr-only" aria-live="polite" data-live-announce></p>
 </div>
 
@@ -36,17 +31,9 @@ const { topic, names, regions, branch } = Astro.props;
   const bar = document.querySelector<HTMLElement>("[data-live-topic]");
   if (bar) {
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const chip = bar.querySelector<HTMLElement>("[data-live-status]")!;
-    const text = bar.querySelector<HTMLElement>("[data-live-text]")!;
     const announce = bar.querySelector<HTMLElement>("[data-live-announce]")!;
-    const icons = { live: '<span class="live-dot" aria-hidden="true"></span>', idle: chip.querySelector("svg")!.outerHTML };
-    let last = { live: false, updatedAt: Date.now() };
-
+    // Los «hace X min» de la página se reescriben solos.
     const paint = () => {
-      chip.classList.toggle("chip-live", last.live);
-      chip.classList.toggle("chip-neutral", !last.live);
-      chip.firstElementChild!.outerHTML = last.live ? icons.live : icons.idle;
-      text.textContent = last.live ? "En vivo" : `Actualizado ${ago(Date.now() - last.updatedAt)}`;
       for (const el of document.querySelectorAll<HTMLElement>("[data-ago]")) el.textContent = ago(Date.now() - Number(el.dataset.ago));
     };
     setInterval(paint, 30_000);
@@ -70,10 +57,7 @@ const { topic, names, regions, branch } = Astro.props;
       regions: bar.dataset.liveRegions!.split(","),
       names: JSON.parse(bar.dataset.branchNames ?? "{}"),
       branch: bar.dataset.liveBranch,
-      onStatus: (status) => {
-        last = status;
-        paint();
-      },
+      onStatus: paint,
       onAnnounce: (message) => {
         // Vaciar y volver a poner: el lector repite el aviso aunque sea igual al anterior.
         announce.textContent = "";
@@ -95,16 +79,6 @@ const { topic, names, regions, branch } = Astro.props;
 </script>
 
 <style>
-  .live-bar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 0.75rem;
-  }
-
-  .live-status {
-    margin: 0;
-  }
-
   /* Lo que acaba de cambiar: un fondo suave que se va solo. Los montos están en la página, no aquí. */
   :global([data-live]) {
     border-radius: 0.25rem;
