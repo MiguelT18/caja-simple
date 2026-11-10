@@ -26,13 +26,22 @@ pnpm astro check         # tipos (usa TypeScript 6: astro check no soporta la 7)
 pnpm test                # vitest: funciones puras (src/**/*.test.ts) y que planLimits coincida con las migraciones
 ```
 
-Supabase (proyecto en la nube; no hay base local). Las variables van en `.env` (ver `.env.example`); `SUPABASE_DB_PASSWORD` es solo para la CLI:
+Supabase: **se desarrolla y se prueba contra la base local** (Docker); la de producción solo recibe migraciones ya probadas. `astro dev` se niega a arrancar contra producción (guardia en `astro.config.mjs`; el motivo queda en `.astro/dev.log`).
 
 ```sh
-pnpm dlx supabase migration new <nombre>                     # migración nueva en supabase/migrations/
+pnpm db:start        # levanta Supabase local (la primera vez baja las imágenes). Studio: http://127.0.0.1:54323 · correos: :54324
+pnpm db:status       # URL y claves locales: van en .env.development.local (ver .env.example)
+pnpm db:reset        # base local desde cero: todas las migraciones + supabase/seed.sql (cuentas *@ejemplo.test, clave ejemplo123)
+pnpm db:types        # tipos desde la base local → src/lib/database.types.ts
+pnpm db:stop
+pnpm dlx supabase migration new <nombre>   # migración nueva; se prueba con db:reset, tests y la app en local
+```
+
+Producción (`.env`; `SUPABASE_DB_PASSWORD` es solo para la CLI). Solo cuando la migración ya funcionó en local:
+
+```sh
 pnpm dlx supabase db push --db-url "$DB_URL"                 # aplicarla
 pnpm dlx supabase db advisors --db-url "$DB_URL"             # revisar seguridad y rendimiento
-pnpm dlx supabase gen types typescript --db-url "$DB_URL" --schema public > src/lib/database.types.ts
 # DB_URL = postgresql://postgres.<ref>:$SUPABASE_DB_PASSWORD@aws-0-us-east-1.pooler.supabase.com:5432/postgres
 ```
 

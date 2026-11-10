@@ -4,13 +4,37 @@ import { defineConfig, envField } from 'astro/config';
 import react from '@astrojs/react';
 import vercel from '@astrojs/vercel';
 import tailwindcss from '@tailwindcss/vite';
+import { existsSync, readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
+
+/**
+ * `astro dev` contra la base de producción se corta: desarrollar y probar va contra Supabase local (AGENTS.md).
+ * @type {import('astro').AstroIntegration}
+ */
+const localDatabaseOnly = {
+  name: 'local-database-only',
+  hooks: {
+    'astro:config:setup': ({ command }) => {
+      if (command !== 'dev') return;
+      // El mismo orden que Vite en `astro dev`: gana .env.development.local, después .env.development, .env.local, .env.
+      const files = ['.env', '.env.local', '.env.development', '.env.development.local'].filter((f) => existsSync(f));
+      const env = Object.assign({}, ...files.map((f) => parseEnv(readFileSync(f, 'utf8'))), process.env);
+      if (/\.supabase\.co/.test(env.SUPABASE_URL ?? '') && env.ALLOW_PROD_DB !== '1') {
+        throw new Error(
+          'astro dev apunta a la base de PRODUCCIÓN (SUPABASE_URL en .env). Levanta la local con `pnpm db:start` y ' +
+            'pon sus claves en .env.development.local (ver .env.example). Solo si de verdad hace falta: ALLOW_PROD_DB=1.',
+        );
+      }
+    },
+  },
+};
 
 // https://astro.build/config
 export default defineConfig({
   // Las páginas se renderizan en el servidor (sesión de Supabase); la landing se prerenderiza.
   output: 'server',
   adapter: vercel(),
-  integrations: [react()],
+  integrations: [react(), localDatabaseOnly],
   devToolbar: { enabled: false },
   // Los enlaces del menú lateral (data-astro-prefetch) se preparan al pasar el mouse o tocarlos: con clientPrerender,
   // Chrome arma la página destino en segundo plano (Speculation Rules) y al hacer clic aparece al instante.

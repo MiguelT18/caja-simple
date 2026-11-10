@@ -10,7 +10,12 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:start": "pnpm dlx supabase@3.0.0 start",
+    "db:stop": "pnpm dlx supabase@3.0.0 stop",
+    "db:reset": "pnpm dlx supabase@3.0.0 db reset",
+    "db:status": "pnpm dlx supabase@3.0.0 status",
+    "db:types": "pnpm dlx supabase@3.0.0 gen types typescript --local --schema public > src/lib/database.types.ts"
   },
   "dependencies": {
     "@astrojs/react": "^7.1.2",
