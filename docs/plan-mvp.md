@@ -24,6 +24,8 @@ Origen: revisión del código, de las migraciones y de PRODUCT.md del 3 de novie
   - Site URL y URLs de redirección en Supabase.
   - `PUBLIC_VAPID_PUBLIC_KEY` y `PUBLIC_UPGRADE_URL` en el esquema de `astro:env`; `VAPID_SUBJECT` en `.env.example`.
   - [x] Migración `20261103140000_search_people_by_name.sql` aplicada en la nube. Falta hacer commit del trabajo pendiente.
+- [ ] **Copias de seguridad:** (flujos y runbook listos, ver docs/copias-de-seguridad.md; falta la puesta en marcha: bucket R2, claves S3 y de age, secretos del repo, y una prueba de restauración en verde)
+  - Con clientes que pagan, evaluar Supabase Pro + PITR (hoy se puede perder hasta un día).
 - [ ] **Legal y honestidad:** (páginas y «Próximamente» listos; faltan los datos entre [corchetes] de `/privacidad` y `/terminos`)
   - Páginas de privacidad y términos.
   - Sacar de `src/data/plans.ts` las funciones que no existen (reportes, exportar, vista consolidada), o marcarlas «Próximamente».

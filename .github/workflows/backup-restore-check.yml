@@ -1,0 +1,59 @@
+# Una vez por semana: restaura la última copia en un Postgres de Supabase vacío (dentro del runner, nunca producción)
+# y comprueba sha256 y filas por tabla. También falla si la última copia tiene más de 2 días. Ver docs/copias-de-seguridad.md.
+name: Prueba de restauración
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # lunes, 05:00 en Bolivia
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BUCKET: caja-simple-backups
+  RCLONE_CONFIG_R2_TYPE: s3
+  RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+  RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+  RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
+
+jobs:
+  restore:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+
+      - name: Instalar age y rclone
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age rclone
+
+      - name: Bajar la última copia
+        run: |
+          last=$(rclone lsf "r2:$BUCKET/db/" --dirs-only | sort | tail -n 1 | tr -d /)
+          [ -n "$last" ] || { echo "No hay copias en R2." >&2; exit 1; }
+          age_days=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 86400 ))
+          echo "Última copia: $last (hace $age_days días)." >> "$GITHUB_STEP_SUMMARY"
+          # GitHub apaga los flujos programados tras 60 días sin actividad: esto avisa si la copia diaria dejó de correr.
+          [ "$age_days" -le 2 ] || { echo "La última copia tiene $age_days días." >&2; exit 1; }
+          rclone copy "r2:$BUCKET/db/$last" copia
+
+      - name: Base vacía de Supabase (Postgres 17, sin migraciones)
+        run: |
+          mkdir -p /tmp/restore && cd /tmp/restore
+          supabase init --force > /dev/null
+          sed -i 's/^project_id = .*/project_id = "restore"/; s/^major_version = .*/major_version = 17/' supabase/config.toml
+          supabase db start
+
+      - name: Restaurar y comprobar
+        env:
+          AGE_VERIFY_KEY: ${{ secrets.AGE_VERIFY_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$AGE_VERIFY_KEY" > "$RUNNER_TEMP/verify.key"
+          AGE_IDENTITY_FILE="$RUNNER_TEMP/verify.key" scripts/backup/verify.sh copia "docker exec -i supabase_db_restore psql -U postgres -d postgres" | tee -a "$GITHUB_STEP_SUMMARY"

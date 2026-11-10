@@ -1,0 +1,69 @@
+# Copia diaria de la base (cifrada) y de Storage a Cloudflare R2. Ver docs/copias-de-seguridad.md.
+name: Copia de seguridad
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # 03:00 en Bolivia
+  workflow_dispatch:
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BUCKET: caja-simple-backups
+  # rclone lee los remotos de estas variables: r2 (destino) y sb (Storage de Supabase, solo lectura).
+  RCLONE_CONFIG_R2_TYPE: s3
+  RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+  RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+  RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
+  RCLONE_CONFIG_SB_TYPE: s3
+  RCLONE_CONFIG_SB_PROVIDER: Other
+  RCLONE_CONFIG_SB_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_KEY_ID }}
+  RCLONE_CONFIG_SB_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET }}
+  RCLONE_CONFIG_SB_ENDPOINT: ${{ secrets.SUPABASE_S3_ENDPOINT }}
+  RCLONE_CONFIG_SB_REGION: us-east-1
+  RCLONE_CONFIG_SB_FORCE_PATH_STYLE: "true"
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+
+      - name: Instalar age y rclone
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age rclone
+
+      - name: Copia de la base
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          AGE_RECIPIENTS: ${{ secrets.AGE_RECIPIENTS }}
+        run: scripts/backup/dump.sh "copia"
+
+      - name: Subir la copia
+        run: |
+          day=$(date -u +%F)
+          rclone copy copia "r2:$BUCKET/db/$day"
+          # El día 1, también a la copia mensual (se guarda más tiempo).
+          if [ "$(date -u +%d)" = "01" ]; then rclone copy copia "r2:$BUCKET/db-mensual/$(date -u +%Y-%m)"; fi
+          echo "Copia del $day: $(jq '.rows | length' copia/manifest.json) tablas." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Copia de Storage
+        # Espejo incremental. Lo borrado o cambiado en Supabase no se pierde: pasa a storage-borrados/<día>.
+        run: |
+          rclone sync sb: "r2:$BUCKET/storage" --backup-dir "r2:$BUCKET/storage-borrados/$(date -u +%F)" --fast-list --stats-one-line
+          echo "Storage: $(rclone size "r2:$BUCKET/storage" --json | jq -r '"\(.count) archivos"')." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Aviso
+        if: failure()
+        run: echo "⚠️ La copia de hoy falló. Revisa el registro del flujo; mientras tanto, la última copia buena sigue en R2." >> "$GITHUB_STEP_SUMMARY"
