@@ -2,7 +2,7 @@
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { defaultShifts } from "@/data/session";
-import { check, confirmName, db, freeSlug, imageFile, kind, name, removeBusinessPhotos, shiftList, shiftsFrom, slugify, storeImage, uuid, uploadLimit } from "./shared";
+import { check, confirmName, db, freeSlug, imageFile, kind, limit, name, removeBusinessPhotos, shiftList, shiftsFrom, slugify, storeImage, uuid, uploadLimit } from "./shared";
 
 // Descripción del negocio (obligatoria) y si aparece en Buscar. La casilla sin marcar no llega: queda en false.
 const profile = {
@@ -26,6 +26,45 @@ async function storePhotos(sb: ReturnType<typeof db>, slug: string, logo?: File,
   }
 }
 
+/** Une las filas de «Tu equipo» y las valida antes de crear nada; los errores van al aviso del formulario. */
+export function invitesFrom(input: { inviteEmail: string[]; inviteJob: string[]; inviteShift: string[] }, shiftNames: string[]) {
+  const fail = (message: string): never => {
+    throw new ActionError({ code: "BAD_REQUEST", message });
+  };
+  const seen = new Set<string>();
+  return input.inviteEmail.map((raw, i) => {
+    const email = raw.toLowerCase();
+    const job = input.inviteJob[i] ?? "";
+    const shift = input.inviteShift[i] ?? "";
+    const who = `Persona ${i + 1}`;
+    if (!z.email().safeParse(email).success) fail(`${who}: escribe su correo completo.`);
+    if (seen.has(email)) fail(`Invitaste dos veces a ${email}.`);
+    if (!job) fail(`${who}: escribe el puesto.`);
+    if (job.length > 60) fail(`${who}: el puesto es muy largo (máximo 60 caracteres).`);
+    if (!shiftNames.includes(shift)) fail(`${who}: elige uno de los turnos de la sucursal.`);
+    seen.add(email);
+    return { email, job, shift };
+  });
+}
+
+// Como storePhotos: el negocio ya existe, una invitación que falla se vuelve a mandar desde Empleados.
+// shortcut: el fallo solo queda en el log, no se avisa en la página (se redirige); si pasa seguido, devolverlo en la respuesta.
+async function inviteTeam(sb: ReturnType<typeof db>, slug: string, invites: ReturnType<typeof invitesFrom>) {
+  if (!invites.length) return;
+  const { data: business } = await sb.from("businesses").select("id, branches(id, shifts(id, name))").eq("slug", slug).single();
+  const branch = business?.branches[0];
+  if (!business || !branch) return;
+  const rows = invites.map((v) => ({
+    business_id: business.id,
+    branch_id: branch.id,
+    shift_id: branch.shifts.find((s) => s.name === v.shift)!.id,
+    email: v.email,
+    job_title: v.job,
+  }));
+  const { error } = await sb.from("employees").insert(rows);
+  if (error) console.error(JSON.stringify({ level: "error", source: "createBusiness.invites", code: error.code, message: error.message }));
+}
+
 export const businesses = {
   createBusiness: defineAction({
     accept: "form",
@@ -38,11 +77,18 @@ export const businesses = {
       image: imageFile,
       branchImage: imageFile,
       ...shiftList,
+      // Equipo opcional del primer negocio: correo, puesto y el nombre del turno (los turnos aún no tienen id).
+      inviteEmail: z.array(z.string().trim()).max(10, "Invita hasta 10 personas por ahora; el resto, desde Empleados.").default([]),
+      inviteJob: z.array(z.string().trim()).default([]),
+      inviteShift: z.array(z.string().trim()).default([]),
     }),
     handler: async (input, context) => {
       await uploadLimit(context, input.image, input.branchImage);
       // Sin el editor (el diálogo de «Crear negocio»), la sucursal arranca con los turnos de siempre.
       const shifts = input.shiftName.length ? shiftsFrom(input) : defaultShifts;
+      const invites = invitesFrom(input, shifts.map((s) => s.name));
+      // Cada invitación a un correo sin cuenta manda un correo: el mismo límite que en Empleados.
+      for (const _ of invites) await limit(context, "invite", 10, 60 * 60);
       const sb = db(context);
       // Los slugs de negocio son únicos en todo el sistema; RLS no deja ver los ajenos, así que se prueba con la RPC.
       let slug = slugify(input.name);
@@ -60,6 +106,7 @@ export const businesses = {
         });
         if (!error) {
           await storePhotos(sb, slug, input.image, input.branchImage);
+          await inviteTeam(sb, slug, invites);
           return { slug };
         }
         if (error.code !== "23505") check(error);

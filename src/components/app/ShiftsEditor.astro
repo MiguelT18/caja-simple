@@ -1,5 +1,5 @@
 ---
-import { Plus, X } from "@lucide/astro";
+import { Plus, Trash } from "@lucide/astro";
 
 interface ShiftDraft {
   name: string;
@@ -48,6 +48,13 @@ const tones = [
     {
       presets[0].shifts.map((s, i) => (
         <li class="shift-row" data-row>
+          <div class="row-head">
+            <span class="row-title" data-row-title>Turno {i + 1}</span>
+            <button type="button" class="remove" data-remove aria-label={`Quitar turno ${s.name}`}>
+              <Trash size={16} stroke-width={1.75} />
+              Quitar
+            </button>
+          </div>
           <div class="field name">
             <label class="field-label" for={`${form}-shift-${i}-name`}>Nombre<span class="sr-only" data-n> del turno {i + 1}</span></label>
             <input class="input" id={`${form}-shift-${i}-name`} name="shiftName" value={s.name} aria-describedby={`${form}-shiftName-error`} required maxlength="40" />
@@ -70,9 +77,6 @@ const tones = [
               ))}
             </select>
           </div>
-          <button type="button" class="icon-btn remove" data-remove aria-label={`Quitar turno ${s.name}`}>
-            <X size={18} stroke-width={1.75} />
-          </button>
           <p class="overnight" data-overnight hidden={!(s.end < s.start)}>Termina al día siguiente</p>
         </li>
       ))
@@ -81,6 +85,13 @@ const tones = [
 
   <template data-row-template>
     <li class="shift-row" data-row>
+      <div class="row-head">
+        <span class="row-title" data-row-title>Turno</span>
+        <button type="button" class="remove" data-remove aria-label="Quitar turno">
+          <Trash size={16} stroke-width={1.75} />
+          Quitar
+        </button>
+      </div>
       <div class="field name">
         <label class="field-label" for={`${form}-shift-__i__-name`}>Nombre<span class="sr-only" data-n> del turno </span></label>
         <input class="input" id={`${form}-shift-__i__-name`} name="shiftName" aria-describedby={`${form}-shiftName-error`} required maxlength="40" />
@@ -99,9 +110,6 @@ const tones = [
           {tones.map((t) => <option value={t.value}>{t.label}</option>)}
         </select>
       </div>
-      <button type="button" class="icon-btn remove" data-remove aria-label="Quitar turno">
-        <X size={18} stroke-width={1.75} />
-      </button>
       <p class="overnight" data-overnight hidden>Termina al día siguiente</p>
     </li>
   </template>
@@ -143,12 +151,26 @@ const tones = [
 
   .shift-row {
     display: grid;
-    grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)) auto;
+    grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
     align-items: end;
     gap: 0.5rem;
     padding: 0.75rem;
     border: 1px solid var(--color-border);
+    /* La franja es del momento del día; el select lo dice escrito, el color solo acompaña. */
+    border-left: 4px solid var(--tone, var(--color-border-strong));
     border-radius: 0.5rem;
+  }
+
+  .shift-row:has([name="shiftTone"] option[value="morning"]:checked) {
+    --tone: var(--color-shift-morning);
+  }
+
+  .shift-row:has([name="shiftTone"] option[value="afternoon"]:checked) {
+    --tone: var(--color-shift-afternoon);
+  }
+
+  .shift-row:has([name="shiftTone"] option[value="night"]:checked) {
+    --tone: var(--color-shift-night);
   }
 
   .shift-row .field-label {
@@ -156,8 +178,46 @@ const tones = [
     color: var(--color-text-muted);
   }
 
+  /* Encabezado de la tarjeta: cuál es y, a la derecha, quitarla (en rojo, con texto, para que se note). */
+  .row-head {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: -0.25rem 0 0.125rem;
+  }
+
+  .row-title {
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+  }
+
   .remove {
-    margin-bottom: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2rem;
+    margin-right: -0.375rem;
+    padding: 0 0.625rem;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--color-expense);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+    cursor: pointer;
+  }
+
+  .remove:hover {
+    background: var(--color-expense-soft);
+  }
+
+  @media (pointer: coarse) {
+    .remove {
+      min-height: 2.75rem;
+    }
   }
 
   .overnight {
@@ -179,23 +239,15 @@ const tones = [
   @container (max-width: 560px) {
     /* Las horas necesitan ancho: comparten su fila en mitades iguales y el resto va a lo ancho. */
     .shift-row {
-      position: relative;
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .shift-row .name {
       grid-column: 1 / -1;
-      margin-right: 2.75rem;
     }
 
     .shift-row .tone {
       grid-column: 1 / -1;
-    }
-
-    .remove {
-      position: absolute;
-      top: 2.125rem;
-      right: 0.75rem;
     }
   }
 </style>
@@ -216,6 +268,7 @@ const tones = [
     const renumber = () => {
       [...rows.children].forEach((row, i) => {
         for (const n of row.querySelectorAll<HTMLElement>("[data-n]")) n.textContent = ` del turno ${i + 1}`;
+        row.querySelector<HTMLElement>("[data-row-title]")!.textContent = `Turno ${i + 1}`;
       });
     };
 
