@@ -29,3 +29,10 @@ begin
   return null;
 end;
 $$;
+
+-- Crear un negocio solo con sus datos. Antes el permiso de INSERT cubría todas las columnas: la política exigía
+-- plan = 'Gratis', pero se podía mandar plan_until, trial o founder_since (el precio de fundador sin haber pagado).
+-- Lo del plan solo lo ponen las funciones de la base (start_trial, activate_plan_charge, plan_daily).
+-- create_business (security invoker) inserta name, slug, kind, description y listed; el resto toma su default.
+revoke insert on public.businesses from authenticated;
+grant insert (name, slug, kind, description, listed, image_path) on public.businesses to authenticated;

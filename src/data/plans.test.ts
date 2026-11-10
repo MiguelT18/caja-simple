@@ -106,3 +106,29 @@ describe("precio fundador", () => {
     expect(latest("private.create_plan_charge")).toMatch(/round\(private\.plan_usd\(v_plan, p_period, v_extra\) \* \(1 - v_discount\), 2\)/);
   });
 });
+
+// Ver docs/planes-de-suscripcion.md › Límites en la app: ninguna función de pago queda abierta a Gratis.
+describe("las funciones de pago miran el plan que vale hoy", () => {
+  const sources = files.map((f) => readFileSync(new URL(f, dir), "utf8"));
+  const defined = new Map<string, string>();
+  for (const sql of sources)
+    for (const m of sql.matchAll(/create (?:or replace )?function ([\w.]+)\(/g)) defined.set(m[1], sql.slice(m.index, sql.indexOf("$$;", m.index)));
+
+  it("todo chequeo de plan usa private.effective_plan (un plan vencido sigue diciendo «Negocio» hasta plan_daily)", () => {
+    // Las que cobran, vencen o dan la prueba miran el plan guardado a propósito. check_free_business ya no existe.
+    const billing = ["private.effective_plan", "private.plan_daily", "private.plan_usd", "private.create_plan_charge", "private.start_trial", "private.check_free_business"];
+    const raw = [...defined]
+      .filter(([fn, body]) => !billing.includes(fn) && /'(Gratis|Negocio|Sucursales)'/.test(body) && !/private\.effective_plan\(/.test(body))
+      .map(([fn]) => fn);
+    expect(raw).toEqual([]);
+  });
+
+  it("nadie escribe el plan, su vencimiento, la prueba ni el cupo de fundador al crear un negocio", () => {
+    const grants = sources.flatMap((sql) => [...sql.matchAll(/grant insert \(([^)]*)\) on public\.businesses/g)].map((m) => m[1]));
+    for (const col of ["plan", "plan_until", "trial", "founder_since", "owner_id"]) expect(grants.at(-1)!.split(",").map((c) => c.trim())).not.toContain(col);
+  });
+
+  it("la prueba es una por persona", () => {
+    expect(latest("private.start_trial")).toMatch(/insert into private\.trials/);
+  });
+});

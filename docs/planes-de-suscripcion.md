@@ -73,6 +73,14 @@ En la app (`/app/<negocio>/plan`) el único método es el **QR bancario** de mon
 
 La base de datos aplica los límites (migraciones `supabase/migrations/20261031012616_plan_limits.sql` `20261108170000_free_plan_limits.sql` y `20261108190000_promotions.sql`). `planLimits`, en `src/data/plans.ts`, solo los muestra y tiene que coincidir con ella. Ese mismo archivo repite, para mostrarlos, los precios en dólares sin impuestos de `private.plan_usd`. No se guarda ningún precio fijo en bolivianos: se calcula al mostrarlo y al cobrar.
 
+**Una función de pago nueva** (checklist, para que ningún negocio en Gratis la use):
+
+1. **En la base**, un trigger o una función que la corte con `private.effective_plan(business_id) = 'Gratis'`, nunca con `businesses.plan`: un plan vencido sigue diciendo «Negocio» hasta que `plan_daily` corre a las 8:00. Lo que ya existe y se sigue viendo después de bajar a Gratis (promociones, combos, stock) no deja de existir: deja de aplicarse o de cambiar.
+2. **En la Action**, si algo no pasa por la base (como importar), `limitsOf()` de `src/actions/shared.ts`, que ya usa el plan efectivo.
+3. **En la página**, `planLimits[business.plan]` con el `business` de la sesión (`src/data/session.ts` ya lo pasa a Gratis al vencer): solo para mostrar o esconder, nunca como única barrera.
+4. **El plan, su vencimiento, la prueba y el cupo de fundador** (`plan`, `plan_until`, `trial`, `founder_since`) solo los escriben funciones de la base: nadie tiene permiso de UPDATE ni de INSERT sobre esas columnas. No los agregues a ningún `grant`.
+5. `planLimits` y `plans.test.ts`: la nueva clave y un test que compare con la migración.
+
 | Límite | Gratis | Negocio | Sucursales | Dónde se aplica |
 | --- | --- | --- | --- | --- |
 | Sucursales por negocio | 1 | 1 | sin tope (cada extra se cobra) | trigger `branches_check_limit` |
