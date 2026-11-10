@@ -1,7 +1,8 @@
 ---
-import { Plus, Store } from "@lucide/astro";
+import { Plus } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import BusinessProfileFields from "@/components/app/BusinessProfileFields.astro";
+import FirstBusiness from "@/components/app/FirstBusiness.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import MediaCard from "@/components/app/MediaCard.astro";
 import Modal from "@/components/app/Modal.astro";
@@ -28,30 +29,7 @@ const monogram = (name: string) =>
 <Layout title="Tus negocios">
   {
     memberships.length === 0 ? (
-      <section class="card onboarding" aria-labelledby="onboarding-title">
-        <span class="onboarding-icon" aria-hidden="true">
-          <Store size={24} stroke-width={1.75} />
-        </span>
-        <header>
-          <h1 id="onboarding-title">Crea tu negocio</h1>
-          <p>
-            Empieza con el nombre de tu negocio y su primera sucursal. La sucursal arranca con los turnos de mañana, tarde
-            y noche; los ajustas cuando quieras en Turnos.
-          </p>
-          <p class="hint">Si te invitaron a trabajar en un negocio, aparecerá aquí cuando entres con el correo de la invitación.</p>
-        </header>
-        <form id="onboarding" class="onboarding-form" data-action="createBusiness" data-redirect="/app/{slug}" novalidate>
-          <FormInput form="onboarding" name="name" label="Nombre del negocio" placeholder="Ej.: Almacén López" required maxlength={80} />
-          <FormInput form="onboarding" name="kind" label="Rubro" options={kindOptions()} hint="Cambia los textos y las secciones. Lo puedes cambiar después." />
-          <BusinessProfileFields form="onboarding" />
-          <div class="field-row-2">
-            <FormInput form="onboarding" name="branchName" label="Primera sucursal" value="Principal" hint="La zona o la calle; por ejemplo: Centro o Mercado Rodríguez." required maxlength={80} />
-            <FormInput form="onboarding" name="branchAddress" label="Dirección" hint="Opcional" maxlength={160} />
-          </div>
-          <p class="notice notice-error" role="alert" data-form-notice />
-          <button type="submit" class="btn btn-primary">Crear negocio</button>
-        </form>
-      </section>
+      <FirstBusiness firstName={firstName} />
     ) : (
       <PageHeader title={firstName ? `${greeting}, ${firstName}` : greeting} description="Los negocios que tienes y en los que trabajas. Elige uno para entrar.">
         <button
@@ -106,44 +84,6 @@ const monogram = (name: string) =>
 </Layout>
 
 <style>
-  .onboarding {
-    display: grid;
-    gap: 1rem;
-    max-width: 32rem;
-    margin: 1rem auto 0;
-    padding: 1.5rem;
-  }
-
-  .onboarding-icon {
-    display: grid;
-    place-items: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 0.75rem;
-    background: var(--color-primary-soft);
-    color: var(--color-primary);
-  }
-
-  .onboarding h1 {
-    margin: 0 0 0.5rem;
-    font-size: var(--text-2xl);
-  }
-
-  .onboarding p {
-    margin: 0;
-    color: var(--color-text-muted);
-  }
-
-  .onboarding .hint {
-    margin-top: 0.5rem;
-    font-size: var(--text-sm);
-  }
-
-  .onboarding-form {
-    display: grid;
-    gap: 1rem;
-  }
-
   .business-grid {
     margin: 0;
     padding: 0;

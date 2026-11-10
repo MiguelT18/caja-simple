@@ -6,9 +6,25 @@ import { check, confirmName, db, freeSlug, imageFile, kind, name, removeBusiness
 
 // Descripción del negocio (obligatoria) y si aparece en Buscar. La casilla sin marcar no llega: queda en false.
 const profile = {
-  description: z.string().trim().min(10, "Cuenta en una o dos frases a qué se dedica tu negocio").max(400, "Usa 400 caracteres o menos"),
+  description: z.string({ error: "Cuenta en una o dos frases a qué se dedica tu negocio" }).trim().min(10, "Cuenta en una o dos frases a qué se dedica tu negocio").max(400, "Usa 400 caracteres o menos"),
   listed: z.coerce.boolean().default(false),
 };
+
+// El negocio ya existe: si una foto no sube, se entra igual (reintentar crearía otro) y se agrega en Configuración.
+async function storePhotos(sb: ReturnType<typeof db>, slug: string, logo?: File, facade?: File) {
+  if (!logo?.size && !facade?.size) return;
+  try {
+    const { data } = await sb.from("businesses").select("id").eq("slug", slug).single();
+    if (!data) return;
+    const { id } = data;
+    await storeImage(sb, "businesses", id, { id, image_path: null }, logo, false);
+    if (!facade?.size) return;
+    const { data: branch } = await sb.from("branches").select("id, image_path").eq("business_id", id).single();
+    if (branch) await storeImage(sb, "branches", id, branch, facade, false);
+  } catch (error) {
+    console.error(JSON.stringify({ level: "error", source: "createBusiness.photos", message: String(error) }));
+  }
+}
 
 export const businesses = {
   createBusiness: defineAction({
@@ -19,8 +35,14 @@ export const businesses = {
       branchAddress: z.string().trim().max(160).nullable().transform((v) => v ?? ""),
       kind,
       ...profile,
+      image: imageFile,
+      branchImage: imageFile,
+      ...shiftList,
     }),
     handler: async (input, context) => {
+      await uploadLimit(context, input.image, input.branchImage);
+      // Sin el editor (el diálogo de «Crear negocio»), la sucursal arranca con los turnos de siempre.
+      const shifts = input.shiftName.length ? shiftsFrom(input) : defaultShifts;
       const sb = db(context);
       // Los slugs de negocio son únicos en todo el sistema; RLS no deja ver los ajenos, así que se prueba con la RPC.
       let slug = slugify(input.name);
@@ -31,13 +53,15 @@ export const businesses = {
           p_branch_name: input.branchName,
           p_branch_slug: slugify(input.branchName),
           p_branch_address: input.branchAddress,
-          // La primera sucursal arranca con los turnos de siempre; cada sucursal los ajusta en Turnos.
-          p_shifts: defaultShifts,
+          p_shifts: shifts,
           p_kind: input.kind,
           p_description: input.description,
           p_listed: input.listed,
         });
-        if (!error) return { slug };
+        if (!error) {
+          await storePhotos(sb, slug, input.image, input.branchImage);
+          return { slug };
+        }
         if (error.code !== "23505") check(error);
         slug = `${slugify(input.name)}-${crypto.randomUUID().slice(0, 4)}`;
       }

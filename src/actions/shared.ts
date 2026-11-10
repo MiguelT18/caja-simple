@@ -11,7 +11,7 @@ import { effectivePlan, planLimits } from "@/data/plans";
 z.config(z.locales.es());
 
 export const uuid = z.uuid();
-export const name = (max: number, message: string) => z.string().trim().min(1, message).max(max, `Máximo ${max} caracteres`);
+export const name = (max: number, message: string) => z.string({ error: message }).trim().min(1, message).max(max, `Máximo ${max} caracteres`);
 export const money = z.coerce.number({ error: "Ingresa un monto" }).min(0, "No puede ser negativo").max(9_999_999);
 export const count = z.coerce.number({ error: "Ingresa un número" }).int("Usa un número entero").min(0, "No puede ser negativo");
 // Astro manda los campos vacíos de un formulario como null: vacío, null o ausente quedan en undefined.
