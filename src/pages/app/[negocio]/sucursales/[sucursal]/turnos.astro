@@ -528,8 +528,13 @@ const daysLabel = (weekdays: number[] | null) =>
 <style>
   .days {
     display: grid;
+    min-width: 0;
     gap: 1rem;
     margin-top: 2rem;
+  }
+
+  .days > .muted {
+    margin-top: -0.5rem;
   }
 
   .week {
@@ -571,8 +576,16 @@ const daysLabel = (weekdays: number[] | null) =>
     opacity: 0.45;
   }
 
+  /* Un input de hora tiene ancho propio: sin esto empuja la fila (y la página) más allá de la pantalla. */
+  .time,
+  .time .input {
+    min-width: 0;
+    width: 100%;
+  }
+
   .week-form .btn {
     justify-self: start;
+    margin-top: 0.5rem;
   }
 
   .week-list {

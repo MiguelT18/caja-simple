@@ -60,8 +60,9 @@ export default function ClosuresCalendar({ branchId, today, isOwner, shifts, hou
   };
 
   return (
-    <div className="grid gap-4 md:grid-cols-[auto_minmax(0,1fr)] md:items-start">
-      <div className="card w-fit max-w-full p-2">
+    <div className="grid min-w-0 gap-4 md:grid-cols-[auto_minmax(0,1fr)] md:items-start md:gap-6">
+      {/* La tarjeta mide lo que el calendario: la leyenda (w-0 min-w-full) se acomoda a ese ancho sin ensancharla. */}
+      <div className="card grid w-full min-w-0 justify-items-center gap-3 p-3 sm:p-4 md:w-fit">
         <Calendar
           mode="single"
           locale={es}
@@ -69,11 +70,13 @@ export default function ClosuresCalendar({ branchId, today, isOwner, shifts, hou
           selected={day ? toDate(day) : undefined}
           onSelect={(date) => date && isOwner && setDay(toDay(date))}
           disabled={isOwner ? { before: toDate(today) } : true}
+          // Celdas de 36 a 44 px según el ancho: caben siete a 320 px sin scroll y se tocan bien con el dedo.
+          className="max-w-full bg-transparent p-0 [--cell-size:clamp(2.25rem,calc((100vw-6rem)/7),2.75rem)]"
           modifiers={{ closed: (date) => closedDays.has(toDay(date)), weekClosed }}
           modifiersClassNames={{
-            // Punto debajo del número, además del color: no se comunica solo con color.
+            // Fondo, color y un punto debajo del número: no se comunica solo con color.
             closed:
-              "[&>button]:font-bold [&>button]:text-[var(--color-expense)] [&>button]:after:absolute [&>button]:after:bottom-1 [&>button]:after:left-1/2 [&>button]:after:size-1.5 [&>button]:after:-translate-x-1/2 [&>button]:after:rounded-full [&>button]:after:bg-current",
+              "[&>button]:bg-[color-mix(in_oklab,var(--color-expense)_14%,transparent)] [&>button]:font-bold [&>button]:text-[var(--color-expense)] [&>button]:after:absolute [&>button]:after:bottom-1 [&>button]:after:left-1/2 [&>button]:after:size-1.5 [&>button]:after:-translate-x-1/2 [&>button]:after:rounded-full [&>button]:after:bg-current",
             weekClosed: "[&>button]:text-muted-foreground [&>button]:line-through",
           }}
           labels={{
@@ -86,9 +89,19 @@ export default function ClosuresCalendar({ branchId, today, isOwner, shifts, hou
             },
           }}
         />
-        <p className="field-hint px-2 pb-2">
-          {isOwner ? "Toca un día para cerrarlo. " : ""}Con punto: cerrado ese día. Tachado: no trabaja ningún turno por el horario semanal.
-        </p>
+        <div className="grid w-0 min-w-full gap-2 border-t pt-3 text-sm text-muted-foreground">
+          {isOwner && <p className="m-0 font-medium text-foreground">Toca un día para cerrarlo.</p>}
+          <ul className="m-0 grid list-none gap-1.5 p-0" role="list">
+            <li className="flex items-center gap-2">
+              <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-[var(--color-expense)]" />
+              Cerrado ese día (feriado o cierre)
+            </li>
+            <li className="flex items-center gap-2">
+              <span aria-hidden="true" className="min-w-2 shrink-0 text-center text-xs leading-none line-through">7</span>
+              Ningún turno trabaja por el horario semanal
+            </li>
+          </ul>
+        </div>
       </div>
 
       <div className="grid gap-2">
