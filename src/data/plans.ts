@@ -27,7 +27,7 @@ export const planLimits: Record<PlanName, PlanLimits> = {
   Sucursales: { branches: null, historyDays: null, reports: true, products: null, stock: true, bulk: true, promotions: true },
 };
 
-/** Días que dura la prueba del plan Negocio de un negocio nuevo (private.start_trial). */
+/** Días que dura la prueba del plan Negocio: el primer negocio de cada persona (private.start_trial). */
 export const TRIAL_DAYS = 30;
 
 /** Días que quedan hasta `until` incluido (AAAA-MM-DD): el último día es 1. */
