@@ -4,7 +4,8 @@ import { z } from "astro/zod";
 import { cents, shiftCash } from "@/data/cash";
 import { movements } from "@/data/shared";
 import { formatBs } from "@/lib/format";
-import { check, db, money, name, optional, time, tone, uuid } from "./shared";
+import { toneOf } from "@/lib/dates";
+import { check, db, money, name, optional, time, uuid } from "./shared";
 
 /** Días ISO marcados en el formulario; los 7 (o ninguno marcado: el formulario lo impide) = null, todos los días. */
 const weekdays = z
@@ -23,12 +24,12 @@ export const shifts = {
       name: name(40, "Ingresa el nombre del turno"),
       start: time,
       end: time,
-      tone,
       weekdays,
     }).refine((s) => s.start !== s.end, { message: "La hora de fin no puede ser igual a la de inicio", path: ["end"] }),
-    handler: async ({ branchId, id, name, start, end, tone, weekdays }, context) => {
+    handler: async ({ branchId, id, name, start, end, weekdays }, context) => {
       const sb = db(context);
-      const fields = { name, start_time: start, end_time: end, tone, weekdays };
+      // El color sale de la hora de inicio (toneOf), igual que al crear la sucursal.
+      const fields = { name, start_time: start, end_time: end, tone: toneOf(start), weekdays };
       const { error } = id
         ? await sb.from("shifts").update(fields).eq("id", id).select("id").single()
         : await sb.from("shifts").insert({ branch_id: branchId, ...fields }).select("id").single();

@@ -28,11 +28,6 @@ for (const c of history) if (!latestClose.has(c.shiftId)) latestClose.set(c.shif
 const canReopen = (c: (typeof history)[number]) =>
   isOwner && latestClose.get(c.shiftId) === c.id && c.date >= addDays(today, -1) && !currentShift;
 const canNote = (c: (typeof history)[number]) => isOwner || c.closedById === Astro.locals.userId;
-const tones = [
-  { value: "morning", label: "Mañana" },
-  { value: "afternoon", label: "Tarde" },
-  { value: "night", label: "Noche" },
-];
 const DAYS = DAY_NAMES.map((d, i) => ({ dow: i + 1, short: "LMXJVSD"[i], long: d.replace(/s$/, "") }));
 /** «Lun a vie», «Lun, mié, vie» o null si son todos los días. */
 const daysLabel = (weekdays: number[] | null) =>
@@ -479,13 +474,6 @@ const daysLabel = (weekdays: number[] | null) =>
               <FormInput form={`${id}-form`} name="start" type="time" label="Empieza" value={shift?.start ?? "07:00"} required />
               <FormInput form={`${id}-form`} name="end" type="time" label="Termina" value={shift?.end ?? "14:00"} required />
             </div>
-            <FormInput
-              form={`${id}-form`}
-              name="tone"
-              label="Momento del día"
-              hint="Define el color y el ícono del turno."
-              options={tones.map((t) => ({ ...t, selected: t.value === (shift?.tone ?? "morning") }))}
-            />
             <fieldset class="field weekdays">
               <legend class="field-label">Días que trabaja</legend>
               <div class="weekday-row">

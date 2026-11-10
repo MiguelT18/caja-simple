@@ -1319,6 +1319,7 @@ export type Database = {
           end_time: string;
           id: string;
           name: string;
+          position: number;
           start_time: string;
           tone: Database["public"]["Enums"]["shift_tone"];
           weekdays: number[] | null;
@@ -1331,6 +1332,7 @@ export type Database = {
           end_time: string;
           id?: string;
           name: string;
+          position?: number;
           start_time: string;
           tone: Database["public"]["Enums"]["shift_tone"];
           weekdays?: number[] | null;
@@ -1342,6 +1344,7 @@ export type Database = {
           end_time?: string;
           id?: string;
           name?: string;
+          position?: number;
           start_time?: string;
           tone?: Database["public"]["Enums"]["shift_tone"];
           weekdays?: number[] | null;

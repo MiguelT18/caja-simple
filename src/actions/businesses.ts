@@ -127,7 +127,7 @@ export const businesses = {
       removeImage: z.coerce.boolean().default(false),
       ...shiftList,
     }),
-    handler: async ({ businessId, id, image, removeImage, shiftName, shiftStart, shiftEnd, shiftTone, ...fields }, context) => {
+    handler: async ({ businessId, id, image, removeImage, shiftName, shiftStart, shiftEnd, ...fields }, context) => {
       await uploadLimit(context, image);
       const sb = db(context);
       if (id) {
@@ -137,7 +137,7 @@ export const businesses = {
         return { id };
       }
       // Al crear, los turnos son obligatorios; al editar se cambian en Turnos.
-      const shifts = shiftsFrom({ shiftName, shiftStart, shiftEnd, shiftTone });
+      const shifts = shiftsFrom({ shiftName, shiftStart, shiftEnd });
       const slug = await freeSlug(slugify(fields.name), async (s) => {
         const { count } = await sb.from("branches").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("slug", s);
         return (count ?? 0) > 0;
@@ -146,7 +146,7 @@ export const businesses = {
       check(error, "Ya tienes una sucursal con ese nombre.");
       const { error: shiftsError } = await sb
         .from("shifts")
-        .insert(shifts.map((s) => ({ branch_id: data!.id, name: s.name, start_time: s.start, end_time: s.end, tone: s.tone })));
+        .insert(shifts.map((s, i) => ({ branch_id: data!.id, name: s.name, start_time: s.start, end_time: s.end, tone: s.tone, position: i })));
       if (shiftsError) {
         // Sin turnos la sucursal no sirve: se deshace para que la dueña corrija y vuelva a guardar.
         await sb.from("branches").delete().eq("id", data!.id);
