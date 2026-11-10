@@ -4,7 +4,8 @@
 import { ArrowRight } from "@lucide/astro";
 
 interface Props {
-  href: string;
+  /** Sin enlace: la vista previa de «Abre tu negocio», que no lleva a ningún lado. */
+  href?: string;
   title: string;
   subtitle?: string;
   /** Texto del arte cuando no hay imagen: iniciales o una palabra corta. */
@@ -30,7 +31,7 @@ const { href, title, subtitle, monogram, image, color = "var(--color-primary)", 
     </span>
   </div>
   <h3 class="title">
-    <a href={href} aria-label={label}>{title}</a>
+    {href ? <a href={href} aria-label={label}>{title}</a> : title}
   </h3>
   {subtitle && <p class="subtitle">{subtitle}</p>}
   <slot />

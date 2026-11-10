@@ -5,6 +5,7 @@ import { Shirt, Store, UtensilsCrossed } from "@lucide/astro";
 import BusinessProfileFields from "./BusinessProfileFields.astro";
 import FormInput from "./FormInput.astro";
 import PhotoField from "./PhotoField.astro";
+import MediaCard from "./MediaCard.astro";
 import ShiftsEditor from "./ShiftsEditor.astro";
 import { businessKinds } from "@/data/kinds";
 import { defaultShifts } from "@/data/queries";
@@ -94,16 +95,10 @@ const next = ["Agrega tus productos con precio y stock", "Invita a tu equipo", "
     <aside class="aside" aria-label="Vista previa y siguientes pasos">
       <div class="preview" aria-hidden="true">
         <p class="aside-label">Así se verá</p>
-        <div class="preview-card">
-          <div class="preview-art">
-            <img alt="" hidden data-preview-logo />
-            <span class="preview-monogram" data-preview-monogram>TN</span>
-          </div>
-          <div class="preview-text">
-            <p class="preview-name" data-preview-name>Tu negocio</p>
-            <p class="preview-meta"><span data-preview-kind>{businessKinds[0].label}</span> · <span data-preview-branch>Principal</span></p>
-          </div>
+        <div class="preview-card" data-preview>
+          <MediaCard title="Tu negocio" monogram="TN" subtitle="Tu negocio · 1 sucursal" />
         </div>
+        <p class="preview-note">Así aparece en Tus negocios.</p>
       </div>
       <div class="next">
         <h2 class="aside-label">Después de crearlo</h2>
@@ -119,24 +114,22 @@ const next = ["Agrega tus productos con precio y stock", "Invita a tu equipo", "
 </section>
 
 <script>
-  // Vista previa: nombre, monograma, rubro, sucursal y el logo ya achicado que muestra PhotoField.
+  // Vista previa con la MediaCard de «Tus negocios»: nombre, monograma y el logo ya achicado que muestra PhotoField.
   const form = document.getElementById("onboarding") as HTMLFormElement | null;
   if (form) {
     const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
-    const name = $("[data-preview-name]");
-    const monogram = $("[data-preview-monogram]");
-    const kind = $("[data-preview-kind]");
-    const branch = $("[data-preview-branch]");
-    const logo = $<HTMLImageElement>("[data-preview-logo]");
+    const card = $("[data-preview]");
+    const name = card.querySelector<HTMLElement>(".title")!;
+    const monogram = card.querySelector<HTMLElement>(".monogram")!;
+    const art = monogram.parentElement!;
+    // El arte de MediaCard sin foto no trae <img>: se agrega uno para el logo elegido.
+    const logo: HTMLImageElement = art.insertBefore(Object.assign(document.createElement("img"), { alt: "", hidden: true }), art.firstChild);
     const source = form.querySelector<HTMLImageElement>('[data-photo-field]:has([name="image"]) [data-photo-preview]');
 
     const paint = () => {
-      const data = new FormData(form);
-      const n = String(data.get("name") ?? "").trim();
+      const n = String(new FormData(form).get("name") ?? "").trim();
       name.textContent = n || "Tu negocio";
       monogram.textContent = (n || "Tu negocio").split(/\s+/).slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase();
-      kind.textContent = form.querySelector<HTMLInputElement>('[name="kind"]:checked')?.dataset.kindLabel ?? "";
-      branch.textContent = String(data.get("branchName") ?? "").trim() || "Sucursal";
     };
     form.addEventListener("input", paint);
     form.addEventListener("change", paint);
@@ -375,60 +368,23 @@ const next = ["Agrega tus productos con precio y stock", "Invita a tu equipo", "
     font-weight: var(--font-semibold);
   }
 
-  .preview {
-    padding: 0.75rem;
-    border-radius: var(--radius-panel);
-    background: var(--color-surface-muted);
-  }
-
+  /* Al ancho de una tarjeta de «Tus negocios» (columnas de 12.5rem o algo más), no al de la columna. */
   .preview-card {
-    display: grid;
-    grid-template-columns: 4rem minmax(0, 1fr);
-    align-items: center;
-    gap: 0.75rem;
+    width: 13.5rem;
+    max-width: 100%;
+    pointer-events: none;
   }
 
-  .preview-art {
-    position: relative;
-    aspect-ratio: 1;
-    overflow: hidden;
-    border-radius: 0.375rem;
-    background: linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--color-primary) 70%, var(--color-surface)),
-      color-mix(in oklab, var(--color-primary) 25%, var(--color-surface))
-    );
-    box-shadow: 0 6px 16px -8px rgb(0 0 0 / 0.4);
-  }
-
-  .preview-art img {
+  .preview-card :global(.art img) {
     width: 100%;
     height: 100%;
-    object-fit: contain;
-    background: var(--color-surface);
+    object-fit: cover;
   }
 
-  .preview-monogram {
-    position: absolute;
-    left: 0.375rem;
-    bottom: 0.25rem;
-    color: var(--color-text);
-    font-size: var(--text-xl);
-    line-height: 1;
-    font-weight: var(--font-extrabold);
-    letter-spacing: -0.04em;
-  }
-
-  .preview-name {
-    margin: 0;
-    overflow-wrap: anywhere;
-    font-weight: var(--font-bold);
-  }
-
-  .preview-meta {
-    margin: 0.125rem 0 0;
+  .preview-note {
+    margin: 0.5rem 0 0;
     color: var(--color-text-muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
   }
 
   .next ol {
