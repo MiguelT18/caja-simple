@@ -36,19 +36,24 @@ export const defaultShifts: { name: string; start: string; end: string; tone: Sh
   { name: "Noche", start: "21:00", end: "23:59", tone: "night" },
 ];
 
+/** La cuenta ya no existe (se borró), pero su token sigue firmado hasta que vence: el middleware cierra la sesión. */
+export class MissingProfile extends Error {}
+
 /** Perfil y negocios de la persona: los que tiene como dueña y en los que trabaja. */
 export async function loadSession(sb: Supabase, userId: string): Promise<SessionData> {
   // Perfil y negocios cambian poco: van a la caché. Los avisos, siempre frescos.
   const rows = () =>
     Promise.all([
-      sb.from("profiles").select("*").eq("id", userId).single(),
+      sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
       sb.from("businesses").select("*, branches(*)").order("created_at"),
       sb.from("employees").select(EMPLOYEE_COLUMNS).eq("person_id", userId).eq("status", "activo"),
     ]).then(([profile, businesses, employments]) => {
       fail(profile.error);
+      // Se lanza (no se devuelve): así no queda en la caché.
+      if (!profile.data) throw new MissingProfile();
       fail(businesses.error);
       fail(employments.error);
-      return { profile: profile.data!, businesses: businesses.data ?? [], employments: employments.data ?? [] };
+      return { profile: profile.data, businesses: businesses.data ?? [], employments: employments.data ?? [] };
     });
   const [{ profile, businesses, employments }, inbox, unread] = await Promise.all([
     cached(`s:${userId}`, 600, rows, (r) => [userVersion(userId), ...r.businesses.map((b) => businessVersion(b.id))]),

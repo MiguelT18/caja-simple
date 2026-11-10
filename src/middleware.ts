@@ -2,7 +2,7 @@ import { getActionContext } from "astro:actions";
 import type { APIContext, MiddlewareNext } from "astro";
 import { defineMiddleware } from "astro:middleware";
 import { bump, businessVersion, userVersion } from "./lib/cache";
-import { loadSession } from "./data/queries";
+import { loadSession, MissingProfile } from "./data/queries";
 import { needsSecondFactor, verifyHref } from "./lib/auth";
 import { createSupabase } from "./lib/supabase";
 
@@ -93,7 +93,15 @@ async function handle(context: APIContext, next: MiddlewareNext): Promise<Respon
     if (!userId) return context.redirect(`/auth/iniciar-sesion?next=${encodeURIComponent(pathname + search)}`);
     // Sin el código, RLS (private.mfa_ok) no le deja leer nada: mejor pedirlo antes.
     if (await needsSecondFactor(supabase)) return context.redirect(verifyHref(pathname + search));
-    context.locals.session = await loadSession(supabase, userId);
+    try {
+      context.locals.session = await loadSession(supabase, userId);
+    } catch (error) {
+      if (!(error instanceof MissingProfile)) throw error;
+      // getClaims solo mira la firma: una cuenta borrada sigue «con sesión» hasta que vence su token (≤ 1 h).
+      // Sin esto, /app da 500 y /auth/* manda de vuelta a /app. Se cierra la sesión y se vuelve a iniciar.
+      await supabase.auth.signOut({ scope: "local" });
+      return context.redirect("/auth/iniciar-sesion");
+    }
   } else if (pathname.startsWith("/auth/") && pathname !== "/auth/verificar" && pathname !== "/auth/nueva-contrasena" && userId) {
     // verificar y nueva-contrasena se usan con sesión (la del enlace de recuperar contraseña); las demás no.
     return context.redirect(safeNext(context.url.searchParams.get("next")));
