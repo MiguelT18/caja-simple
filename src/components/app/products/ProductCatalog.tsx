@@ -344,7 +344,7 @@ export default function ProductCatalog({
           </p>
           <p className="m-0 max-w-md text-sm text-muted-foreground">
             {mode === "business"
-              ? "Agrega los productos que vendes. Después, en el inventario de cada sucursal, les pones precio y stock."
+              ? "Agrega los productos que vendes, con su precio y stock en cada sucursal."
               : canEdit
                 ? "Elige productos de tu catálogo y ponles precio y stock para esta sucursal."
                 : "Todavía no hay productos en esta sucursal. Quien administra el negocio los agrega desde el catálogo."}
@@ -426,6 +426,7 @@ export default function ProductCatalog({
           comboSeed={comboSeed}
           catalog={products as CatalogEntry[]}
           branches={branches}
+          withStock={limits.stock}
           onClose={() => setEditing(null)}
         />
       )}

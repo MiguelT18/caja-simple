@@ -63,16 +63,19 @@ export const products = {
       // Precio en cada sucursal donde ya se vende (mismo orden que priceBranch). Vacío: se escribe al vender.
       priceBranch: z.array(uuid).max(100).default([]),
       price: z.array(z.preprocess((v) => (v === "" || v == null ? undefined : v), money.optional())).max(100).default([]),
+      // Producto nuevo: stock inicial en cada sucursal elegida (mismo orden). Vacío: no se controla.
+      stock: z.array(z.preprocess((v) => (v === "" || v == null ? undefined : v), count.optional())).max(100).default([]),
       // Combo: lo que incluye (mismo orden que componentQty). Al crearlo, priceBranch lo agrega a esas sucursales.
       combo: z.coerce.boolean().default(false),
       componentId: z.array(uuid).max(20, "Un combo incluye hasta 20 productos").default([]),
       componentQty: z.array(z.coerce.number({ error: "Ingresa un número" }).int("Usa un número entero").min(1, "Al menos 1").max(99, "Hasta 99")).max(20).default([]),
     })
       .refine((v) => v.price.length === v.priceBranch.length, { message: "Revisa los precios", path: ["price"] })
+      .refine((v) => v.stock.length === 0 || v.stock.length === v.priceBranch.length, { message: "Revisa el stock", path: ["stock"] })
       .refine((v) => v.componentId.length === v.componentQty.length, { message: "Revisa las cantidades", path: ["components"] })
       .refine((v) => new Set(v.componentId).size === v.componentId.length, { message: "Hay un producto repetido", path: ["components"] })
       .refine((v) => !v.combo || v.componentQty.reduce((a, b) => a + b, 0) >= 2, { message: "Un combo lleva al menos dos productos", path: ["components"] }),
-    handler: async ({ businessId, id, name, categoryId, barcode, description, image, removeImage, priceBranch, price, combo, componentId, componentQty }, context) => {
+    handler: async ({ businessId, id, name, categoryId, barcode, description, image, removeImage, priceBranch, price, stock, combo, componentId, componentQty }, context) => {
       await uploadLimit(context, image);
       const sb = db(context);
       const fields = { name, category_id: categoryId ?? null, barcode: barcode ?? null, description: description || null };
@@ -100,7 +103,20 @@ export const products = {
           check(error);
         }
       }
-      // Solo filas que ya existen: agregar el producto a una sucursal sigue siendo desde su inventario.
+      // Un producto nuevo entra al inventario de las sucursales elegidas con su precio y stock (Gratis: sin stock).
+      if (!id && !combo && priceBranch.length) {
+        const withStock = (await limitsOf(sb, businessId)).stock;
+        const { error } = await sb
+          .from("inventory")
+          .upsert(
+            priceBranch.map((branchId, i) => inventoryRow(businessId, branchId, product.id, { price: price[i], stock: withStock ? stock[i] : undefined })),
+            { onConflict: "branch_id,product_id", ignoreDuplicates: true },
+          );
+        // Como con el combo: si no entró al inventario, no queda a medias en el catálogo.
+        if (error) await sb.from("products").delete().eq("id", product.id);
+        check(error);
+      }
+      // Al editar, solo filas que ya existen: agregar el producto a otra sucursal sigue siendo desde su inventario.
       if (id) {
         const results = await Promise.all(
           priceBranch.map((branchId, i) => sb.from("inventory").update({ price: price[i] ?? null }).eq("branch_id", branchId).eq("product_id", id)),
@@ -108,6 +124,20 @@ export const products = {
         for (const r of results) check(r.error);
       }
       return { id: product.id };
+    },
+  }),
+
+  /** La foto de un producto, sola: la usa Importar después del alta en lote (las fotos no caben en un solo envío). */
+  productImage: defineAction({
+    accept: "form",
+    input: z.object({ businessId: uuid, id: uuid, image: imageFile }),
+    handler: async ({ businessId, id, image }, context) => {
+      await uploadLimit(context, image);
+      const sb = db(context);
+      const { data, error } = await sb.from("products").select("id, image_path").eq("id", id).single();
+      check(error);
+      await storeImage(sb, "products", businessId, data!, image, false);
+      return { ok: true };
     },
   }),
 
@@ -196,7 +226,9 @@ export const products = {
         );
         check(error);
       }
-      return { imported: fresh.length, skipped, stocked: stocked.length };
+      // Nombre (en minúscula) → id de los recién creados: el navegador sube después la foto de cada fila (productImage).
+      const created = Object.fromEntries(fresh.map((r) => [key(r.name), productId.get(key(r.name))!]));
+      return { imported: fresh.length, skipped, stocked: stocked.length, created };
     },
   }),
 

@@ -39,6 +39,11 @@ const { title, context } = Astro.props;
 			import '../scripts/nav-skeleton.ts';
 			// El service worker da los avisos push, la página sin conexión y Vender sin conexión.
 			if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+			// La rueda del mouse sobre un número enfocado lo cambia sin querer (un precio de 7 pasa a 6): se suelta el foco y la página baja.
+			document.addEventListener('wheel', (e) => {
+				const el = e.target;
+				if (el instanceof HTMLInputElement && el.type === 'number' && el === document.activeElement) el.blur();
+			}, { passive: true });
 		</script>
 	</body>
 </html>

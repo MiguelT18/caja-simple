@@ -220,6 +220,19 @@ main:focus {
 		box-shadow 150ms;
 }
 
+/* Números sin las flechas de subir y bajar: son diminutas, en el celular no sirven y se tocan sin querer. */
+input[type='number'] {
+	appearance: textfield;
+	-moz-appearance: textfield;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	appearance: none;
+	margin: 0;
+}
+
 /* Varias líneas: aire arriba y abajo (el padding de .input es solo a los lados). */
 textarea.input {
 	padding-block: 0.625rem;

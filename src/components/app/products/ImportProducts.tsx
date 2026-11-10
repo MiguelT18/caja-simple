@@ -1,6 +1,6 @@
 import { actions } from "astro:actions";
 import { useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
-import { CircleCheck, Download, FileUp, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { CircleCheck, Download, FileUp, ImagePlus, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { AppDialog } from "../AppDialog";
@@ -9,6 +9,10 @@ import { toCsv } from "@/lib/format";
 import { toast } from "@/scripts/dialogs";
 import { refreshRegions } from "@/scripts/refresh";
 import { FilePicker, safeAction } from "./form";
+import { shrinkImage } from "@/scripts/shrink-image";
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+type Photo = { file: File; url: string };
 
 const SHOWN_ERRORS = 8;
 const MAX_ROWS = 500;
@@ -57,6 +61,8 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
   // marcar o desmarcar «código de barras» no mueve lo ya escrito.
   const [grid, setGrid] = useState<GridRow[]>(() => emptyRows(START_ROWS));
   const tableRef = useRef<HTMLTableElement>(null);
+  // La foto de cada fila (mismo índice que grid). No va en el CSV: se sube después del alta, una por producto.
+  const [photos, setPhotos] = useState<(Photo | undefined)[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   // Con una sola sucursal, lo importado queda listo para vender ahí sin tener que marcarla.
@@ -100,7 +106,13 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
   const ready = rows.length > 0 && !tooMany;
 
   const [fileName, setFileName] = useState("");
+  function clearPhotos() {
+    for (const p of photos) if (p) URL.revokeObjectURL(p.url);
+    setPhotos([]);
+  }
+
   function reset() {
+    clearPhotos();
     setGrid(emptyRows(START_ROWS));
     setMessage("");
     setFileName("");
@@ -120,6 +132,8 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
   }
 
   function removeRow(row: number) {
+    if (photos[row]) URL.revokeObjectURL(photos[row]!.url);
+    setPhotos((list) => list.filter((_, i) => i !== row));
     setGrid((g) => (g.length === 1 ? emptyRows(1) : g.filter((_, i) => i !== row)));
     focusCell(Math.max(0, Math.min(row, grid.length - 2)), 0);
   }
@@ -147,6 +161,7 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
     setFileName(file.name);
     if (file.size > 1_000_000) return setMessage("El archivo pesa más de 1 MB. Divídelo en partes.");
     const table = parseCsv(await file.text());
+    clearPhotos();
     setGrid([]);
     load(table, { row: 0, col: 0 });
   }
@@ -171,17 +186,61 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
     }
   }
 
+  async function pickPhoto(row: number, input: HTMLInputElement) {
+    const original = input.files?.[0];
+    input.value = "";
+    if (!original) return;
+    const file = await shrinkImage(original, 640);
+    const problem = !IMAGE_TYPES.includes(file.type) ? "Elige una foto JPG, PNG o WebP." : file.size > 2 * 1024 * 1024 ? "La foto pesa más de 2 MB. Elige una más liviana." : "";
+    if (problem) return setMessage(`Fila ${row + 1}: ${problem}`);
+    setMessage("");
+    setPhotos((list) => {
+      const next = [...list];
+      if (next[row]) URL.revokeObjectURL(next[row]!.url);
+      next[row] = { file, url: URL.createObjectURL(file) };
+      return next;
+    });
+  }
+
+  /** Sube las fotos de los productos recién creados, de a tres. Devuelve cuántas no se pudieron subir. */
+  async function uploadPhotos(created: Record<string, string>) {
+    const jobs = grid.flatMap((row, i) => {
+      const id = created[(row.name ?? "").trim().toLowerCase()];
+      return photos[i] && id ? [{ id, file: photos[i]!.file }] : [];
+    });
+    let failed = 0;
+    let firstError = "";
+    for (let i = 0; i < jobs.length; i += 3) {
+      await Promise.all(
+        jobs.slice(i, i + 3).map(async ({ id, file }) => {
+          const form = new FormData();
+          form.set("businessId", businessId);
+          form.set("id", id);
+          form.set("image", file);
+          const { error } = await safeAction(() => actions.productImage(form));
+          if (error) (failed++, (firstError ||= error.message));
+        }),
+      );
+    }
+    return { failed, firstError };
+  }
+
   async function submit() {
     if (busy || !ready) return;
     setBusy(true);
     const { data, error } = await safeAction(() => actions.importProducts({ businessId, rows, branchIds }));
+    if (error) {
+      setBusy(false);
+      return setMessage(error.message);
+    }
+    const { failed, firstError } = await uploadPhotos(data.created);
     setBusy(false);
-    if (error) return setMessage(error.message);
     const where = data.stocked && chosen.length ? ` y quedaron listos en ${chosen.length === 1 ? chosen[0].name : `${chosen.length} sucursales`}` : "";
     const skipped = data.skipped.length ? ` ${data.skipped.length} ya estaban en el catálogo y no se repitieron.` : "";
     setOpen(false);
     reset();
-    toast(`Se importaron ${data.imported} productos${where}.${skipped}`, "success");
+    const photoNote = failed ? ` ${failed === 1 ? "1 foto no se subió" : `${failed} fotos no se subieron`} (${firstError}); agrégalas desde el producto.` : "";
+    toast(`Se importaron ${data.imported} productos${where}.${skipped}${photoNote}`, failed ? "warning" : "success");
     await refreshRegions();
   }
 
@@ -269,7 +328,8 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
           <div className="grid min-w-0 gap-2">
             <p id="import-grid-hint" className="field-hint m-0">
               Escribe un producto por fila, o pega celdas copiadas de Excel o Google Sheets en la primera casilla: se reparten solas. Solo el nombre es
-              obligatorio; sin precio se cobra al vender y sin stock no se controla. Enter o las flechas pasan de fila.
+              obligatorio; sin precio se cobra al vender y sin stock no se controla. Enter o las flechas pasan de fila. La foto es opcional: toca el
+              cuadro de la fila.
             </p>
             <div className="max-h-[22rem] overflow-auto rounded-lg border">
               <table ref={tableRef} className="w-full min-w-[36rem] border-collapse text-left text-sm" aria-describedby="import-grid-hint">
@@ -278,6 +338,9 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
                   <tr>
                     <th scope="col" className="w-10 px-2 py-2 text-center font-semibold text-[var(--color-text-muted)]">
                       <span className="sr-only">Fila</span>#
+                    </th>
+                    <th scope="col" className="w-12 px-2 py-2 font-semibold">
+                      Foto
                     </th>
                     {columns.map((c) => (
                       <th key={c.key} scope="col" className={`px-2 py-2 font-semibold ${numeric(c.key) ? "text-right" : ""}`}>
@@ -303,6 +366,22 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
                         <th scope="row" className="num px-2 text-center font-normal text-[var(--color-text-muted)]">
                           {ri + 1}
                         </th>
+                        <td className="p-1">
+                          {/* El label hace de botón: abre la galería o la cámara. */}
+                          <label
+                            className="grid size-10 cursor-pointer place-items-center overflow-hidden rounded-md border bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--color-focus)] hover:border-[var(--color-primary)]"
+                            title={photos[ri] ? "Cambiar foto" : "Agregar foto"}
+                          >
+                            <input
+                              type="file"
+                              accept={IMAGE_TYPES.join(",")}
+                              className="sr-only"
+                              aria-label={`${photos[ri] ? "Cambiar la foto" : "Agregar una foto"}, fila ${ri + 1}`}
+                              onChange={(e) => pickPhoto(ri, e.target)}
+                            />
+                            {photos[ri] ? <img src={photos[ri]!.url} alt="" className="size-full object-cover" /> : <ImagePlus className="size-5" aria-hidden="true" />}
+                          </label>
+                        </td>
                         {columns.map((c, ci) => (
                           <td key={c.key} className="p-1">
                             <input

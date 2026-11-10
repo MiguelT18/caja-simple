@@ -22,6 +22,7 @@ export function ProductForm({
   comboSeed,
   catalog = [],
   branches = [],
+  withStock = true,
   onClose,
 }: {
   businessId: string;
@@ -32,6 +33,8 @@ export function ProductForm({
   comboSeed?: string[];
   catalog?: CatalogEntry[];
   branches?: { id: string; name: string }[];
+  /** Sin control de stock (plan Gratis): al agregar, solo el precio. */
+  withStock?: boolean;
   onClose: () => void;
 }) {
   const isCombo = combo || Boolean(product?.components);
@@ -46,6 +49,7 @@ export function ProductForm({
       another.current ? undefined
       : product ? `Cambios de «${form.get("name")}» guardados.`
       : isCombo ? `El combo «${form.get("name")}» se armó${form.getAll("priceBranch").length ? " y ya se puede vender" : ""}.`
+      : form.getAll("priceBranch").length ? `«${form.get("name")}» se agregó y ya se puede vender.`
       : `«${form.get("name")}» se agregó al catálogo.`,
   );
 
@@ -59,6 +63,7 @@ export function ProductForm({
     setPreview(undefined);
     setPhotoName("");
     setFileError("");
+    setOff(new Set());
     setLastAdded(name);
     (form.elements.namedItem("name") as HTMLInputElement).focus();
   }
@@ -71,6 +76,9 @@ export function ProductForm({
   const [shrinking, setShrinking] = useState(false);
   const imageError = fileError || save.errors.image;
   const soldIn = product && "soldIn" in product ? product.soldIn : [];
+  // Producto nuevo: se vende desde ya en las sucursales marcadas (todas, salvo las que se desmarquen).
+  const [off, setOff] = useState<Set<string>>(new Set());
+  const placing = !product && !isCombo && branches.length > 0;
 
   async function remove() {
     if (!product || !(await confirmDialog(`¿Borrar «${product.name}» del catálogo? Se quita de todas las sucursales.`, { confirmLabel: "Borrar", danger: true }))) return;
@@ -90,6 +98,7 @@ export function ProductForm({
       description={
         isCombo ? "Junta productos de tu catálogo y véndelos a un precio propio. Al venderlo se descuenta el stock de cada uno."
         : soldIn.length ? "El stock se cambia en el inventario de cada sucursal."
+        : placing ? "Elige dónde se vende y ponle precio" + (withStock ? " y stock." : ".")
         : "El precio y el stock se ponen en el inventario de cada sucursal."
       }
       size={isCombo ? "lg" : "md"}
@@ -186,6 +195,44 @@ export function ProductForm({
               ))}
               <p className={save.errors.price ? "field-error m-0" : "field-hint m-0"}>
                 {save.errors.price || "Déjalo vacío para que quien vende escriba el precio en cada venta."}
+              </p>
+            </fieldset>
+          )}
+          {placing && (
+            <fieldset className="grid min-w-0 gap-4 border-0 p-0">
+              <legend className="mb-1 text-sm font-semibold">Dónde se vende</legend>
+              {branches.map((b) => {
+                const on = !off.has(b.id);
+                return (
+                  <div key={b.id} className="grid min-w-0 gap-2">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-semibold">
+                      <input
+                        type="checkbox"
+                        name="priceBranch"
+                        value={b.id}
+                        checked={on}
+                        onChange={(e) => setOff((s) => { const next = new Set(s); e.target.checked ? next.delete(b.id) : next.add(b.id); return next; })}
+                        className="size-5 shrink-0 accent-[var(--color-primary)]"
+                      />
+                      Vender en {b.name}
+                    </label>
+                    {/* Deshabilitados no se envían: sucursal, precio y stock siguen en el mismo orden (ver saveProduct). */}
+                    <div className={withStock ? "grid min-w-0 grid-cols-2 gap-3" : "grid min-w-0"}>
+                      <Field id={`new-price-${b.id}`} label="Precio (Bs)">
+                        <input id={`new-price-${b.id}`} name="price" type="number" inputMode="decimal" step="0.01" min="0" className="input" placeholder="Al vender" disabled={!on} />
+                      </Field>
+                      {withStock && (
+                        <Field id={`new-stock-${b.id}`} label="Stock">
+                          <input id={`new-stock-${b.id}`} name="stock" type="number" inputMode="numeric" step="1" min="0" className="input" placeholder="Sin control" disabled={!on} />
+                        </Field>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <p className={save.errors.price || save.errors.stock ? "field-error m-0" : "field-hint m-0"}>
+                {save.errors.price || save.errors.stock ||
+                  (withStock ? "Sin precio, quien vende lo escribe en cada venta. Sin stock, no se lleva la cuenta." : "Sin precio, quien vende lo escribe en cada venta. El control de stock es del plan Negocio.")}
               </p>
             </fieldset>
           )}
