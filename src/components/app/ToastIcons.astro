@@ -1,0 +1,11 @@
+---
+// Íconos de los avisos flotantes (scripts/dialogs.ts › toast): el script no puede usar componentes de Lucide, así que
+// los clona de estas plantillas. Uno por tono, más el de cerrar.
+import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from "@lucide/astro";
+---
+
+<template data-toast-icon="success"><CircleCheck size={20} stroke-width={1.75} /></template>
+<template data-toast-icon="error"><CircleAlert size={20} stroke-width={1.75} /></template>
+<template data-toast-icon="warning"><TriangleAlert size={20} stroke-width={1.75} /></template>
+<template data-toast-icon="info"><Info size={20} stroke-width={1.75} /></template>
+<template data-toast-icon="close"><X size={18} stroke-width={1.75} /></template>

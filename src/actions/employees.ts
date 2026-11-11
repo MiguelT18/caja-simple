@@ -53,12 +53,14 @@ export const employees = {
    * y qué ve: por nombre, el correo llega enmascarado (`byEmail: false`).
    */
   searchPeople: defineAction({
-    input: z.object({ businessId: uuid, query: z.string().trim().max(120), page: z.number().int().min(1).max(1000).default(1) }),
+    // Sin businessId: al crear el primer negocio, para invitar al equipo (la base lo acota a quien no tiene ninguno).
+    input: z.object({ businessId: uuid.optional(), query: z.string().trim().max(120), page: z.number().int().min(1).max(1000).default(1) }),
     handler: async ({ businessId, query, page }, context) => {
       if (query.length < 3) return { people: [], total: 0, page };
       // El límite evita recorrer las cuentas de todos a fuerza de búsquedas.
       await limit(context, "search", 30, 60);
-      const { data, error } = await db(context).rpc("search_people", { p_business: businessId, p_query: query, p_page: page });
+      // El tipo generado no admite null en p_business, pero la función sí (20261110160000_search_people_first_business.sql).
+      const { data, error } = await db(context).rpc("search_people", { p_business: businessId ?? (null as unknown as string), p_query: query, p_page: page });
       check(error);
       return {
         // La base devuelve 5 por página y el total en cada fila.

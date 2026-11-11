@@ -1,5 +1,6 @@
 // Tipos de dominio de la app. Ver docs/modelo-de-datos.md.
 // Salen de la base (src/lib/database.types.ts) ya convertidos a la forma que usan las páginas.
+import type { BrandColor } from "./brand";
 
 export interface Person {
   id: string;
@@ -31,6 +32,8 @@ export interface Business {
   description?: string;
   /** Aparece en Buscar (/app/buscar) y recibe pedidos para unirse. */
   listed: boolean;
+  /** Color del negocio, de la paleta de src/data/brand.ts: su acento dentro de la app. */
+  color: BrandColor;
 }
 
 export type BusinessKind = "tienda" | "ropa" | "restaurante";

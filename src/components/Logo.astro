@@ -4,13 +4,13 @@ interface Props {
 }
 
 // La marca: una caja abierta y un check que entra en ella («la caja cuadra»). Misma geometría que public/brand/logo.svg.
-// El cuadrado toma currentColor (el ámbar de cada tema) y el trazo, el color de la superficie.
+// El cuadrado es --color-logo (el ámbar de cada tema; no cambia con el color de un negocio) y el trazo, el color de la superficie.
 // `rest` lleva el atributo de scope de Astro para que los estilos del padre lleguen al SVG.
 const { class: className, ...rest } = Astro.props;
 ---
 
 <svg class={className} viewBox="0 0 32 32" aria-hidden="true" {...rest}>
-  <rect width="32" height="32" rx="8" fill="currentColor"></rect>
+  <rect width="32" height="32" rx="8" fill="var(--color-logo, currentColor)"></rect>
   <g fill="none" stroke="var(--color-surface)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8.5 13.5v7.5a4 4 0 0 0 4 4h7a4 4 0 0 0 4-4v-3.5"></path>
     <path d="M12.5 15.5l3.5 3.5 8.5-10.5"></path>

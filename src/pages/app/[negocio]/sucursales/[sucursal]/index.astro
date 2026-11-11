@@ -7,7 +7,7 @@ import WeekChart from "@/components/app/charts/WeekChart";
 import MovementsTable from "@/components/app/MovementsTable";
 import LiveStatus from "@/components/app/LiveStatus.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, headerBackdrop, shiftBarData, branchHref, isLowStock, orderLabels, receiptUrls } from "@/data/queries";
+import { branchContext, headerBackdrop, shiftBarData, branchHref, isLowStock, orderLabels, receiptUrls } from "@/data/queries";
 import { differenceLabel, formatBs, plural, shiftHours } from "@/lib/format";
 import { longDate } from "@/lib/dates";
 
@@ -48,15 +48,14 @@ const movements = [
   });
 
 const lowStock = products.filter(isLowStock);
-const color = branchColor(ctx.membership, branch.id);
 const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(ctx.employees.length, "persona", "personas")]
   .filter(Boolean)
   .join(" · ");
 ---
 
 <Layout title={`Resumen · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader {...businessBackdrop} tint={color} eyebrow={longDate(today)} title={branch.name} description={meta}>
-    <span slot="cover" class="cover-art" style={`--branch: ${color}`}>
+  <PageHeader {...businessBackdrop} eyebrow={longDate(today)} title={branch.name} description={meta}>
+    <span slot="cover" class="cover-art">
       <Store size={64} stroke-width={1.5} />
       {/* Mismo view-transition-name que la foto de la BranchCard: la fachada pasa de la tarjeta a la portada. */}
       {cover.image && <img src={cover.image} alt="" decoding="async" style={cover.transition && `view-transition-name: ${cover.transition}`} data-fallback />}
@@ -218,11 +217,11 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
     place-items: center;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, color-mix(in oklab, var(--branch) 55%, var(--color-surface)), color-mix(in oklab, var(--branch) 20%, var(--color-surface)));
+    background: linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 55%, var(--color-surface)), color-mix(in oklab, var(--color-primary) 20%, var(--color-surface)));
     color: var(--color-text);
   }
 
-  /* La foto tapa el ícono; si no carga (data-fallback), queda el ícono sobre el color de la sucursal. */
+  /* La foto tapa el ícono; si no carga (data-fallback), queda el ícono sobre el color del negocio. */
   .cover-art img {
     position: absolute;
     inset: 0;

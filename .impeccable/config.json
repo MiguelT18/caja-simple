@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/components/app/FirstBusiness.astro"
+        ],
+        "createdAt": "2026-11-10T15:10:54.839Z",
+        "reason": "Claude: <img hidden> sin src es la vista previa del logo; el script le pone el src de la foto elegida antes de mostrarla"
+      }
+    ]
+  }
+}

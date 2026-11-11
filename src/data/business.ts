@@ -25,7 +25,7 @@ export async function businessContext(locals: App.Locals, businessSlug: string) 
   // Turnos, catálogo, categorías y equipo cambian poco: van a la caché. Stock y movimientos, siempre frescos.
   const slow = () =>
     Promise.all([
-      sb.from("shifts").select("*").in("branch_id", branchIds).order("start_time"),
+      sb.from("shifts").select("*").in("branch_id", branchIds).order("position"),
       sb.from("products").select(`*, categories(name), ${COMBO_PARTS}`).eq("business_id", business.id).order("name"),
       sb.from("categories").select("id, name").eq("business_id", business.id).order("name"),
       sb.from("employees").select(EMPLOYEE_COLUMNS).eq("business_id", business.id).order("created_at"),

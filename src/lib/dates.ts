@@ -3,6 +3,12 @@ import { overnight } from "./format";
 
 export const TIME_ZONE = "America/La_Paz";
 
+/** El momento del día (color e ícono de un turno) sale de su hora de inicio: 5 a 12 mañana, 12 a 19 tarde, el resto noche. */
+export function toneOf(start: string): "morning" | "afternoon" | "night" {
+  const hour = Number(start.slice(0, 2));
+  return hour >= 5 && hour < 12 ? "morning" : hour >= 12 && hour < 19 ? "afternoon" : "night";
+}
+
 const dayFormat = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE });
 const clockFormat = new Intl.DateTimeFormat("es-BO", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const stampFormat = new Intl.DateTimeFormat("es-BO", {

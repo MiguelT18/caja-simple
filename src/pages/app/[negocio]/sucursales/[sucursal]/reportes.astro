@@ -8,7 +8,6 @@ import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
 import { planLimits } from "@/data/plans";
 import {
-  branchColor,
   branchContext,
   businessHref,
   byPeriod,
@@ -61,7 +60,6 @@ const csvHref = `reportes.csv?desde=${range.from}&hasta=${range.to}`;
 
 <Layout title={`Reportes · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
   <PageHeader {...ctx.backdrop}
-    tint={branchColor(ctx.membership, branch.id)}
     eyebrow={longDate(today)}
     title="Reportes"
     description={allowed ? `Ventas y gastos ${rangeText} en ${branch.name}.` : `Ventas y gastos de ${branch.name} por día, semana y mes.`}

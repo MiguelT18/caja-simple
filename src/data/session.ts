@@ -130,7 +130,7 @@ export async function accountSettings(locals: Locals) {
   // Donde trabaja como empleada: puede cambiar su turno entre los vigentes de su sucursal.
   const jobs = myBusinesses(locals).filter((m) => m.role === "empleado" && m.employee && m.branches[0]);
   const { data: shiftRows } = jobs.length
-    ? await locals.supabase.from("shifts").select("*").in("branch_id", jobs.map((m) => m.branches[0].id)).is("archived_at", null).order("start_time")
+    ? await locals.supabase.from("shifts").select("*").in("branch_id", jobs.map((m) => m.branches[0].id)).is("archived_at", null).order("position")
     : { data: [] };
   return {
     user: session(locals).user,

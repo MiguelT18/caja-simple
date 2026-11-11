@@ -8,7 +8,7 @@ import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, shiftBarData, branchHref, expensesByCategory, fullName, sum } from "@/data/queries";
+import { branchContext, shiftBarData, branchHref, expensesByCategory, fullName, sum } from "@/data/queries";
 import { formatBs } from "@/lib/format";
 import { addDays, longDate, parseRange, shortDate, today as todayOf } from "@/lib/dates";
 
@@ -48,7 +48,7 @@ const rows = expenseHistory.map((g) => {
 ---
 
 <Layout title={`Gastos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader {...ctx.backdrop} tint={branchColor(ctx.membership, branch.id)} eyebrow={longDate(today)} title="Gastos" description={`Lo que salió de la caja ${rangeText} en ${branch.name}.`}>
+  <PageHeader {...ctx.backdrop} eyebrow={longDate(today)} title="Gastos" description={`Lo que salió de la caja ${rangeText} en ${branch.name}.`}>
     {
       currentShift ? (
         <button type="button" class="btn btn-primary" data-open-dialog="expense">
