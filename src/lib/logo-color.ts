@@ -30,7 +30,9 @@ export function nearestBrand(rgb: Rgb): BrandColor {
   let best: { key: BrandColor; d: number } = { key: brandColors[0].key, d: Infinity };
   for (const c of brandColors) {
     const [cl, ca, cb] = oklab(hex(c.light));
-    const cc = Math.hypot(ca, cb) || 1;
+    const cc = Math.hypot(ca, cb);
+    // Grafito (casi sin color) no es un tono: un logo con color nunca cae ahí.
+    if (cc < 0.05) continue;
     const d = Math.hypot(a / chroma - ca / cc, b / chroma - cb / cc) + 0.3 * Math.abs(L - cl);
     if (d < best.d) best = { key: c.key, d };
   }

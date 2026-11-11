@@ -15,7 +15,9 @@ describe("nearestBrand", () => {
     expect(nearestBrand([240, 150, 40])).toBe("ambar");
     expect(nearestBrand([150, 90, 200])).toBe("violeta");
     expect(nearestBrand([20, 160, 160])).toBe("turquesa");
-    expect(nearestBrand([250, 160, 200])).toBe("rosa");
+    expect(nearestBrand([250, 160, 200])).toBe("fucsia");
+    expect(nearestBrand([30, 170, 230])).toBe("celeste");
+    expect(nearestBrand([150, 180, 40])).toBe("lima");
   });
 });
 

@@ -38,6 +38,11 @@
 	background: var(--color-bg);
 }
 
+/* Checkboxes, radios y rangos nativos en el color del negocio. */
+.app-surface {
+	accent-color: var(--color-primary);
+}
+
 .app-surface ::selection {
 	background: color-mix(in srgb, var(--color-primary) 35%, transparent);
 }

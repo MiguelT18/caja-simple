@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { brandColors } from "./brand";
+import { brandColors, tinted } from "./brand";
 
 // Contraste WCAG entre dos #rrggbb.
 const lum = (hex: string) => {
@@ -16,7 +16,30 @@ const contrast = (a: string, b: string) => {
 const light = { onPrimary: "#ffffff", surfaces: ["#ffffff", "#f3f0eb"] };
 const dark = { onPrimary: "#1f1a17", surfaces: ["#161311", "#221e1b"] };
 
+// color-mix(in srgb, a p, b), como en brandStyle.
+const mix = (a: string, b: string, p: number) =>
+  "#" + [0, 1, 2].map((i) => Math.round(parseInt(a.slice(1 + 2 * i, 3 + 2 * i), 16) * p + parseInt(b.slice(1 + 2 * i, 3 + 2 * i), 16) * (1 - p)).toString(16).padStart(2, "0")).join("");
+
 describe("paleta del negocio", () => {
+  it.each(brandColors)("los neutros teñidos de $label dejan leer el texto", ({ light: l, dark: d }) => {
+    // --color-text y --color-text-muted de app-surface.css, y el color como texto, sobre suelo, tarjetas y hover.
+    const themes = [
+      { i: 0, color: l, text: "#1a1613", muted: "#5c544c", surface: mix(l, "#ffffff", tinted["--color-surface"].mix[0]) },
+      { i: 1, color: d, text: "#f5f1ec", muted: "#b3a99e", surface: mix(d, "#161311", tinted["--color-surface"].mix[1]) },
+    ];
+    for (const t of themes) {
+      const tint = (name: keyof typeof tinted) => mix(t.color, tinted[name].base[t.i], tinted[name].mix[t.i]);
+      for (const bg of [tint("--color-bg"), tint("--color-surface"), tint("--color-surface-muted"), tint("--color-surface-hover")]) {
+        expect(contrast(t.text, bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(t.muted, bg)).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(t.color, tint("--color-surface-muted"))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t.color, tint("--color-surface"))).toBeGreaterThanOrEqual(4.5);
+      // El borde de los inputs se distingue del panel.
+      expect(contrast(tint("--color-border-strong"), t.surface)).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it.each(brandColors)("$label cumple AA en los dos temas", ({ light: l, dark: d }) => {
     // Texto del botón primario sobre el color, y el color como texto (ítem activo, enlaces) sobre las superficies.
     expect(contrast(light.onPrimary, l)).toBeGreaterThanOrEqual(4.5);

@@ -124,9 +124,36 @@ function trackChanges(form: HTMLFormElement) {
   update();
 }
 
+const hasUnsaved = () => [...unsaved].some((form) => form.isConnected && !form.closest("dialog:not([open])"));
+
+// Recargar, cerrar la pestaña o «Atrás» del navegador: solo el aviso nativo puede frenarlos.
 window.addEventListener("beforeunload", (event) => {
-  if ([...unsaved].some((form) => form.isConnected && !form.closest("dialog:not([open])"))) event.preventDefault();
+  if (hasUnsaved()) event.preventDefault();
 });
+
+// Un enlace de la app con cambios sin guardar: se pregunta con nuestro diálogo antes del esqueleto (nav-skeleton.ts,
+// que no actúa si el clic ya se canceló; por eso va en captura). Al confirmar, se sale sin el aviso nativo.
+document.addEventListener(
+  "click",
+  async (event) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !hasUnsaved()) return;
+    const link = (event.target as Element).closest?.("a[href]");
+    if (!(link instanceof HTMLAnchorElement) || link.target || link.hasAttribute("download")) return;
+    const url = new URL(link.href);
+    if (url.origin !== location.origin || (url.pathname === location.pathname && url.search === location.search)) return;
+    event.preventDefault();
+    const leave = await confirmDialog("Si sales ahora, se pierden los cambios que no guardaste.", {
+      title: "¿Salir sin guardar?",
+      confirmLabel: "Salir sin guardar",
+      danger: true,
+    });
+    if (!leave) return;
+    unsaved.clear();
+    if (url.pathname.startsWith("/app")) showPageSkeleton(url);
+    location.assign(url);
+  },
+  { capture: true },
+);
 
 document.addEventListener("click", (event) => {
   const target = event.target instanceof Element ? event.target : null;

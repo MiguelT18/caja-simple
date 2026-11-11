@@ -1,5 +1,5 @@
 ---
-// Encabezado de página de /app: un degradado del color de la entidad (sucursal o negocio) que se funde con el panel,
+// Encabezado de página de /app: un degradado del color del negocio que se funde con el panel,
 // el título grande y, debajo, las acciones. El slot `back` pone un enlace de volver sobre el título. Con el slot `cover`, se arma como la portada de un álbum a la izquierda.
 interface Props {
   title: string;
@@ -8,7 +8,7 @@ interface Props {
   eyebrow?: string;
   /** Encabezado bajo para las páginas de trabajo rápido («Vender»): deja ver el contenido en el primer pantallazo. */
   compact?: boolean;
-  /** Color del degradado: el de la sucursal (branchColor) o, por defecto, el ámbar del negocio. */
+  /** Color del degradado: por defecto, el color del negocio (--color-primary, src/data/brand.ts). */
   tint?: string;
   /** La descripción muestra datos que cambian al guardar (p. ej., «12 productos»): se actualiza sin recargar (scripts/refresh.ts). */
   live?: boolean;
@@ -64,8 +64,8 @@ const hasActions = Astro.slots.has("default");
     padding: clamp(2.5rem, 6vw, 4.5rem) var(--main-pad) 1.5rem;
     background: linear-gradient(
       180deg,
-      color-mix(in oklab, var(--tint) 40%, var(--color-surface)) 0%,
-      color-mix(in oklab, var(--tint) 16%, var(--color-surface)) 65%,
+      color-mix(in oklab, var(--tint) 30%, var(--color-surface)) 0%,
+      color-mix(in oklab, var(--tint) 10%, var(--color-surface)) 65%,
       var(--color-surface) 100%
     );
   }
@@ -103,8 +103,8 @@ const hasActions = Astro.slots.has("default");
     z-index: -1;
     background: linear-gradient(
       180deg,
-      color-mix(in oklab, var(--tint) 25%, transparent) 0%,
-      color-mix(in oklab, var(--color-surface) 92%, transparent) 50%,
+      color-mix(in oklab, var(--tint) 35%, transparent) 0%,
+      color-mix(in oklab, color-mix(in oklab, var(--tint) 6%, var(--color-surface)) 92%, transparent) 55%,
       var(--color-surface) 100%
     );
   }

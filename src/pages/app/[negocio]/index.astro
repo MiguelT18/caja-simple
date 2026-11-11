@@ -591,10 +591,10 @@ const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.
     background: var(--color-surface-hover);
   }
 
-  /* Píldora activa invertida, como los filtros de Vender. */
+  /* Píldora activa en el color del negocio, como los filtros de Vender. */
   .period[aria-current] {
-    background: var(--color-text);
-    color: var(--color-surface);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
   }
 
   .stats-grid {

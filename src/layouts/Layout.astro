@@ -4,6 +4,7 @@ import '../styles/app.css';
 import '../styles/app-surface.css';
 import Sidebar from '../components/Sidebar.astro';
 import PageSkeleton from '../components/app/PageSkeleton.astro';
+import ToastIcons from '../components/app/ToastIcons.astro';
 import ShiftBar from '../components/app/ShiftBar.astro';
 import type { Branch } from '../data/types';
 import { currentUser, type Membership, type ShiftBarData } from '../data/queries';
@@ -36,6 +37,7 @@ const { title, context } = Astro.props;
 		</main>
 		{context?.shift && <ShiftBar data={context.shift} />}
 		<PageSkeleton />
+		<ToastIcons />
 		<script>
 			import '../scripts/action-forms.ts';
 			import '../scripts/nav-skeleton.ts';

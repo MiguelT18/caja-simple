@@ -8,7 +8,7 @@ import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, businessHref, closesBetween, shiftBarData, fullName } from "@/data/queries";
+import { branchContext, businessHref, closesBetween, shiftBarData, fullName } from "@/data/queries";
 import { differenceLabel, formatBs, overnight, shiftHours } from "@/lib/format";
 import { addDays, inShiftWindow, longDate, openFrom, parseRange, shortDate, stamp } from "@/lib/dates";
 import { DAY_NAMES } from "@/lib/schedule";
@@ -35,7 +35,7 @@ const daysLabel = (weekdays: number[] | null) =>
 ---
 
 <Layout title={`Turnos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader {...ctx.backdrop} tint={branchColor(ctx.membership, branch.id)} eyebrow={longDate(today)} title="Turnos" description={`Horarios, quién está a cargo y el cuadre de caja de hoy en ${branch.name}.`}>
+  <PageHeader {...ctx.backdrop} eyebrow={longDate(today)} title="Turnos" description={`Horarios, quién está a cargo y el cuadre de caja de hoy en ${branch.name}.`}>
     {
       isOwner && (
         <button type="button" class="btn btn-primary" data-open-dialog="shift-new">

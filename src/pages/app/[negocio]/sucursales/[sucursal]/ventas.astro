@@ -5,7 +5,7 @@ import ShiftChip from "@/components/ShiftChip.astro";
 import MovementsTable from "@/components/app/MovementsTable";
 import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, shiftBarData, branchHref, orderLabels, receiptUrls, saleLines, sum } from "@/data/queries";
+import { branchContext, shiftBarData, branchHref, orderLabels, receiptUrls, saleLines, sum } from "@/data/queries";
 import { addDays, inRange, longDate, parseRange, shortDate, today as todayOf } from "@/lib/dates";
 import { formatBs, plural } from "@/lib/format";
 
@@ -59,7 +59,6 @@ const rows = [...salesHistory]
 
 <Layout title={`Ventas · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
   <PageHeader {...ctx.backdrop}
-    tint={branchColor(ctx.membership, branch.id)}
     eyebrow={longDate(today)}
     title="Ventas"
     description={`Lo que se vendió ${rangeText} en ${branch.name}.`}
