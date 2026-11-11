@@ -4,14 +4,14 @@ import { ActionError, type ActionAPIContext } from "astro:actions";
 import { z } from "astro/zod";
 import { rateLimit } from "@/lib/cache";
 import { imageInfo, tooLarge } from "@/lib/image";
-import { today } from "@/lib/dates";
+import { today, toneOf } from "@/lib/dates";
 import { effectivePlan, planLimits } from "@/data/plans";
 
 // Los mensajes que zod arma solo (los que no escribimos a mano) también en español: nada en inglés llega a la pantalla.
 z.config(z.locales.es());
 
 export const uuid = z.uuid();
-export const name = (max: number, message: string) => z.string().trim().min(1, message).max(max, `Máximo ${max} caracteres`);
+export const name = (max: number, message: string) => z.string({ error: message }).trim().min(1, message).max(max, `Máximo ${max} caracteres`);
 export const money = z.coerce.number({ error: "Ingresa un monto" }).min(0, "No puede ser negativo").max(9_999_999);
 export const count = z.coerce.number({ error: "Ingresa un número" }).int("Usa un número entero").min(0, "No puede ser negativo");
 // Astro manda los campos vacíos de un formulario como null: vacío, null o ausente quedan en undefined.
@@ -90,21 +90,19 @@ export async function freeSlug(base: string, taken: (slug: string) => Promise<bo
 
 // Turnos que vienen de ShiftsEditor: campos repetidos, uno por fila.
 export const time = z.string().regex(/^\d{2}:\d{2}$/, "Hora no válida");
-export const tone = z.enum(["morning", "afternoon", "night"]);
 export const kind = z.enum(["tienda", "ropa", "restaurante"], { error: "Elige el rubro" }).default("tienda");
 export const shiftList = {
   shiftName: z.array(z.string().trim()).default([]),
   shiftStart: z.array(z.string()).default([]),
   shiftEnd: z.array(z.string()).default([]),
-  shiftTone: z.array(z.string()).default([]),
 };
 
 /** Une las filas del editor de turnos y las valida; los errores van al campo shiftName. */
-export function shiftsFrom(input: { shiftName: string[]; shiftStart: string[]; shiftEnd: string[]; shiftTone: string[] }) {
+export function shiftsFrom(input: { shiftName: string[]; shiftStart: string[]; shiftEnd: string[] }) {
   const fail = (message: string): never => {
     throw new ActionError({ code: "BAD_REQUEST", message });
   };
-  const shifts = input.shiftName.map((name, i) => ({ name, start: input.shiftStart[i] ?? "", end: input.shiftEnd[i] ?? "", tone: input.shiftTone[i] ?? "" }));
+  const shifts = input.shiftName.map((name, i) => ({ name, start: input.shiftStart[i] ?? "", end: input.shiftEnd[i] ?? "", }));
   if (shifts.length === 0) fail("Agrega al menos un turno.");
   if (shifts.length > 8) fail("Máximo 8 turnos por sucursal.");
   const seen = new Set<string>();
@@ -114,11 +112,10 @@ export function shiftsFrom(input: { shiftName: string[]; shiftStart: string[]; s
     if (s.name.length > 40) fail(`El nombre «${s.name}» es muy largo (máximo 40 caracteres).`);
     if (!time.safeParse(s.start).success || !time.safeParse(s.end).success) fail(`${label}: revisa las horas.`);
     if (s.start === s.end) fail(`${label}: la hora de inicio y la de fin no pueden ser iguales.`);
-    if (!tone.safeParse(s.tone).success) fail(`${label}: elige el momento del día.`);
     if (seen.has(s.name.toLowerCase())) fail(`Hay dos turnos llamados «${s.name}».`);
     seen.add(s.name.toLowerCase());
   }
-  return shifts as { name: string; start: string; end: string; tone: z.infer<typeof tone> }[];
+  return shifts.map((s) => ({ ...s, tone: toneOf(s.start) }));
 }
 
 export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];

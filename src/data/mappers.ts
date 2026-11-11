@@ -19,6 +19,8 @@ export const toBusiness = (b: Row<"businesses">): Business => ({
   imagePath: b.image_path ?? undefined,
   description: b.description ?? undefined,
   listed: b.listed,
+  // Una fila cacheada de antes de la columna no la trae: ámbar.
+  color: (b.color ?? "ambar") as Business["color"],
 });
 
 export const toBranch = (b: Row<"branches">): Branch => ({

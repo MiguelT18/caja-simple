@@ -7,7 +7,7 @@ import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
 import { plural } from "@/lib/format";
 import { stamp } from "@/lib/dates";
-import { branchColor, branchContext, shiftBarData, businessHref, isLowStock, stockMoves, stockRequests } from "@/data/queries";
+import { branchContext, shiftBarData, businessHref, isLowStock, stockMoves, stockRequests } from "@/data/queries";
 import { planLimits } from "@/data/plans";
 
 const { negocio, sucursal } = Astro.params;
@@ -48,7 +48,6 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
 
 <Layout title={`Inventario · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
   <PageHeader {...ctx.backdrop}
-    tint={branchColor(ctx.membership, branch.id)}
     title="Inventario"
     live
     description={[`${plural(products.length, "producto", "productos")} en ${branch.name}`, lowCount > 0 && `${lowCount} con stock bajo`].filter(Boolean).join(" · ")}

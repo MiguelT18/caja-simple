@@ -156,6 +156,7 @@ export type Database = {
       };
       businesses: {
         Row: {
+          color: string;
           created_at: string;
           description: string | null;
           founder_since: string | null;
@@ -172,6 +173,7 @@ export type Database = {
         };
         ComputedFields: never;
         Insert: {
+          color?: string;
           created_at?: string;
           description?: string | null;
           founder_since?: string | null;
@@ -187,6 +189,7 @@ export type Database = {
           trial?: boolean;
         };
         Update: {
+          color?: string;
           created_at?: string;
           description?: string | null;
           founder_since?: string | null;
@@ -1319,6 +1322,7 @@ export type Database = {
           end_time: string;
           id: string;
           name: string;
+          position: number;
           start_time: string;
           tone: Database["public"]["Enums"]["shift_tone"];
           weekdays: number[] | null;
@@ -1331,6 +1335,7 @@ export type Database = {
           end_time: string;
           id?: string;
           name: string;
+          position?: number;
           start_time: string;
           tone: Database["public"]["Enums"]["shift_tone"];
           weekdays?: number[] | null;
@@ -1342,6 +1347,7 @@ export type Database = {
           end_time?: string;
           id?: string;
           name?: string;
+          position?: number;
           start_time?: string;
           tone?: Database["public"]["Enums"]["shift_tone"];
           weekdays?: number[] | null;

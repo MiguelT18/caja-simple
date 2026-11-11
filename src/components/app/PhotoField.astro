@@ -14,16 +14,19 @@ interface Props {
   square?: boolean;
   /** Con `square`: portada grande (10rem) con los botones debajo, como en Configuración. */
   cover?: boolean;
+  /** Nombre del archivo en el formulario; otro que «image» si el formulario lleva dos fotos. */
+  name?: string;
 }
 
-const { form, label, image, round = false, square = false, cover = false } = Astro.props;
+const { form, label, image, round = false, square = false, cover = false, name = "image" } = Astro.props;
+const id = `${form}-${name}`;
 const Placeholder = round ? UserRound : Store;
 // Lado mayor al subirla: perfil y logo se ven chicos; la fachada, a lo ancho de una tarjeta (pantallas 2x).
 const max = round || square ? 512 : 1280;
 ---
 
 <div class:list={["field", { round, square, cover }]} data-photo-field data-form={form} data-max={max}>
-  <span class="field-label" id={`${form}-image-label`}>{label}</span>
+  <span class="field-label" id={`${id}-label`}>{label}</span>
   <div class="photo-row">
     <div class="photo-preview">
       <img src={image} alt="" hidden={!image} decoding="async" referrerpolicy="no-referrer" data-photo-preview data-fallback />
@@ -35,12 +38,12 @@ const max = round || square ? 512 : 1280;
         {image ? "Cambiar foto" : "Elegir foto"}
         <input
           class="sr-only"
-          id={`${form}-image`}
+          id={id}
           type="file"
-          name="image"
+          name={name}
           accept="image/jpeg,image/png,image/webp"
-          aria-labelledby={`${form}-image-label`}
-          aria-describedby={`${form}-image-hint ${form}-image-error`}
+          aria-labelledby={`${id}-label`}
+          aria-describedby={`${id}-hint ${id}-error`}
           data-photo-input
         />
       </label>
@@ -54,8 +57,8 @@ const max = round || square ? 512 : 1280;
       }
     </div>
   </div>
-  <p class="field-hint" id={`${form}-image-hint`}>Opcional · JPG, PNG o WebP. La achicamos al subirla</p>
-  <p class="field-error" id={`${form}-image-error`}></p>
+  <p class="field-hint" id={`${id}-hint`}>Opcional · JPG, PNG o WebP. La achicamos al subirla</p>
+  <p class="field-error" id={`${id}-error`}></p>
 </div>
 
 <script>

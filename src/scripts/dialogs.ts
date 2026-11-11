@@ -102,20 +102,25 @@ export function announce(message: string, politeness: "polite" | "assertive" = "
  * Aviso flotante abajo a la derecha (arriba del todo en móvil). Se va solo, salvo los errores y los que llevan enlace
  * (hay que poder leerlos y usarlos sin apuro, WCAG 2.2.1). Con el mouse encima o con foco dentro, no se cierra.
  */
+const icon = (name: string) => document.querySelector<HTMLTemplateElement>(`template[data-toast-icon="${name}"]`)?.content.cloneNode(true);
+
 export function toast(message: string, tone: "error" | "success" | "warning" | "info" = "info", link?: { href: string; label: string }) {
   const { toasts } = regions();
   const el = document.createElement("div");
   el.className = `toast toast-${tone}`;
-  el.innerHTML = `<p></p><button type="button" class="icon-btn" aria-label="Cerrar aviso">×</button>`;
+  el.innerHTML = `<span class="toast-icon" aria-hidden="true"></span><div class="toast-body"><p></p></div><button type="button" class="toast-close" aria-label="Cerrar aviso"></button>`;
   el.querySelector("p")!.textContent = message;
+  const toneIcon = icon(tone);
+  if (toneIcon) el.querySelector(".toast-icon")!.append(toneIcon);
+  const closeIcon = icon("close");
+  el.querySelector(".toast-close")!.append(closeIcon ?? "×");
   if (link) {
-    const a = document.createElement("a");
-    a.href = link.href;
-    a.textContent = link.label;
-    el.querySelector("p")!.append(" ", a);
+    const a = Object.assign(document.createElement("a"), { href: link.href, textContent: link.label, className: "toast-link" });
+    el.querySelector(".toast-body")!.append(a);
   }
 
   const dismiss = () => {
+    if (el.classList.contains("toast-leaving")) return;
     el.classList.add("toast-leaving");
     // Sin animación (movimiento reducido) no hay animationend: se quita igual.
     const remove = () => el.remove();
@@ -123,17 +128,20 @@ export function toast(message: string, tone: "error" | "success" | "warning" | "
     setTimeout(remove, 400);
   };
   el.querySelector("button")!.addEventListener("click", dismiss);
+  el.addEventListener("keydown", (e) => e.key === "Escape" && dismiss());
   toasts.append(el);
   announce(link ? `${message} ${link.label}` : message, tone === "error" ? "assertive" : "polite");
 
   if (tone === "error" || link) return;
-  let timer = setTimeout(dismiss, 6000);
-  const pause = () => clearTimeout(timer);
-  const resume = () => {
-    if (el.matches(":hover, :focus-within")) return;
-    clearTimeout(timer);
-    timer = setTimeout(dismiss, 3000);
-  };
+  // La barra de abajo muestra cuánto le queda; es el reloj del aviso: se pausa con el mouse encima o con foco dentro.
+  // Con movimiento reducido la barra no se ve, pero el tiempo corre igual.
+  const bar = Object.assign(document.createElement("span"), { className: "toast-progress" });
+  bar.setAttribute("aria-hidden", "true");
+  el.append(bar);
+  const clock = bar.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], { duration: 6000, fill: "forwards" });
+  clock.onfinish = dismiss;
+  const pause = () => clock.pause();
+  const resume = () => !el.matches(":hover, :focus-within") && clock.play();
   el.addEventListener("mouseenter", pause);
   el.addEventListener("focusin", pause);
   el.addEventListener("mouseleave", resume);

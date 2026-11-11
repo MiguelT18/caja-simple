@@ -1,5 +1,5 @@
 ---
-import { CalendarX2, CircleCheck, Hourglass, LockOpen, MessageSquareText, Pencil, Plus, RotateCcw, Trash, TriangleAlert } from "@lucide/astro";
+import { CalendarX2, CircleCheck, GripVertical, Hourglass, LockOpen, MessageSquareText, Pencil, Plus, RotateCcw, Trash, TriangleAlert } from "@lucide/astro";
 import Avatar from "@/components/Avatar.astro";
 import ClosuresCalendar from "@/components/app/ClosuresCalendar";
 import PageHeader from "@/components/PageHeader.astro";
@@ -8,7 +8,7 @@ import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, businessHref, closesBetween, shiftBarData, fullName } from "@/data/queries";
+import { branchContext, businessHref, closesBetween, shiftBarData, fullName } from "@/data/queries";
 import { differenceLabel, formatBs, overnight, shiftHours } from "@/lib/format";
 import { addDays, inShiftWindow, longDate, openFrom, parseRange, shortDate, stamp } from "@/lib/dates";
 import { DAY_NAMES } from "@/lib/schedule";
@@ -28,11 +28,6 @@ for (const c of history) if (!latestClose.has(c.shiftId)) latestClose.set(c.shif
 const canReopen = (c: (typeof history)[number]) =>
   isOwner && latestClose.get(c.shiftId) === c.id && c.date >= addDays(today, -1) && !currentShift;
 const canNote = (c: (typeof history)[number]) => isOwner || c.closedById === Astro.locals.userId;
-const tones = [
-  { value: "morning", label: "Mañana" },
-  { value: "afternoon", label: "Tarde" },
-  { value: "night", label: "Noche" },
-];
 const DAYS = DAY_NAMES.map((d, i) => ({ dow: i + 1, short: "LMXJVSD"[i], long: d.replace(/s$/, "") }));
 /** «Lun a vie», «Lun, mié, vie» o null si son todos los días. */
 const daysLabel = (weekdays: number[] | null) =>
@@ -40,7 +35,7 @@ const daysLabel = (weekdays: number[] | null) =>
 ---
 
 <Layout title={`Turnos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
-  <PageHeader {...ctx.backdrop} tint={branchColor(ctx.membership, branch.id)} eyebrow={longDate(today)} title="Turnos" description={`Horarios, quién está a cargo y el cuadre de caja de hoy en ${branch.name}.`}>
+  <PageHeader {...ctx.backdrop} eyebrow={longDate(today)} title="Turnos" description={`Horarios, quién está a cargo y el cuadre de caja de hoy en ${branch.name}.`}>
     {
       isOwner && (
         <button type="button" class="btn btn-primary" data-open-dialog="shift-new">
@@ -62,7 +57,7 @@ const daysLabel = (weekdays: number[] | null) =>
     )
   }
 
-  <section class="shift-list">
+  <section class="shift-list" data-shift-list={isOwner && shifts.length > 1 ? branch.id : undefined}>
     {
       shifts.map((shift) => {
         const t = shiftTotals(shift.id);
@@ -73,8 +68,13 @@ const daysLabel = (weekdays: number[] | null) =>
         // Días hábiles (horario semanal, días del turno y cierres): la empleada no lo abre; la dueña lo confirma.
         const closed = closedNow(shift);
         return (
-          <article class:list={["card shift", { live: t.close.status === "en-curso" }]} aria-labelledby={`shift-${shift.id}-title`}>
+          <article class:list={["card shift", { live: t.close.status === "en-curso" }]} aria-labelledby={`shift-${shift.id}-title`} data-shift-id={shift.id}>
             <header class="shift-head">
+              {isOwner && shifts.length > 1 && (
+                <button type="button" class="drag" data-drag aria-label={`Mover turno ${shift.name}`} aria-describedby="shift-order-hint">
+                  <GripVertical size={18} stroke-width={1.75} />
+                </button>
+              )}
               <h2 class="sr-only" id={`shift-${shift.id}-title`}>Turno {shift.name}</h2>
               <ShiftChip shift={shift} />
               <span class="hours num">
@@ -306,6 +306,10 @@ const daysLabel = (weekdays: number[] | null) =>
       })
     }
   </section>
+  {isOwner && shifts.length > 1 && (
+    <p class="sr-only" id="shift-order-hint">Arrástralo o usa las flechas arriba y abajo para cambiar el orden de los turnos.</p>
+  )}
+  <p class="sr-only" aria-live="polite" data-order-status></p>
 
   <section class="days" aria-labelledby="days-title" data-region="calendar">
     <h2 class="section-title" id="days-title">Días y horario</h2>
@@ -479,13 +483,6 @@ const daysLabel = (weekdays: number[] | null) =>
               <FormInput form={`${id}-form`} name="start" type="time" label="Empieza" value={shift?.start ?? "07:00"} required />
               <FormInput form={`${id}-form`} name="end" type="time" label="Termina" value={shift?.end ?? "14:00"} required />
             </div>
-            <FormInput
-              form={`${id}-form`}
-              name="tone"
-              label="Momento del día"
-              hint="Define el color y el ícono del turno."
-              options={tones.map((t) => ({ ...t, selected: t.value === (shift?.tone ?? "morning") }))}
-            />
             <fieldset class="field weekdays">
               <legend class="field-label">Días que trabaja</legend>
               <div class="weekday-row">
@@ -524,6 +521,35 @@ const daysLabel = (weekdays: number[] | null) =>
   }
   </div>
 </Layout>
+
+<script>
+  import { actions } from "astro:actions";
+  import { toast } from "@/scripts/dialogs";
+  import { onRegions, refreshRegions } from "@/scripts/refresh";
+  import { sortable } from "@/scripts/sortable";
+
+  // La dueña ordena los turnos arrastrando el asa de cada tarjeta; el orden se guarda al soltar.
+  onRegions((root) => {
+    const list = root.querySelector<HTMLElement>("[data-shift-list]");
+    if (!list || list.dataset.sortable) return;
+    list.dataset.sortable = "true";
+    const status = document.querySelector<HTMLElement>("[data-order-status]")!;
+    sortable(list, {
+      item: "[data-shift-id]",
+      onDrop: async (card, changed) => {
+        if (!changed) return;
+        const cards = [...list.querySelectorAll<HTMLElement>("[data-shift-id]")];
+        const name = card.querySelector("h2")?.textContent ?? "Turno";
+        status.textContent = `${name}: posición ${cards.indexOf(card) + 1} de ${cards.length}.`;
+        const { error } = await actions.reorderShifts({ branchId: list.dataset.shiftList!, ids: cards.map((c) => c.dataset.shiftId!) });
+        if (error) {
+          toast("No se pudo guardar el orden de los turnos. Intenta de nuevo.", "error");
+          await refreshRegions(["shifts"]);
+        }
+      },
+    });
+  });
+</script>
 
 <style>
   .days {
@@ -736,6 +762,44 @@ const daysLabel = (weekdays: number[] | null) =>
     flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
+  }
+
+  /* Asa para ordenar (solo la dueña, con dos turnos o más); sortable.ts mueve la tarjeta con transform. */
+  .drag {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    margin: 0 -0.5rem 0 -0.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.375rem;
+    background: none;
+    color: var(--color-text-muted);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .drag:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+
+  @media (pointer: coarse) {
+    .drag {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+  }
+
+  .shift.dragging {
+    position: relative;
+    z-index: 2;
+    box-shadow: var(--shadow-md);
+  }
+
+  .shift.dragging .drag {
+    cursor: grabbing;
   }
 
   .hours {

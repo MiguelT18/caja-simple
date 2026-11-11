@@ -1,5 +1,6 @@
 ---
-import { Plus, X } from "@lucide/astro";
+import { GripVertical, Plus, Trash } from "@lucide/astro";
+import { toneOf } from "@/lib/dates";
 
 interface ShiftDraft {
   name: string;
@@ -16,19 +17,17 @@ interface Props {
 }
 
 const { form, presets } = Astro.props;
-const tones = [
-  { value: "morning", label: "Mañana" },
-  { value: "afternoon", label: "Tarde" },
-  { value: "night", label: "Noche" },
-];
+// El momento del día no se elige: sale de la hora de inicio (toneOf), y el chip lo dice escrito junto al color.
+const toneLabels = { morning: "Mañana", afternoon: "Tarde", night: "Noche" };
 ---
 
 <!-- Lista de turnos de una sucursal nueva. Los campos se repiten (shiftName, shiftStart…), uno por fila, como espera la acción. -->
 <fieldset class="shifts-editor" data-shifts-editor data-presets={JSON.stringify(presets.map((p) => p.shifts))}>
   <legend class="field-label">Turnos</legend>
-  <p class="field-hint">
-    Los horarios de esta sucursal. Si un turno termina después de medianoche (por ejemplo 22:00 a 06:00), cuenta para el
-    día en que se abre.
+  <p class="field-hint" id={`${form}-shifts-hint`}>
+    Los horarios de esta sucursal, en el orden en que los quieres ver. Arrastra un turno desde
+    <GripVertical size={14} stroke-width={1.75} class="inline-icon" /> para moverlo, o usa las flechas del teclado sobre él.
+    Si termina después de medianoche (por ejemplo 22:00 a 06:00), cuenta para el día en que se abre.
   </p>
 
   {
@@ -47,7 +46,18 @@ const tones = [
   <ol class="shift-rows" data-rows>
     {
       presets[0].shifts.map((s, i) => (
-        <li class="shift-row" data-row>
+        <li class="shift-row" data-row data-tone={toneOf(s.start)}>
+          <div class="row-head">
+            <button type="button" class="drag" data-drag aria-label={`Mover turno ${s.name}`} aria-describedby={`${form}-shifts-hint`}>
+              <GripVertical size={18} stroke-width={1.75} />
+            </button>
+            <span class="row-title" data-row-title>Turno {i + 1}</span>
+            <span class="tone-chip" data-tone-label>{toneLabels[toneOf(s.start)]}</span>
+            <button type="button" class="remove" data-remove aria-label={`Quitar turno ${s.name}`}>
+              <Trash size={16} stroke-width={1.75} />
+              Quitar
+            </button>
+          </div>
           <div class="field name">
             <label class="field-label" for={`${form}-shift-${i}-name`}>Nombre<span class="sr-only" data-n> del turno {i + 1}</span></label>
             <input class="input" id={`${form}-shift-${i}-name`} name="shiftName" value={s.name} aria-describedby={`${form}-shiftName-error`} required maxlength="40" />
@@ -60,19 +70,6 @@ const tones = [
             <label class="field-label" for={`${form}-shift-${i}-end`}>Termina<span class="sr-only" data-n> del turno {i + 1}</span></label>
             <input class="input" id={`${form}-shift-${i}-end`} name="shiftEnd" type="time" value={s.end} required />
           </div>
-          <div class="field tone">
-            <label class="field-label" for={`${form}-shift-${i}-tone`}>Momento<span class="sr-only" data-n> del turno {i + 1}</span></label>
-            <select class="input" id={`${form}-shift-${i}-tone`} name="shiftTone">
-              {tones.map((t) => (
-                <option value={t.value} selected={t.value === s.tone}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button type="button" class="icon-btn remove" data-remove aria-label={`Quitar turno ${s.name}`}>
-            <X size={18} stroke-width={1.75} />
-          </button>
           <p class="overnight" data-overnight hidden={!(s.end < s.start)}>Termina al día siguiente</p>
         </li>
       ))
@@ -81,6 +78,17 @@ const tones = [
 
   <template data-row-template>
     <li class="shift-row" data-row>
+      <div class="row-head">
+        <button type="button" class="drag" data-drag aria-label="Mover turno" aria-describedby={`${form}-shifts-hint`}>
+          <GripVertical size={18} stroke-width={1.75} />
+        </button>
+        <span class="row-title" data-row-title>Turno</span>
+        <span class="tone-chip" data-tone-label hidden></span>
+        <button type="button" class="remove" data-remove aria-label="Quitar turno">
+          <Trash size={16} stroke-width={1.75} />
+          Quitar
+        </button>
+      </div>
       <div class="field name">
         <label class="field-label" for={`${form}-shift-__i__-name`}>Nombre<span class="sr-only" data-n> del turno </span></label>
         <input class="input" id={`${form}-shift-__i__-name`} name="shiftName" aria-describedby={`${form}-shiftName-error`} required maxlength="40" />
@@ -93,15 +101,6 @@ const tones = [
         <label class="field-label" for={`${form}-shift-__i__-end`}>Termina<span class="sr-only" data-n> del turno </span></label>
         <input class="input" id={`${form}-shift-__i__-end`} name="shiftEnd" type="time" required />
       </div>
-      <div class="field tone">
-        <label class="field-label" for={`${form}-shift-__i__-tone`}>Momento<span class="sr-only" data-n> del turno </span></label>
-        <select class="input" id={`${form}-shift-__i__-tone`} name="shiftTone">
-          {tones.map((t) => <option value={t.value}>{t.label}</option>)}
-        </select>
-      </div>
-      <button type="button" class="icon-btn remove" data-remove aria-label="Quitar turno">
-        <X size={18} stroke-width={1.75} />
-      </button>
       <p class="overnight" data-overnight hidden>Termina al día siguiente</p>
     </li>
   </template>
@@ -111,6 +110,7 @@ const tones = [
     Agregar turno
   </button>
   <p class="field-error" id={`${form}-shiftName-error`}></p>
+  <p class="sr-only" aria-live="polite" data-move-status></p>
 </fieldset>
 
 <style>
@@ -143,12 +143,88 @@ const tones = [
 
   .shift-row {
     display: grid;
-    grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)) auto;
+    grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
     align-items: end;
     gap: 0.5rem;
     padding: 0.75rem;
     border: 1px solid var(--color-border);
+    /* La franja es del momento del día; el select lo dice escrito, el color solo acompaña. */
+    border-left: 4px solid var(--tone, var(--color-border-strong));
     border-radius: 0.5rem;
+  }
+
+  .shift-row[data-tone="morning"] {
+    --tone: var(--color-shift-morning);
+    --tone-soft: var(--color-shift-morning-soft);
+  }
+
+  .shift-row[data-tone="afternoon"] {
+    --tone: var(--color-shift-afternoon);
+    --tone-soft: var(--color-shift-afternoon-soft);
+  }
+
+  .shift-row[data-tone="night"] {
+    --tone: var(--color-shift-night);
+    --tone-soft: var(--color-shift-night-soft);
+  }
+
+  /* La tarjeta que se arrastra flota sobre las demás (sortable.ts la mueve con transform). */
+  .shift-row.dragging {
+    position: relative;
+    z-index: 1;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+    transition: box-shadow 150ms;
+  }
+
+  .drag {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    margin: 0 -0.25rem 0 -0.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.375rem;
+    background: none;
+    color: var(--color-text-muted);
+    cursor: grab;
+    /* Sin esto, en el celular arrastrar el asa desplaza la página. */
+    touch-action: none;
+  }
+
+  .drag:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+
+  .dragging .drag {
+    cursor: grabbing;
+  }
+
+  @media (pointer: coarse) {
+    .drag {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+  }
+
+  .tone-chip {
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--tone-soft);
+    color: var(--tone);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+  }
+
+  .tone-chip[hidden] {
+    display: none;
+  }
+
+  .field-hint :global(.inline-icon) {
+    display: inline;
+    vertical-align: -0.15em;
   }
 
   .shift-row .field-label {
@@ -156,8 +232,46 @@ const tones = [
     color: var(--color-text-muted);
   }
 
+  /* Encabezado de la tarjeta: cuál es y, a la derecha, quitarla (en rojo, con texto, para que se note). */
+  .row-head {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: -0.25rem 0 0.125rem;
+  }
+
+  .row-title {
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+  }
+
   .remove {
-    margin-bottom: 0.25rem;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2rem;
+    margin-right: -0.375rem;
+    padding: 0 0.625rem;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--color-expense);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+    cursor: pointer;
+  }
+
+  .remove:hover {
+    background: var(--color-expense-soft);
+  }
+
+  @media (pointer: coarse) {
+    .remove {
+      min-height: 2.75rem;
+    }
   }
 
   .overnight {
@@ -179,29 +293,22 @@ const tones = [
   @container (max-width: 560px) {
     /* Las horas necesitan ancho: comparten su fila en mitades iguales y el resto va a lo ancho. */
     .shift-row {
-      position: relative;
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .shift-row .name {
       grid-column: 1 / -1;
-      margin-right: 2.75rem;
     }
 
-    .shift-row .tone {
-      grid-column: 1 / -1;
-    }
-
-    .remove {
-      position: absolute;
-      top: 2.125rem;
-      right: 0.75rem;
-    }
   }
 </style>
 
 <script>
+  import { toneOf } from "@/lib/dates";
   import { confirmDialog } from "@/scripts/dialogs";
+  import { sortable } from "@/scripts/sortable";
+
+  const toneLabels = { morning: "Mañana", afternoon: "Tarde", night: "Noche" };
 
   type Draft = { name: string; start: string; end: string; tone: string };
 
@@ -216,6 +323,7 @@ const tones = [
     const renumber = () => {
       [...rows.children].forEach((row, i) => {
         for (const n of row.querySelectorAll<HTMLElement>("[data-n]")) n.textContent = ` del turno ${i + 1}`;
+        row.querySelector<HTMLElement>("[data-row-title]")!.textContent = `Turno ${i + 1}`;
       });
     };
 
@@ -225,6 +333,13 @@ const tones = [
       const name = row.querySelector<HTMLInputElement>("[name=shiftName]")!.value;
       row.querySelector<HTMLElement>("[data-overnight]")!.hidden = !(start && end && end < start);
       row.querySelector<HTMLElement>("[data-remove]")!.setAttribute("aria-label", name ? `Quitar turno ${name}` : "Quitar turno");
+      row.querySelector<HTMLElement>("[data-drag]")!.setAttribute("aria-label", name ? `Mover turno ${name}` : "Mover turno");
+      // Sin hora todavía no tiene momento: la franja queda neutra y el chip oculto.
+      const chip = row.querySelector<HTMLElement>("[data-tone-label]")!;
+      if (start) row.dataset.tone = toneOf(start);
+      else delete row.dataset.tone;
+      chip.hidden = !start;
+      chip.textContent = start ? toneLabels[toneOf(start)] : "";
     };
 
     const addRow = (draft?: Draft) => {
@@ -239,7 +354,6 @@ const tones = [
       row.querySelector<HTMLInputElement>("[name=shiftName]")!.value = draft?.name ?? "";
       row.querySelector<HTMLInputElement>("[name=shiftStart]")!.value = draft?.start ?? "";
       row.querySelector<HTMLInputElement>("[name=shiftEnd]")!.value = draft?.end ?? "";
-      row.querySelector<HTMLSelectElement>("[name=shiftTone]")!.value = draft?.tone ?? "morning";
       rows.append(row);
       syncRow(row);
       renumber();
@@ -260,6 +374,21 @@ const tones = [
       edited = true;
       // El foco no se pierde: pasa a la fila vecina o al botón de agregar.
       (next?.querySelector<HTMLElement>("[data-remove]") ?? editor.querySelector<HTMLElement>("[data-add]"))!.focus();
+    });
+
+    // Ordenar: arrastrando el asa (mouse o dedo) o con las flechas sobre ella. El orden de las filas es el que se guarda.
+    const status = editor.querySelector<HTMLElement>("[data-move-status]")!;
+    const announce = (row: Element) => {
+      const name = row.querySelector<HTMLInputElement>("[name=shiftName]")!.value || "Turno";
+      status.textContent = `${name}: posición ${[...rows.children].indexOf(row) + 1} de ${rows.children.length}.`;
+    };
+    sortable(rows, {
+      item: "[data-row]",
+      onChange: () => {
+        renumber();
+        edited = true;
+      },
+      onDrop: (row) => announce(row),
     });
 
     editor.addEventListener("input", (event) => {

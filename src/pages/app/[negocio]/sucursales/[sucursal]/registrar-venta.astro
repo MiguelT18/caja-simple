@@ -3,7 +3,7 @@ import { ChevronUp, Clock, CloudOff, ImagePlus, LayoutGrid, LockOpen, Minus, Not
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchColor, branchContext, shiftBarData, branchHref, colorAt, isLowStock, openOrders, promotionsToday } from "@/data/queries";
+import { branchContext, shiftBarData, branchHref, colorAt, isLowStock, openOrders, promotionsToday } from "@/data/queries";
 import { planLimits } from "@/data/plans";
 import { bestDiscount, promoBadge, promoLabel } from "@/lib/promos";
 import { longDate } from "@/lib/dates";
@@ -46,7 +46,6 @@ const colorOf = (categoryId?: string) => {
 <Layout title={`Registrar venta · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: bar }}>
   <PageHeader {...ctx.backdrop}
     compact
-    tint={branchColor(ctx.membership, branch.id)}
     eyebrow={[longDate(today), shift && `Turno ${shift.name.toLowerCase()}`].filter(Boolean).join(" · ")}
     title="Registrar venta"
     description={`${branch.name} · elige los productos y el total se suma solo.`}
@@ -1307,8 +1306,8 @@ const colorOf = (categoryId?: string) => {
   }
 
   .view-toggle .icon-btn[aria-pressed="true"] {
-    background: var(--color-text);
-    color: var(--color-surface);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
   }
 
   .search :global(svg) {
@@ -1352,10 +1351,10 @@ const colorOf = (categoryId?: string) => {
     background: var(--color-surface-hover);
   }
 
-  /* Activa: invertida, como las píldoras de filtro de un reproductor. */
+  /* Activa: en el color del negocio, como las píldoras de filtro de un reproductor. */
   .pill[aria-pressed="true"] {
-    background: var(--color-text);
-    color: var(--color-surface);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
   }
 
   .empty {

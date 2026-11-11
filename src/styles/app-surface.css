@@ -17,6 +17,8 @@
 	--color-input-border: var(--color-border-strong);
 	/* En claro, el ámbar, el verde y el amarillo bajan un tono: el texto chico sobre el suelo y las superficies elevadas llega a AA. */
 	--color-primary: light-dark(#9c4708, #f0a04b);
+	/* La marca de Caja Simple: siempre ámbar, aunque el negocio cambie el acento (src/data/brand.ts). */
+	--color-logo: light-dark(#9c4708, #f0a04b);
 	--color-income: light-dark(#246a41, #5cc88a);
 	--color-warning: light-dark(#7a5600, #e8c35a);
 	--shadow-sm: 0 1px 3px light-dark(rgb(26 22 19 / 0.08), rgb(0 0 0 / 0.5));
@@ -34,6 +36,11 @@
 	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
 	background: var(--color-bg);
+}
+
+/* Checkboxes, radios y rangos nativos en el color del negocio. */
+.app-surface {
+	accent-color: var(--color-primary);
 }
 
 .app-surface ::selection {

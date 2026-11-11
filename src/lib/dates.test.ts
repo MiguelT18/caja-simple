@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, boliviaNow, inShiftWindow, inRange, lastWeek, openFrom, parseRange, periodStart, shiftProgress } from "./dates";
+import { addDays, boliviaNow, inShiftWindow, inRange, lastWeek, openFrom, parseRange, periodStart, shiftProgress, toneOf } from "./dates";
 
 const at = (minutes: number) => ({ date: "2026-11-03", minutes });
 const params = (q: string) => new URLSearchParams(q);
@@ -87,5 +87,13 @@ describe("rango con hora", () => {
     expect(inRange(r, "2026-11-02", "23:00")).toBe(true);
     expect(inRange(r, "2026-11-03", "18:01")).toBe(false);
     expect(inRange({ from: "2026-11-01", to: "2026-11-03" }, "2026-11-03", "23:59")).toBe(true);
+  });
+});
+
+describe("toneOf", () => {
+  it("mañana de 5 a 12, tarde de 12 a 19 y noche el resto", () => {
+    expect(["04:59", "05:00", "11:59", "12:00", "18:59", "19:00", "23:30", "00:00"].map(toneOf)).toEqual([
+      "night", "morning", "morning", "afternoon", "afternoon", "night", "night", "night",
+    ]);
   });
 });

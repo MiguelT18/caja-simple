@@ -1,0 +1,191 @@
+---
+// Sugerencias de cuentas al escribir el nombre o el correo de quien se invita (popover con la lista, el esqueleto,
+// páginas de 5 y la plantilla del avatar). Uno por página; cada campo se conecta con peopleSearch() de
+// src/scripts/people-search.ts. Lo usan Empleados (dentro del diálogo, para que no quede inerte) y «Abre tu negocio».
+import { ChevronLeft, ChevronRight, User } from "@lucide/astro";
+---
+
+<div id="people-suggest" class="suggest" popover="manual">
+  <ul class="suggest-skeleton" aria-hidden="true">
+    {[0, 1, 2].map(() => (
+      <li>
+        <span class="sk sk-avatar" />
+        <span class="sk-lines">
+          <span class="sk sk-name" />
+          <span class="sk sk-email" />
+        </span>
+      </li>
+    ))}
+  </ul>
+  <ul class="suggest-list" id="people-suggest-list" role="listbox" aria-label="Cuentas registradas"></ul>
+  <p class="suggest-empty"></p>
+  <div class="suggest-pager">
+    <button type="button" class="pager-btn" data-step="-1" tabindex="-1" aria-label="Página anterior">
+      <ChevronLeft size={16} stroke-width={2} />
+    </button>
+    <span class="pager-info"></span>
+    <button type="button" class="pager-btn" data-step="1" tabindex="-1" aria-label="Página siguiente">
+      <ChevronRight size={16} stroke-width={2} />
+    </button>
+  </div>
+  <p class="sr-only" aria-live="polite" data-status></p>
+  <p class="sr-only" id="people-keys">Con las flechas arriba y abajo eliges una cuenta; con RePág y AvPág cambias de página.</p>
+</div>
+<template id="avatar-icon"><User stroke-width={1.75} /></template>
+
+<style>
+  .suggest {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 0.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-md);
+  }
+
+  .suggest-list,
+  .suggest-skeleton {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .suggest :global(.suggest-option),
+  .suggest-skeleton li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding: 0.375rem 0.625rem;
+    border-radius: 0.5rem;
+  }
+
+  .suggest :global(.suggest-option) {
+    cursor: pointer;
+  }
+
+  .suggest :global(.suggest-option:hover),
+  .suggest :global(.suggest-option[aria-selected="true"]) {
+    background: var(--color-surface-muted);
+  }
+
+  .suggest :global(.suggest-text),
+  .sk-lines {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .suggest :global(.suggest-text) {
+    gap: 0;
+  }
+
+  .suggest :global(.suggest-name),
+  .suggest :global(.suggest-email) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .suggest :global(.suggest-name) {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  .suggest :global(.suggest-email) {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  /* Esqueleto: la forma de una fila (foto, nombre, correo) mientras llega la respuesta. */
+  .sk {
+    display: block;
+    border-radius: 999px;
+    background: var(--color-surface-muted);
+  }
+
+  .sk-avatar {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .sk-name {
+    width: 45%;
+    height: 0.75rem;
+  }
+
+  .sk-email {
+    width: 70%;
+    height: 0.625rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .sk {
+      animation: sk-pulse 1.2s ease-in-out infinite;
+    }
+
+    .suggest-skeleton li:nth-child(2) .sk {
+      animation-delay: 150ms;
+    }
+
+    .suggest-skeleton li:nth-child(3) .sk {
+      animation-delay: 300ms;
+    }
+  }
+
+  @keyframes sk-pulse {
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .suggest-empty {
+    margin: 0;
+    padding: 0.625rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .suggest-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    padding: 0.25rem 0.25rem 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .pager-info {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pager-btn {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  .pager-btn:hover:not(:disabled) {
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+  }
+
+  .pager-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+</style>

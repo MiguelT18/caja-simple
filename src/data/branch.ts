@@ -22,7 +22,7 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
   // Turnos, equipo y categorías cambian poco: van a la caché. Stock, cierres y movimientos, siempre frescos.
   const slow = () =>
     Promise.all([
-      sb.from("shifts").select("*").eq("branch_id", branch.id).order("start_time"),
+      sb.from("shifts").select("*").eq("branch_id", branch.id).order("position"),
       sb.from("employees").select(EMPLOYEE_COLUMNS).eq("branch_id", branch.id).order("created_at"),
       sb.from("categories").select("id, name").eq("business_id", m.business.id).order("name"),
       sb.from("branch_hours").select("dow, open_time, close_time").eq("branch_id", branch.id),
