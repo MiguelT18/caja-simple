@@ -1,6 +1,6 @@
 ---
 // Calculadora del precio según la cantidad de locales: stepper y, debajo, la cuenta a la vista (base + extras = total),
-// en US$ sin impuestos y, con tipo de cambio, «hoy Bs …». La usan /planes y /app/[negocio]/plan.
+// en US$ y, con tipo de cambio, «hoy Bs …». La usan /planes y /app/[negocio]/plan.
 // La cuenta es la misma del cobro (usdFor y bsTotal, src/data/plans.ts).
 import { Minus, Plus, RotateCcw } from "@lucide/astro";
 import type { Period, Quote } from "../data/plans";
@@ -18,12 +18,16 @@ interface Props {
   form?: string;
   /** Precio fundador (0,5 = 50%): el total va con descuento y se muestra el de antes. */
   discount?: number;
+  /** Meses de fundador que le quedan: en el anual, el descuento cubre solo esos (de 12). */
+  founderMonths?: number;
+  /** Nombre del descuento: «Precio fundador» o, en el primer cobro de un negocio referido, «Descuento por recomendación». */
+  discountName?: string;
   period: Period;
   quote: Quote | null;
 }
 
 const MAX = 20;
-const { period, quote, current, name, form, discount = 0 } = Astro.props;
+const { period, quote, current, name, form, discount = 0, founderMonths = 12, discountName = "Precio fundador" } = Astro.props;
 const min = Math.min(MAX, Math.max(1, Astro.props.min ?? 1));
 const branches = Math.min(MAX, Math.max(min, Astro.props.branches ?? 1));
 const per = period === "mensual" ? "al mes" : "al año";
@@ -33,7 +37,7 @@ const rateText = quote
   : "Todavía no tenemos el tipo de cambio de hoy: el total en bolivianos aparece apenas llegue.";
 ---
 
-<section class="calc" aria-labelledby="calc-title" data-branches={branches} data-current={current} data-min={min} data-discount={discount} data-max={MAX} data-period={period} data-quote={quote ? JSON.stringify(quote) : ""}>
+<section class="calc" aria-labelledby="calc-title" data-branches={branches} data-current={current} data-min={min} data-discount={discount} data-founder-months={founderMonths} data-discount-name={discountName} data-max={MAX} data-period={period} data-quote={quote ? JSON.stringify(quote) : ""}>
   <div class="calc-input">
     <div class="calc-head">
       <h2 id="calc-title" class="calc-title"><label for="calc-branches">¿Cuántos locales tienes?</label></h2>
@@ -87,7 +91,7 @@ const rateText = quote
       {
         discount > 0 && (
           <div class="bill-row">
-            <dt>Precio fundador · −{Math.round(discount * 100)}%</dt>
+            <dt data-discount-label>{discountName} · −{Math.round(discount * 100)}%</dt>
             <dd class="num" data-discount-amount></dd>
           </div>
         )
@@ -95,7 +99,7 @@ const rateText = quote
       <div class="bill-total">
         <dt data-per>Total {per}</dt>
         <dd aria-live="polite" aria-atomic="true">
-          <span class="calc-price num"><span data-usd></span> <small>+ impuestos</small></span>
+          <span class="calc-price num"><span data-usd></span>{quote?.tax ? <small> + impuestos</small> : null}</span>
           <span class="calc-bs num"></span>
         </dd>
       </div>
@@ -113,6 +117,9 @@ const rateText = quote
     const min = Number(calc.dataset.min ?? 1);
     const discount = Number(calc.dataset.discount ?? 0);
     const discountAmount = calc.querySelector("[data-discount-amount]");
+    const discountLabel = calc.querySelector("[data-discount-label]");
+    const founderMonths = Number(calc.dataset.founderMonths ?? 12);
+    const discountName = calc.dataset.discountName ?? "Precio fundador";
     let period = calc.dataset.period as Period;
     const quote: Quote | null = calc.dataset.quote ? JSON.parse(calc.dataset.quote) : null;
     const current = calc.dataset.current ? Number(calc.dataset.current) : undefined;
@@ -138,19 +145,23 @@ const rateText = quote
       // Un local: Negocio (o Gratis). Más: Sucursales, con cada local extra aparte.
       const extra = branches - 1;
       const full = usdFor(extra === 0 ? "Negocio" : "Sucursales", period, extra);
-      const usd = discounted(full, discount);
+      // Anual: el precio fundador cubre solo los meses que le quedan.
+      const months = period === "anual" ? founderMonths : 12;
+      const usd = discounted(full, discount, months);
+      if (discountLabel)
+        discountLabel.textContent = `${discountName} · −${Math.round(discount * 100)}%${months < 12 ? ` en ${months} de 12 meses` : ""}`;
       if (discountAmount) discountAmount.textContent = `− ${usdLabel(Math.round((full - usd) * 100) / 100)}`;
       base.textContent = usdLabel(planUsd.base[period]);
       extraRow.hidden = extra === 0;
       extraLabel.textContent = `${extra} ${extra === 1 ? "sucursal extra" : "sucursales extra"} × ${usdLabel(planUsd.extraBranch[period])}`;
       extraAmount.textContent = usdLabel(Math.round(extra * planUsd.extraBranch[period] * 100) / 100);
-      // Dólares sin impuestos y bolivianos con impuestos, al tipo de cambio de hoy (la misma cuenta del cobro).
+      // Dólares y bolivianos al tipo de cambio de hoy (la misma cuenta del cobro); «con impuestos» solo si los hay.
       usdText.textContent = usdLabel(usd);
       bs.hidden = !quote;
-      bs.textContent = quote ? `Bs ${bsTotal(usd, quote.rate, quote.tax).toLocaleString("es-BO")} con impuestos` : "";
+      bs.textContent = quote ? `Bs ${bsTotal(usd, quote.rate, quote.tax).toLocaleString("es-BO")}${quote.tax ? " con impuestos" : ""}` : "";
       detail.textContent =
         (extra === 0 ? "Plan Negocio (o Gratis, sin pagar)." : `Plan Sucursales: ${branches} locales en total.`) +
-        (discount > 0 ? ` Sin el precio fundador serían ${usdLabel(full)}.` : "");
+        (discount > 0 ? ` Sin el descuento serían ${usdLabel(full)}.` : "");
       if (currentNote) currentNote.hidden = current === undefined || branches === current;
     };
 

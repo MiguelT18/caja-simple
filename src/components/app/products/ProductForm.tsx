@@ -1,5 +1,5 @@
 import { actions } from "astro:actions";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 import type { Category } from "@/data/types";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import type { CatalogEntry } from "@/data/queries";
 import { refreshRegions } from "@/scripts/refresh";
 import { confirmDialog, toast } from "@/scripts/dialogs";
 import { shrinkInput } from "@/scripts/shrink-image";
+import { clearDraft, confirmDiscard, draftKey, hasDraft, keepDraft } from "@/scripts/drafts";
 
 export function ProductForm({
   businessId,
@@ -42,9 +43,22 @@ export function ProductForm({
   // «Guardar y agregar otro»: el diálogo queda abierto, limpio y con la misma categoría, para cargar un estante seguido.
   const another = useRef(false);
   const [lastAdded, setLastAdded] = useState("");
+  // Al agregar (no al editar), lo escrito queda como borrador en este equipo hasta guardar; la foto y el combo no.
+  const draft = product ? undefined : draftKey("product", businessId, isCombo ? "combo" : "new");
+  // Ref de callback, no useEffect: el diálogo (portal de Radix) monta el formulario un render después.
+  const attachForm = useCallback(
+    (form: HTMLFormElement | null) => {
+      formRef.current = form;
+      return form && draft ? keepDraft(form, draft) : undefined;
+    },
+    [draft],
+  );
   const save = useActionForm(
     (form) => actions.saveProduct(form) as never,
-    () => (another.current ? startAnother() : onClose()),
+    () => {
+      if (draft) clearDraft(draft);
+      another.current ? startAnother() : onClose();
+    },
     (form) =>
       another.current ? undefined
       : product ? `Cambios de «${form.get("name")}» guardados.`
@@ -80,6 +94,15 @@ export function ProductForm({
   const [off, setOff] = useState<Set<string>>(new Set());
   const placing = !product && !isCombo && branches.length > 0;
 
+  /** «Cancelar» con un borrador escrito: pregunta antes de perderlo. La X y Esc cierran y lo conservan. */
+  async function cancel() {
+    if (draft && hasDraft(draft)) {
+      if (!(await confirmDiscard())) return;
+      clearDraft(draft);
+    }
+    onClose();
+  }
+
   async function remove() {
     if (!product || !(await confirmDialog(`¿Borrar «${product.name}» del catálogo? Se quita de todas las sucursales.`, { confirmLabel: "Borrar", danger: true }))) return;
     const form = new FormData();
@@ -105,7 +128,7 @@ export function ProductForm({
       onClose={onClose}
     >
         <form
-          ref={formRef}
+          ref={attachForm}
           className="grid min-w-0 gap-4"
           onSubmit={(e) => {
             if (shrinking) return e.preventDefault();
@@ -298,7 +321,7 @@ export function ProductForm({
             )}
             {/* Celular: «Guardar» arriba a todo el ancho y los otros dos en una fila, para que el pie no tape el formulario. */}
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-              <Button type="button" variant="outline" className={!product && !isCombo ? undefined : "max-sm:col-span-2"} onClick={onClose}>
+              <Button type="button" variant="outline" className={!product && !isCombo ? undefined : "max-sm:col-span-2"} onClick={cancel}>
                 Cancelar
               </Button>
               {!product && !isCombo && (

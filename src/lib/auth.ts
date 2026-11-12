@@ -1,4 +1,5 @@
 import type { AuthError } from "@supabase/supabase-js";
+import type { AstroCookies } from "astro";
 import type { Supabase } from "./supabase";
 
 /** Mensajes de Supabase Auth en español. Los códigos: https://supabase.com/docs/guides/auth/debugging/error-codes */
@@ -42,3 +43,19 @@ export async function needsSecondFactor(supabase: Supabase) {
 }
 
 export const verifyHref = (next: string) => `/auth/verificar?next=${encodeURIComponent(next)}`;
+
+/** Cookie que deja el link de un afiliado (/r/<código>) hasta que la persona crea su cuenta. */
+export const REFERRAL_COOKIE = "ref";
+
+/**
+ * Si llegó con el link de un afiliado, la deja referida por él (la base decide si vale: cuenta nueva, sin pagos, no
+ * es el propio afiliado). Se llama al tener sesión tras crear la cuenta; la cookie se borra pase lo que pase.
+ */
+export async function claimReferral(supabase: Supabase, cookies: AstroCookies) {
+  const code = cookies.get(REFERRAL_COOKIE)?.value;
+  if (!code) return;
+  cookies.delete(REFERRAL_COOKIE, { path: "/" });
+  // Un error aquí no debe impedir entrar: la atribución es secundaria.
+  const { error } = await supabase.rpc("claim_referral", { p_code: code });
+  if (error) console.error(JSON.stringify({ level: "error", source: "claimReferral", message: error.message }));
+}

@@ -21,6 +21,7 @@ export const toBusiness = (b: Row<"businesses">): Business => ({
   listed: b.listed,
   // Una fila cacheada de antes de la columna no la trae: ámbar.
   color: (b.color ?? "ambar") as Business["color"],
+  referred: !!b.referred_by || undefined,
 });
 
 export const toBranch = (b: Row<"branches">): Branch => ({

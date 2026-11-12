@@ -45,7 +45,7 @@ const monogram = (name: string) =>
     )
   }
 
-  <Modal id="new-business" title="Crear negocio" description="Con su primera sucursal, que arranca con los turnos de mañana, tarde y noche." action="createBusiness" submitLabel="Crear negocio" redirect="/app/{slug}">
+  <Modal id="new-business" title="Crear negocio" description="Con su primera sucursal, que arranca con los turnos de mañana, tarde y noche." action="createBusiness" draft submitLabel="Crear negocio" redirect="/app/{slug}">
     <FormInput form="new-business-form" name="name" label="Nombre del negocio" required maxlength={80} />
     <FormInput form="new-business-form" name="kind" label="Rubro" options={kindOptions()} />
     <BusinessProfileFields form="new-business-form" />

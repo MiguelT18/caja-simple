@@ -3,6 +3,42 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      affiliates: {
+        Row: {
+          active: boolean;
+          code: string;
+          created_at: string;
+          id: string;
+          payout_details: string | null;
+          rate: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          active?: boolean;
+          code: string;
+          created_at?: string;
+          id: string;
+          payout_details?: string | null;
+          rate?: number;
+        };
+        Update: {
+          active?: boolean;
+          code?: string;
+          created_at?: string;
+          id?: string;
+          payout_details?: string | null;
+          rate?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "affiliates_id_fkey";
+            columns: ["id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       billing_settings: {
         Row: {
           bank_details: string | null;
@@ -14,6 +50,9 @@ export type Database = {
           founder_slots: number;
           id: boolean;
           qr_image_url: string | null;
+          referral_discount: number;
+          referral_hold_days: number;
+          referral_months: number;
           tax_rate: number;
         };
         ComputedFields: never;
@@ -27,6 +66,9 @@ export type Database = {
           founder_slots?: number;
           id?: boolean;
           qr_image_url?: string | null;
+          referral_discount?: number;
+          referral_hold_days?: number;
+          referral_months?: number;
           tax_rate?: number;
         };
         Update: {
@@ -39,6 +81,9 @@ export type Database = {
           founder_slots?: number;
           id?: boolean;
           qr_image_url?: string | null;
+          referral_discount?: number;
+          referral_hold_days?: number;
+          referral_months?: number;
           tax_rate?: number;
         };
         Relationships: [];
@@ -168,6 +213,7 @@ export type Database = {
           owner_id: string;
           plan: Database["public"]["Enums"]["plan"];
           plan_until: string | null;
+          referred_by: string | null;
           slug: string;
           trial: boolean;
         };
@@ -185,6 +231,7 @@ export type Database = {
           owner_id?: string;
           plan?: Database["public"]["Enums"]["plan"];
           plan_until?: string | null;
+          referred_by?: string | null;
           slug: string;
           trial?: boolean;
         };
@@ -201,6 +248,7 @@ export type Database = {
           owner_id?: string;
           plan?: Database["public"]["Enums"]["plan"];
           plan_until?: string | null;
+          referred_by?: string | null;
           slug?: string;
           trial?: boolean;
         };
@@ -210,6 +258,13 @@ export type Database = {
             columns: ["owner_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "businesses_referred_by_fkey";
+            columns: ["referred_by"];
+            isOneToOne: false;
+            referencedRelation: "affiliates";
             referencedColumns: ["id"];
           },
         ];
@@ -711,6 +766,8 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           discount: number;
+          discount_months: number | null;
+          discount_reason: string | null;
           expires_at: string;
           extra_branches: number;
           id: string;
@@ -730,6 +787,8 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           discount?: number;
+          discount_months?: number | null;
+          discount_reason?: string | null;
           expires_at: string;
           extra_branches?: number;
           id?: string;
@@ -748,6 +807,8 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           discount?: number;
+          discount_months?: number | null;
+          discount_reason?: string | null;
           expires_at?: string;
           extra_branches?: number;
           id?: string;
@@ -878,6 +939,7 @@ export type Database = {
           first_name: string;
           id: string;
           last_name: string;
+          referred_by: string | null;
         };
         ComputedFields: never;
         Insert: {
@@ -887,6 +949,7 @@ export type Database = {
           first_name?: string;
           id: string;
           last_name?: string;
+          referred_by?: string | null;
         };
         Update: {
           avatar_url?: string | null;
@@ -895,8 +958,17 @@ export type Database = {
           first_name?: string;
           id?: string;
           last_name?: string;
+          referred_by?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "profiles_referred_by_fkey";
+            columns: ["referred_by"];
+            isOneToOne: false;
+            referencedRelation: "affiliates";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       promotion_products: {
         Row: {
@@ -1031,6 +1103,77 @@ export type Database = {
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      referral_commissions: {
+        Row: {
+          affiliate_id: string;
+          amount_bs: number;
+          business_id: string | null;
+          business_name: string;
+          charge_bs: number;
+          charge_id: string | null;
+          created_at: string;
+          id: string;
+          months: number;
+          paid_out_at: string | null;
+          payable_at: string;
+          payout_ref: string | null;
+          rate: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          affiliate_id: string;
+          amount_bs: number;
+          business_id?: string | null;
+          business_name: string;
+          charge_bs: number;
+          charge_id?: string | null;
+          created_at?: string;
+          id?: string;
+          months: number;
+          paid_out_at?: string | null;
+          payable_at: string;
+          payout_ref?: string | null;
+          rate: number;
+        };
+        Update: {
+          affiliate_id?: string;
+          amount_bs?: number;
+          business_id?: string | null;
+          business_name?: string;
+          charge_bs?: number;
+          charge_id?: string | null;
+          created_at?: string;
+          id?: string;
+          months?: number;
+          paid_out_at?: string | null;
+          payable_at?: string;
+          payout_ref?: string | null;
+          rate?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "referral_commissions_affiliate_id_fkey";
+            columns: ["affiliate_id"];
+            isOneToOne: false;
+            referencedRelation: "affiliates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "referral_commissions_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "referral_commissions_charge_id_fkey";
+            columns: ["charge_id"];
+            isOneToOne: true;
+            referencedRelation: "plan_charges";
             referencedColumns: ["id"];
           },
         ];
@@ -1560,7 +1703,18 @@ export type Database = {
       };
     };
     Functions: {
-      answer_join: { Args: { p_accept: boolean; p_branch?: string; p_job_title?: string; p_request: string; p_shift?: string }; Returns: undefined };
+      affiliate_referrals: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          businesses: number;
+          paying: number;
+          people: number;
+        }[];
+      };
+      answer_join: {
+        Args: { p_accept: boolean; p_branch?: string; p_job_title?: string; p_request: string; p_shift?: string };
+        Returns: undefined;
+      };
       answer_reopen: { Args: { p_accept: boolean; p_request: string }; Returns: undefined };
       answer_stock_request: { Args: { p_accept: boolean; p_request: string }; Returns: undefined };
       attach_sale_receipt: { Args: { p_path: string; p_sale: string }; Returns: undefined };
@@ -1582,6 +1736,7 @@ export type Database = {
         Args: { p_items: Json; p_order: string; p_payment: Database["public"]["Enums"]["payment_method"]; p_sale: string; p_shift: string };
         Returns: string;
       };
+      claim_referral: { Args: { p_code: string }; Returns: boolean };
       create_business: {
         Args: {
           p_branch_address: string;
@@ -1618,7 +1773,13 @@ export type Database = {
         }[];
       };
       record_stock_move: {
-        Args: { p_branch: string; p_kind: Database["public"]["Enums"]["stock_move_kind"]; p_product: string; p_qty: number; p_reason: string };
+        Args: {
+          p_branch: string;
+          p_kind: Database["public"]["Enums"]["stock_move_kind"];
+          p_product: string;
+          p_qty: number;
+          p_reason: string;
+        };
         Returns: undefined;
       };
       register_sale: {
@@ -1729,13 +1890,15 @@ type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
 
 export type Tables<
-  DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"]) | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
@@ -1753,11 +1916,11 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I;
@@ -1774,11 +1937,11 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U;
@@ -1795,11 +1958,11 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
@@ -1808,11 +1971,11 @@ export type Enums<
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]

@@ -1,10 +1,10 @@
-import { BadgePercent, BriefcaseBusiness, Search, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
+import { BadgePercent, HandCoins, BriefcaseBusiness, Search, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
 import { catalogLabel } from "./kinds";
 import type { Branch } from "./types";
 import { branchHref, businessHref, type Membership } from "./queries";
 
 /** Secciones del panel lateral según dónde está la persona y su rol en ese negocio. */
-export function appNav(m?: Membership, branch?: Branch) {
+export function appNav(m?: Membership, branch?: Branch, affiliate = false) {
   if (!m)
     return [
       {
@@ -14,6 +14,7 @@ export function appNav(m?: Membership, branch?: Branch) {
           { id: "negocios", label: "Tus negocios", href: "/app", icon: BriefcaseBusiness },
           { id: "buscar", label: "Buscar", href: "/app/buscar", icon: Search },
           { id: "cuenta", label: "Tu cuenta", href: "/app/cuenta", icon: UserRound },
+          ...(affiliate ? [{ id: "afiliado", label: "Afiliados", href: "/app/cuenta/afiliado", icon: HandCoins }] : []),
           { id: "ayuda", label: "Ayuda y comentarios", href: "/app/ayuda", icon: LifeBuoy },
         ],
       },

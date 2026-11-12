@@ -26,9 +26,12 @@ const tax = quote && Math.round(quote.tax * 100);
   </nav>
   <p class="rate-note">
     {
+      // Sin NIT (tasa 0) no se habla de impuestos: el precio es el final.
       quote
-        ? `Precios en dólares sin impuestos. En bolivianos, con el tipo de cambio oficial del BCB del ${shortDate(quote.rateDate)} (Bs ${rate}) e impuestos (${tax}%: IVA e IT). El monto queda fijo al generar el cobro.`
-        : "Precios en dólares sin impuestos. Pagas en bolivianos, con el tipo de cambio oficial del BCB del día de tu cobro más impuestos."
+        ? quote.tax
+          ? `Precios en dólares sin impuestos. En bolivianos, con el tipo de cambio oficial del BCB del ${shortDate(quote.rateDate)} (Bs ${rate}) e impuestos (${tax}%). El monto queda fijo al generar el cobro.`
+          : `Precios en dólares. Pagas en bolivianos: el precio por el tipo de cambio oficial del BCB del ${shortDate(quote.rateDate)} (Bs ${rate}), redondeado al boliviano. El monto queda fijo al generar el cobro.`
+        : "Precios en dólares. Pagas en bolivianos, con el tipo de cambio oficial del BCB del día de tu cobro."
     }
   </p>
 </div>

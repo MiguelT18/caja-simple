@@ -1,8 +1,8 @@
 import type { APIRoute } from "astro";
 import { rateLimit } from "@/lib/cache";
-import { authMessage, authResponse } from "@/lib/auth";
+import { authMessage, authResponse, claimReferral } from "@/lib/auth";
 
-export const POST: APIRoute = async ({ request, locals, url, clientAddress }) => {
+export const POST: APIRoute = async ({ request, locals, url, clientAddress, cookies }) => {
   const form = await request.formData();
   const firstName = String(form.get("firstName") ?? "").trim();
   const lastName = String(form.get("lastName") ?? "").trim();
@@ -26,5 +26,6 @@ export const POST: APIRoute = async ({ request, locals, url, clientAddress }) =>
   if (error) return authResponse(request, { back, message: authMessage(error) });
   // Con confirmación de correo activa no hay sesión todavía.
   if (!data.session) return authResponse(request, { back, message: `Te enviamos un correo a ${email}. Ábrelo para confirmar tu cuenta y entrar.` });
+  await claimReferral(locals.supabase, cookies);
   return authResponse(request, { back, redirect: "/app" });
 };

@@ -7,7 +7,8 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { AppDialog } from "../AppDialog";
 import { toast } from "@/scripts/dialogs";
 import { refreshRegions } from "@/scripts/refresh";
-import { safeAction } from "./form";
+import { safeAction, useStoredState } from "./form";
+import { confirmDiscard, draftKey } from "@/scripts/drafts";
 
 type Draft = { on: boolean; price: string; stock: string };
 const EMPTY: Draft = { on: false, price: "", stock: "" };
@@ -31,7 +32,8 @@ export function AddToBranch({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  // Lo marcado y escrito queda como borrador hasta agregar (o descartar con «Cancelar»).
+  const [drafts, setDrafts, clearDrafts] = useStoredState<Record<string, Draft>>(draftKey("add-to-branch", branchId), {});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -55,7 +57,7 @@ export function AddToBranch({
     setBusy(false);
     if (error) return setMessage(error.message);
     setOpen(false);
-    setDrafts({});
+    clearDrafts();
     setQuery("");
     toast(data.added === 1 ? `«${chosen[0].name}» se agregó a esta sucursal.` : `Se agregaron ${data.added} productos a esta sucursal.`, "success");
     await refreshRegions();
@@ -166,7 +168,16 @@ export function AddToBranch({
           </p>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (chosen.length || Object.values(drafts).some((d) => d.price || d.stock)) {
+                if (!(await confirmDiscard())) return;
+                clearDrafts();
+              }
+              setOpen(false);
+            }}
+          >
             Cancelar
           </Button>
           <Button onClick={submit} aria-disabled={busy || !chosen.length || undefined} aria-busy={busy || undefined}>

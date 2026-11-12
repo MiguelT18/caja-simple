@@ -12,10 +12,13 @@
 //   data-success="Cambios guardados."    → al guardar, lo muestra en un toast (si la Action devuelve
 //                                          { toast: { message, tone } }, se muestra ese en su lugar)
 //   data-reset                           → al guardar, el formulario queda vacío (p. ej., Ayuda y comentarios)
+//   data-draft                           → lo escrito se guarda en localStorage hasta guardar (scripts/drafts.ts);
+//                                          «Cancelar» de su diálogo pregunta antes de descartarlo
 // Diálogos: <button data-open-dialog="id"> abre <dialog id="id" class="modal">; [data-close-dialog] lo cierra.
 import { actions, isInputError } from "astro:actions";
 import { isBusy, setBusy } from "./busy";
 import { confirmDialog, flashToast, toast } from "./dialogs";
+import { clearDraft, confirmDiscard, draftKey, hasDraft, keepDraft } from "./drafts";
 import { showPageSkeleton } from "./nav-skeleton";
 import { onRegions, refreshRegions } from "./refresh";
 
@@ -47,6 +50,7 @@ document.addEventListener("submit", async (event) => {
   const { data, error } = result;
   if (!error) {
     unsaved.delete(form);
+    if ("draft" in form.dataset) clearDraft(formDraftKey(form));
     const target = form.dataset.redirect?.replace(/\{(\w+)\}/g, (_, key) => String(data?.[key] ?? ""));
     if (target || "reload" in form.dataset) {
       if (form.dataset.success) flashToast(form.dataset.success);
@@ -100,7 +104,15 @@ const snapshot = (form: HTMLFormElement) =>
   JSON.stringify([...new FormData(form)].map(([key, value]) => [key, value instanceof File ? `${value.name}:${value.size}` : value]));
 
 // También en las regiones que llegan nuevas tras guardar.
+// El borrador va antes que trackChanges: lo restaurado cuenta como cambio sin guardar.
+const formDraftKey = (form: HTMLFormElement) => draftKey(location.pathname, form.id);
+const drafting = new WeakSet<HTMLFormElement>();
 onRegions((root) => {
+  for (const form of root.querySelectorAll<HTMLFormElement>("form[data-draft]")) {
+    if (drafting.has(form)) continue;
+    drafting.add(form);
+    keepDraft(form, formDraftKey(form));
+  }
   for (const form of root.querySelectorAll<HTMLFormElement>("form[data-track-changes]")) trackChanges(form);
 });
 
@@ -155,7 +167,7 @@ document.addEventListener(
   { capture: true },
 );
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const target = event.target instanceof Element ? event.target : null;
   const opener = target?.closest<HTMLElement>("[data-open-dialog]");
   if (opener) {
@@ -167,7 +179,17 @@ document.addEventListener("click", (event) => {
     return;
   }
   const closer = target?.closest<HTMLElement>("[data-close-dialog]");
-  if (closer) closer.closest("dialog")?.close();
+  if (closer) {
+    const form = closer.closest("form");
+    // Cancelar con un borrador escrito: se pregunta antes de perderlo. Esc, la X y el fondo lo conservan.
+    if (form?.dataset.draft !== undefined && hasDraft(formDraftKey(form))) {
+      if (!(await confirmDiscard())) return;
+      clearDraft(formDraftKey(form));
+      form.reset();
+    }
+    closer.closest("dialog")?.close();
+    return;
+  }
   // Clic en el fondo del diálogo: lo cierra solo si no hay nada escrito (un toque de más en el celular no borra lo cargado).
   if (target instanceof HTMLDialogElement && target.classList.contains("modal") && dialogSnapshot(target) === opened.get(target)) target.close();
 });

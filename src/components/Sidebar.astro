@@ -2,7 +2,7 @@
 import { BriefcaseBusiness, GripVertical, Store } from "@lucide/astro";
 import type { Branch, User } from "../data/types";
 import { NAV_ORDER_COOKIE, appNav, applyNavOrder } from "../data/navigation";
-import { branchColor, branchHref, branchImages, branchSections, businessHref, entryHref, founderPromo, myBusinesses, type Membership } from "../data/queries";
+import { branchColor, branchHref, branchImages, branchSections, businessHref, entryHref, founderPromo, myAffiliate, myBusinesses, type Membership } from "../data/queries";
 import PromoBar from "./PromoBar.astro";
 import ContextSwitcher from "./ContextSwitcher.astro";
 import Logo from "./Logo.astro";
@@ -26,7 +26,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
 // En Gratis o en la prueba de 30 días: los dos todavía no pagaron.
 const freeOwned = myBusinesses(Astro.locals).find((other) => other.role === "dueño" && (other.business.plan === "Gratis" || other.business.trial))?.business;
 const promo = freeOwned && !currentPath.endsWith("/plan") && !currentPath.includes("/cobro/") ? await founderPromo(Astro.locals.supabase).catch(() => null) : null;
-const navSections = applyNavOrder(appNav(m, branch), Astro.cookies.get(NAV_ORDER_COOKIE)?.value);
+const navSections = applyNavOrder(appNav(m, branch, !!myAffiliate(Astro.locals)), Astro.cookies.get(NAV_ORDER_COOKIE)?.value);
 
 const businessOptions = myBusinesses(Astro.locals).map((other) => ({
   label: other.business.name,

@@ -34,6 +34,8 @@ export interface Business {
   listed: boolean;
   /** Color del negocio, de la paleta de src/data/brand.ts: su acento dentro de la app. */
   color: BrandColor;
+  /** Llegó con el link de un afiliado: su primer cobro lleva el descuento de recomendación. */
+  referred?: boolean;
 }
 
 export type BusinessKind = "tienda" | "ropa" | "restaurante";
@@ -298,7 +300,7 @@ export interface PlanCharge {
   plan: "Negocio" | "Sucursales";
   period: "mensual" | "anual";
   extraBranches: number;
-  /** US$ sin impuestos. */
+  /** US$ (antes de impuestos, si hay). */
   usd: number;
   /** Tipo de cambio usado y su día (el de ese día o, si no se pudo obtener, el último). */
   rate: number;
@@ -306,8 +308,12 @@ export interface PlanCharge {
   taxRate: number;
   amountBs: number;
   method: "qr" | "transferencia" | "tarjeta";
-  /** Descuento aplicado (precio fundador): 0,5 = 50%. `usd` ya va con él. */
+  /** Descuento aplicado: 0,5 = 50%. `usd` ya va con él. */
   discount: number;
+  /** De dónde viene el descuento: precio fundador o recomendación de un afiliado (primer cobro). */
+  discountReason: "fundador" | "referido" | null;
+  /** Anual con precio fundador: cuántos de los 12 meses llevan el descuento. null en mensual o sin descuento. */
+  discountMonths: number | null;
   createdAt: string;
   expiresAt: string;
   paidAt: string | null;

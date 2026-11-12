@@ -7,7 +7,8 @@ import { AppDialog } from "../AppDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { colorOf } from "./catalog";
-import { safeAction } from "./form";
+import { safeAction, useStoredState } from "./form";
+import { draftKey } from "@/scripts/drafts";
 import { announce, confirmDialog } from "@/scripts/dialogs";
 
 const nameError = (categories: Category[], name: string, exceptId?: string) => {
@@ -31,7 +32,7 @@ export function CategoryManager({
   onDeleted: (id: string) => void;
   counts: Map<string, number>;
 }) {
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft, clearDraft] = useStoredState(draftKey("category", businessId), "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<{ id: string; name: string; error: string | null; busy?: boolean } | null>(null);
@@ -57,7 +58,7 @@ export function CategoryManager({
     setBusy(false);
     if (error || !data) return setError(error?.message ?? "No se pudo guardar.");
     setCategories((list) => [...list, data].sort((a, b) => a.name.localeCompare(b.name, "es")));
-    setDraft("");
+    clearDraft();
     announce(`Categoría «${data.name}» agregada.`);
   };
 

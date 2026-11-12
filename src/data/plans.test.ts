@@ -1,7 +1,7 @@
 // planLimits solo muestra los límites: la base los aplica. Este test avisa si dejan de coincidir.
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { bsTotal, daysLeft, discounted, effectivePlan, planLimits, planUsd, TRIAL_DAYS, untilLabel, usdFor } from "./plans";
+import { bsTotal, daysLeft, discounted, founderMonthsLeft, priceOf, effectivePlan, planLimits, planUsd, TRIAL_DAYS, untilLabel, usdFor } from "./plans";
 
 const dir = new URL("../../supabase/migrations/", import.meta.url);
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
@@ -69,7 +69,26 @@ describe("untilLabel", () => {
   });
 });
 
-describe("precio en bolivianos (ejemplos del documento, TC 11,81 e impuestos 0,16)", () => {
+describe("precio en bolivianos sin NIT (tasa 0): US$ × TC, redondeado", () => {
+  it("la cuenta que hace el cliente cuadra", () => {
+    expect(bsTotal(5.5, 11.7, 0)).toBe(64); // 64,35
+    expect(bsTotal(usdFor("Sucursales", "mensual", 2), 11.7, 0)).toBe(146); // 12,50 × 11,70 = 146,25
+    expect(bsTotal(55, 11.7, 0)).toBe(644); // 643,50
+  });
+  it("el precio no habla de impuestos con tasa 0, y sí con tasa", () => {
+    const quote = { rate: 11.7, rateDate: "2026-11-12", tax: 0 };
+    expect(priceOf("Negocio", "mensual", quote)).toEqual({ usd: "US$ 5,50", detail: "al mes", today: "hoy Bs 64" });
+    expect(priceOf("Sucursales", "anual", quote).detail).toBe("por sucursal extra, al año");
+    expect(priceOf("Negocio", "mensual", { ...quote, tax: 0.16 }).detail).toBe("+ impuestos al mes");
+    expect(priceOf("Negocio", "mensual", null).detail).toBe("al mes");
+  });
+  it("la base guarda tasa 0 hasta tener NIT", () => {
+    const sql = files.map((f) => readFileSync(new URL(f, dir), "utf8")).join("\n");
+    expect([...sql.matchAll(/update public\.billing_settings set tax_rate = ([\d.]+)/g)].at(-1)?.[1]).toBe("0");
+  });
+});
+
+describe("precio en bolivianos con impuestos (para cuando haya NIT: TC 11,81 y 0,16)", () => {
   const bs = (usd: number) => bsTotal(usd, 11.81, 0.16);
   it("mensual", () => {
     expect(bs(usdFor("Negocio", "mensual"))).toBe(77);
@@ -102,8 +121,24 @@ describe("precio fundador", () => {
     expect(bsTotal(discounted(usdFor("Negocio", "anual"), 0.5), 11.81, 0.16)).toBe(387);
     expect(discounted(5.5, 0)).toBe(5.5);
   });
-  it("la base aplica el mismo redondeo", () => {
-    expect(latest("private.create_plan_charge")).toMatch(/round\(private\.plan_usd\(v_plan, p_period, v_extra\) \* \(1 - v_discount\), 2\)/);
+  it("anual: el descuento solo cubre los meses de fundador que quedan", () => {
+    expect(discounted(55, 0.5)).toBe(27.5); // 12 meses
+    expect(discounted(55, 0.5, 2)).toBe(50.42); // 55 × (1 − 0,5 × 2/12)
+    expect(discounted(55, 0.5, 1)).toBe(52.71);
+  });
+  it("meses de fundador que quedan (los empezados cuentan enteros, hasta 12)", () => {
+    // Fundador desde el 2026-01-12: su último día es el 2027-01-11.
+    expect(founderMonthsLeft("2027-01-11", "2026-12-12")).toBe(1);
+    expect(founderMonthsLeft("2027-01-11", "2026-12-20")).toBe(1);
+    expect(founderMonthsLeft("2027-01-11", "2026-11-20")).toBe(2);
+    expect(founderMonthsLeft("2027-01-11", "2026-01-12")).toBe(12);
+    expect(founderMonthsLeft("2027-01-11", "2027-01-11")).toBe(1);
+    expect(founderMonthsLeft("2027-01-11", "2027-01-12")).toBe(0);
+  });
+  it("la base aplica el mismo redondeo y prorrateo", () => {
+    expect(latest("private.create_plan_charge")).toMatch(
+      /round\(private\.plan_usd\(v_plan, p_period, v_extra\) \* \(1 - v_discount \* coalesce\(v_months, 12\) \/ 12\.0\), 2\)/,
+    );
   });
 });
 

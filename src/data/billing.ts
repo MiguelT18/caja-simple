@@ -42,6 +42,13 @@ export async function founderPromo(sb: Supabase, businessId?: string): Promise<F
   return { slots: row.slots, left, discount: Number(row.discount), months: row.months, until };
 }
 
+/** Descuento del primer cobro de un negocio referido por un afiliado (0,2 = 20%). */
+export async function referralDiscount(sb: Supabase) {
+  const { data, error } = await sb.from("billing_settings").select("referral_discount").maybeSingle();
+  fail(error);
+  return Number(data?.referral_discount ?? 0);
+}
+
 /** Negocios que la persona ve, para /planes (ahí el middleware no carga la sesión). Vencido cuenta como Gratis, como en la base. */
 export async function ownedBusinesses(sb: Supabase, userId: string) {
   const { data, error } = await sb.from("businesses").select("slug, name, plan, plan_until, trial, owner_id").order("created_at");
@@ -87,6 +94,8 @@ export async function planCharges(sb: Supabase, businessId: string): Promise<Pla
     amountBs: c.amount_bs,
     method: c.method,
     discount: Number(c.discount),
+    discountMonths: c.discount_months,
+    discountReason: c.discount_reason as PlanCharge["discountReason"],
     createdAt: c.created_at,
     expiresAt: c.expires_at,
     paidAt: c.paid_at,

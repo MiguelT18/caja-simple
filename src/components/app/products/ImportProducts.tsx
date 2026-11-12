@@ -8,7 +8,8 @@ import { cellsToGrid, gridToCsv, importColumns, parseCsv, productsFromCsv, type 
 import { toCsv } from "@/lib/format";
 import { toast } from "@/scripts/dialogs";
 import { refreshRegions } from "@/scripts/refresh";
-import { FilePicker, safeAction } from "./form";
+import { FilePicker, safeAction, useStoredState } from "./form";
+import { confirmDiscard, draftKey } from "@/scripts/drafts";
 import { shrinkImage } from "@/scripts/shrink-image";
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -59,18 +60,20 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
   const [open, setOpen] = useState(false);
   // La tabla: una fila por producto, una celda por columna. Las celdas se guardan por la clave de su columna, así
   // marcar o desmarcar «código de barras» no mueve lo ya escrito.
-  const [grid, setGrid] = useState<GridRow[]>(() => emptyRows(START_ROWS));
+  // La tabla y las opciones quedan como borrador en este equipo hasta importar (o descartar); las fotos no.
+  const key = (part: string) => draftKey("import", businessId, part);
+  const [grid, setGrid, clearGrid] = useStoredState<GridRow[]>(key("grid"), emptyRows(START_ROWS));
   const tableRef = useRef<HTMLTableElement>(null);
   // La foto de cada fila (mismo índice que grid). No va en el CSV: se sube después del alta, una por producto.
   const [photos, setPhotos] = useState<(Photo | undefined)[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   // Con una sola sucursal, lo importado queda listo para vender ahí sin tener que marcarla.
-  const [branchIds, setBranchIds] = useState<string[]>(branches.length === 1 ? [branches[0].id] : []);
-  const [stockMode, setStockMode] = useState<"same" | "each">("each");
+  const [branchIds, setBranchIds, clearBranchIds] = useStoredState<string[]>(key("branches"), branches.length === 1 ? [branches[0].id] : []);
+  const [stockMode, setStockMode, clearStockMode] = useStoredState<"same" | "each">(key("stock-mode"), "each");
   // El código de barras y la categoría son opcionales: sin encabezado, solo se leen si se marcan.
-  const [withBarcode, setWithBarcode] = useState(false);
-  const [withCategory, setWithCategory] = useState(false);
+  const [withBarcode, setWithBarcode, clearBarcode] = useStoredState(key("barcode"), false);
+  const [withCategory, setWithCategory, clearCategory] = useStoredState(key("category"), false);
 
   const chosen = branches.filter((b) => branchIds.includes(b.id));
   const perBranch = stockMode === "each" && chosen.length > 1;
@@ -111,11 +114,24 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
     setPhotos([]);
   }
 
+  /** Vacía la tabla y las opciones y borra el borrador: tras importar o al descartar. */
   function reset() {
     clearPhotos();
-    setGrid(emptyRows(START_ROWS));
+    clearGrid();
+    clearBranchIds();
+    clearStockMode();
+    clearBarcode();
+    clearCategory();
     setMessage("");
     setFileName("");
+  }
+
+  async function cancel() {
+    if (grid.some((r) => Object.values(r).some((v) => v?.trim())) || photos.some(Boolean)) {
+      if (!(await confirmDiscard())) return;
+      reset();
+    }
+    setOpen(false);
   }
 
   const focusCell = (row: number, col: number) =>
@@ -260,7 +276,8 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
-          if (!next) reset();
+          // Al cerrar (Esc, la X) lo escrito queda como borrador; solo se pierden las fotos.
+          if (!next) setMessage("");
         }}
       >
 
@@ -492,7 +509,7 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={cancel}>
               Cancelar
             </Button>
             <Button onClick={submit} aria-disabled={busy || !ready || undefined} aria-busy={busy || undefined}>

@@ -38,10 +38,17 @@ export function AppDialog({
   return (
     <Dialog open={controlled} onOpenChange={(next) => (onOpenChange?.(next), !next && onClose?.())}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent {...contentProps} className={cn(
+      <DialogContent
+        {...contentProps}
+        // Con un pop-up de confirmar encima (data-covered), Escape cierra solo ese.
+        onEscapeKeyDown={(e) => {
+          if ((e.target as Element | null)?.closest?.("dialog[open]") || document.querySelector("[role=dialog][data-covered]")) return e.preventDefault();
+          contentProps?.onEscapeKeyDown?.(e);
+        }}
+        className={cn(
           "max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto",
-          // Celular: hoja inferior (ui/dialog.tsx) con margen para la barra del iPhone; el pie la usa para quedar pegado abajo.
-          "max-sm:p-5 max-sm:pb-[var(--sheet-pad)] max-sm:[--sheet-pad:max(1.25rem,env(safe-area-inset-bottom))]",
+          // Celular: hoja inferior flotante (ui/dialog.tsx); el pie usa --sheet-pad para quedar pegado abajo.
+          "max-sm:p-5 max-sm:pb-[var(--sheet-pad)] max-sm:[--sheet-pad:1.25rem]",
           WIDTHS[size],
           className,
         )}>

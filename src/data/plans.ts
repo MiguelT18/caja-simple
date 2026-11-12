@@ -56,7 +56,7 @@ export interface Plan {
 
 export type Period = "mensual" | "anual";
 
-// US$ sin impuestos. El cobro lo calcula la base (private.plan_usd): esto solo lo muestra y tiene que coincidir
+// US$ (sin impuestos, si algún día los hay). El cobro lo calcula la base (private.plan_usd): esto solo lo muestra y tiene que coincidir
 // (plans.test.ts). El anual trae 2 meses gratis.
 export const planUsd = {
   base: { mensual: 5.5, anual: 55 },
@@ -68,13 +68,32 @@ export const usdFor = (plan: PlanName, period: Period, extra = 0) =>
   plan === "Gratis" ? 0 : planUsd.base[period] + (plan === "Sucursales" ? extra : 0) * planUsd.extraBranch[period];
 
 /**
- * Total en bolivianos con impuestos, redondeado al boliviano (igual que private.bs_total):
- * los impuestos (IVA + IT) van sobre el total facturado, por eso se divide entre (1 − tasa).
+ * Total en bolivianos, redondeado al boliviano (igual que private.bs_total). Sin NIT la tasa es 0 y el total es
+ * US$ × TC. Con impuestos, van sobre el total facturado: por eso se divide entre (1 − tasa).
  */
 export const bsTotal = (usd: number, rate: number, tax: number) => Math.round((usd * rate) / (1 - tax) + 1e-9);
 
-/** US$ con descuento (precio fundador), redondeado a centavos como la base: round(usd × (1 − d), 2). */
-export const discounted = (usd: number, discount: number) => Math.round(usd * (1 - discount) * 100 + 1e-9) / 100;
+/**
+ * US$ con descuento (precio fundador), redondeado a centavos como la base. En el anual, el descuento cubre solo
+ * `months` de los 12 meses (los de fundador que le quedan): round(usd × (1 − d × months / 12), 2).
+ */
+export const discounted = (usd: number, discount: number, months = 12) =>
+  Math.round(usd * (1 - (discount * months) / 12) * 100 + 1e-9) / 100;
+
+/**
+ * Meses de precio fundador que le quedan a un negocio cuyo período termina `until` (su último día, AAAA-MM-DD),
+ * contando enteros los empezados y hasta 12. Igual que private.create_plan_charge.
+ */
+export function founderMonthsLeft(until: string, today: string) {
+  const [ty, tm, td] = today.split("-").map(Number);
+  const end = new Date(`${until}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() + 1);
+  const [ey, em, ed] = [end.getUTCFullYear(), end.getUTCMonth() + 1, end.getUTCDate()];
+  if (`${ey}-${String(em).padStart(2, "0")}-${String(ed).padStart(2, "0")}` <= today) return 0;
+  const months = (ey - ty) * 12 + (em - tm) - (ed < td ? 1 : 0);
+  // Los días que sobran después de los meses enteros cuentan como un mes más.
+  return Math.min(12, months + (ed !== td ? 1 : 0));
+}
 
 const usdFormat = (n: number) => n.toLocaleString("es-BO", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
 /** «US$ 5,50», «US$ 55». */
@@ -89,7 +108,8 @@ export interface Quote {
 }
 
 /**
- * Precio de un plan como lo muestra la app: «US$ 5,50 + impuestos · hoy Bs 77». Sin tipo de cambio, solo dólares.
+ * Precio de un plan como lo muestra la app: «US$ 5,50 al mes · hoy Bs 64» (con impuestos, «+ impuestos al mes»).
+ * Sin tipo de cambio, solo dólares.
  * En Sucursales, el precio base y aparte lo de cada sucursal extra.
  */
 export function priceOf(plan: PlanName, period: Period, quote?: Quote | null) {
@@ -97,11 +117,13 @@ export function priceOf(plan: PlanName, period: Period, quote?: Quote | null) {
   const bs = (usd: number) => (quote ? `Bs ${bsTotal(usd, quote.rate, quote.tax).toLocaleString("es-BO")}` : null);
   if (plan === "Gratis") return { usd: "US$ 0", detail: "Sin vencimiento", today: null };
   const base = planUsd.base[period];
-  if (plan === "Negocio") return { usd: usdLabel(base), detail: `+ impuestos ${per}`, today: bs(base) && `hoy ${bs(base)}` };
+  // Sin NIT (tasa 0) no se habla de impuestos: el precio es el final.
+  const tax = quote?.tax ? "+ impuestos " : "";
+  if (plan === "Negocio") return { usd: usdLabel(base), detail: `${tax}${per}`, today: bs(base) && `hoy ${bs(base)}` };
   const extra = planUsd.extraBranch[period];
   return {
     usd: `${usdLabel(base)} + ${usdFormat(extra)}`,
-    detail: `por sucursal extra, + impuestos ${per}`,
+    detail: `por sucursal extra, ${tax}${per}`,
     today: bs(base) && `hoy ${bs(base)} + ${bs(extra)} por sucursal extra`,
   };
 }
