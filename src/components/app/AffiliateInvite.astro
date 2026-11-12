@@ -1,0 +1,225 @@
+---
+// Anuncio del programa de afiliados al final de /app/[negocio]/plan: solo para quien tiene perfil de afiliado
+// (`affiliate` de la sesión, public.affiliates). Su enlace `/r/<código>` guarda la cookie `ref` y lleva a /planes;
+// las comisiones y las condiciones están en /app/cuenta/afiliado.
+import { ArrowRight, Check, Copy, HandCoins, MessageCircle, Share2, Store, Wallet } from "@lucide/astro";
+
+interface Props {
+  affiliate: { code: string; rate: number };
+}
+
+const { affiliate } = Astro.props;
+const link = `${Astro.url.origin}/r/${affiliate.code}`;
+const pct = `${Math.round(affiliate.rate * 100)}%`;
+const share = `https://wa.me/?text=${encodeURIComponent(`Yo llevo la caja de mi negocio con Caja Simple: ventas, gastos y cuadre de caja, desde el celular. Con este enlace tienes 20% de descuento en tu primer pago: ${link}`)}`;
+---
+
+<section class="affiliate" aria-labelledby="affiliate-title">
+  <div class="intro">
+    <span class="badge-icon" aria-hidden="true"><HandCoins size={24} stroke-width={1.75} /></span>
+    <div>
+      <p class="eyebrow">Nuevo · Programa de afiliados</p>
+      <h2 id="affiliate-title">Gana dinero recomendando Caja Simple</h2>
+      <p class="lead">
+        Tienes un perfil de afiliado. Gana el <strong class="num">{pct}</strong> de lo que paguen los negocios que lleguen
+        con tu enlace, durante sus primeros 12 meses. Ellos tienen <strong class="num">20%</strong> de descuento en su primer pago.
+      </p>
+    </div>
+  </div>
+
+  <ol class="steps" role="list">
+    <li><Share2 size={18} stroke-width={1.75} aria-hidden="true" /><span>Comparte tu enlace</span></li>
+    <li><Store size={18} stroke-width={1.75} aria-hidden="true" /><span>Un negocio llega y paga su plan</span></li>
+    <li><Wallet size={18} stroke-width={1.75} aria-hidden="true" /><span>Recibes tu {pct} cada mes</span></li>
+  </ol>
+
+  <div class="link-field">
+    <label class="field-label" for="affiliate-link">Tu enlace de afiliado</label>
+    <div class="link-row">
+      <input id="affiliate-link" class="input num" type="text" value={link} readonly data-affiliate-link />
+      <button type="button" class="btn btn-primary" data-affiliate-copy>
+        <span class="copy-icon" aria-hidden="true"><Copy size={18} stroke-width={1.75} /></span>
+        <span class="done-icon" aria-hidden="true"><Check size={18} stroke-width={1.75} /></span>
+        <span data-copy-label>Copiar enlace</span>
+      </button>
+      <a class="btn btn-secondary" href={share} target="_blank" rel="noopener">
+        <MessageCircle size={18} stroke-width={1.75} aria-hidden="true" />
+        WhatsApp<span class="sr-only"> (se abre en otra pestaña)</span>
+      </a>
+    </div>
+  </div>
+
+  <a class="more" href="/app/cuenta/afiliado">
+    Ver tus comisiones y las condiciones
+    <ArrowRight size={16} stroke-width={1.75} aria-hidden="true" />
+  </a>
+</section>
+
+<script>
+  import { toast } from "@/scripts/dialogs";
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-affiliate-copy]")) {
+    const field = button.closest(".affiliate")!.querySelector<HTMLInputElement>("[data-affiliate-link]")!;
+    const label = button.querySelector<HTMLElement>("[data-copy-label]")!;
+    let timer: ReturnType<typeof setTimeout>;
+    // Tocar el campo lo selecciona entero: se puede copiar a mano si el portapapeles no está disponible.
+    field.addEventListener("focus", () => field.select());
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(field.value);
+      } catch {
+        field.focus();
+        field.select();
+        toast("No se pudo copiar. El enlace quedó seleccionado: cópialo con el menú del teclado.", "warning");
+        return;
+      }
+      button.toggleAttribute("data-copied", true);
+      label.textContent = "Copiado";
+      toast("Enlace copiado.", "success");
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        button.removeAttribute("data-copied");
+        label.textContent = "Copiar enlace";
+      }, 2500);
+    });
+  }
+</script>
+
+<style>
+  .affiliate {
+    display: grid;
+    gap: 1.25rem;
+    margin-top: 2.5rem;
+    padding: clamp(1.25rem, 3vw, 2rem);
+    border: 1px solid color-mix(in oklab, var(--color-primary) 30%, var(--color-border));
+    border-radius: var(--radius-panel);
+    /* El color del negocio en un velo desde arriba: se distingue del resto sin gritar. */
+    background:
+      radial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--color-primary) 16%, transparent), transparent 60%),
+      var(--color-surface-muted);
+  }
+
+  .intro {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .badge-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+
+  .eyebrow {
+    margin: 0 0 0.25rem;
+    color: var(--color-primary);
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+  }
+
+  h2 {
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lead {
+    max-width: 60ch;
+    margin: 0.5rem 0 0;
+    color: var(--color-text-muted);
+  }
+
+  .lead strong {
+    color: var(--color-text);
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .steps li {
+    display: flex;
+    gap: 0.625rem;
+    align-items: center;
+    padding: 0.625rem 0.875rem;
+    border-radius: 999px;
+    background: var(--color-surface);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  .steps :global(svg) {
+    flex: none;
+    color: var(--color-primary);
+  }
+
+  .link-field {
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  .link-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .link-row .input {
+    flex: 1 1 16rem;
+    min-width: 0;
+    background: var(--color-surface);
+  }
+
+  .link-row .btn {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .done-icon,
+  [data-copied] .copy-icon {
+    display: none;
+  }
+
+  [data-copied] .done-icon {
+    display: inline-flex;
+  }
+
+  .copy-icon {
+    display: inline-flex;
+  }
+
+  .more {
+    display: inline-flex;
+    gap: 0.375rem;
+    align-items: center;
+    justify-self: start;
+    color: var(--color-text);
+    font-weight: var(--font-bold);
+    text-decoration: underline;
+    text-decoration-color: var(--color-primary);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+
+  @media (max-width: 480px) {
+    .intro {
+      flex-direction: column;
+    }
+
+    .link-row .btn {
+      flex: 1 1 auto;
+      justify-content: center;
+    }
+  }
+</style>

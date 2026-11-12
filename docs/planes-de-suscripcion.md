@@ -8,7 +8,7 @@ Cobrar **al dueño, por sucursal**, y que los empleados entren siempre gratis.
 
 El plan es **de cada negocio**: quien tiene dos negocios paga cada uno por separado, y trabajar como empleado en un negocio ajeno nunca cuesta.
 
-El precio se fija **en dólares** y el cliente paga **en bolivianos**: el sistema convierte con el tipo de cambio del día y suma los impuestos.
+El precio se fija **en dólares** y el cliente paga **en bolivianos**: el sistema convierte con el tipo de cambio del día. **Mientras no haya NIT, no se suman impuestos** (ver abajo).
 
 Así encaja con cómo está pensada la app. La cuenta es de la persona y no del rol, así que cobrar por usuario castigaría justo lo que se quiere fomentar: que el dueño invite a su gente y que registrar sea fácil.
 
@@ -26,27 +26,43 @@ Tres planes, con precio en dólares y sin impuestos. El monto final en boliviano
 
 ## Precio en bolivianos
 
-El sistema calcula el total en bolivianos al generar cada cobro: precio en dólares por el tipo de cambio oficial del BCB del día, más impuestos, redondeado al boliviano.
+El sistema calcula el total en bolivianos al generar cada cobro: precio en dólares por el tipo de cambio oficial del BCB del día, redondeado al boliviano.
+
+### Sin NIT (hoy): sin impuestos
+
+Todavía no hay inscripción ante el SIN ni NIT, así que **no se cobran ni se mencionan impuestos**: cobrar «impuestos» que no se declaran ni se facturan se puede leer como un engaño. `billing_settings.tax_rate = 0` (`20261112120000_no_tax_and_founder_annual.sql`) y el total es la cuenta que el cliente puede rehacer con su calculadora:
 
 ```latex
-\text{Total (Bs)} = \operatorname{redondear}\left( \frac{\text{Precio (US\$)} \times \text{TC}}{1 - 0{,}16} \right)
+\text{Total (Bs)} = \operatorname{redondear}\left( \text{Precio (US\$)} \times \text{TC} \right)
 ```
 
-El 0,16 es IVA (13%) más IT (3%), ambos calculados sobre el total facturado. Por eso se divide entre 0,84 en vez de multiplicar por 1,16: así, después de impuestos, queda limpio el precio en dólares.
+Ejemplo con el tipo de cambio de Bs 11,70:
 
-Ejemplo con el tipo de cambio de Bs 11,81 (7 de noviembre de 2026):
-
-| Concepto | US$ sin impuestos | Bs con impuestos |
+| Concepto | US$ | Bs |
 | --- | --- | --- |
-| Negocio, mensual | 5,50 | 77 |
-| Sucursal extra, mensual | 3,50 | 49 |
-| Sucursales con 3 locales, mensual | 12,50 | 176 |
-| Negocio, anual | 55 | 773 |
-| Sucursal extra, anual | 35 | 492 |
+| Negocio, mensual | 5,50 | 64 (64,35) |
+| Sucursal extra, mensual | 3,50 | 41 (40,95) |
+| Sucursales con 3 locales, mensual | 12,50 | 146 (146,25) |
+| Negocio, anual | 55 | 644 (643,50) |
 
-- La factura y el cobro (por QR) van siempre en bolivianos. El dólar es solo la referencia del precio.
+La página del cobro muestra el desglose: «US$ 5,50 × Bs 11,70 = Bs 64,35 · Total Bs 64 (redondeado al boliviano)». La app no dice «impuestos» en ningún lado mientras la tasa sea 0.
+
+### Al inscribirse: con impuestos
+
+Cuando haya NIT y se sepa el régimen, se cambia `tax_rate` con una migración (`update public.billing_settings set tax_rate = …`):
+
+- **SIETE-RG:** `0.05`. El plan Negocio quedaría en ~Bs 68 (TC 11,70).
+- **Régimen General:** `0.16` (IVA 13% + IT 3%, sobre el total facturado). Por eso se divide entre (1 − tasa) en vez de multiplicar por (1 + tasa): después de impuestos queda limpio el precio en dólares.
+
+```latex
+\text{Total (Bs)} = \operatorname{redondear}\left( \frac{\text{Precio (US\$)} \times \text{TC}}{1 - \text{tasa}} \right)
+```
+
+Con tasa mayor que 0, la app vuelve sola a mostrar «+ impuestos» en los precios y, en el cobro, la línea «Impuestos sobre el total: Bs …» (con 0,16 y TC 11,70: 64,35 + 12,26 → Bs 77). Confirmar la tasa con un contador.
+
+- La factura (cuando la haya) y el cobro por QR van siempre en bolivianos. El dólar es solo la referencia del precio.
 - El monto en Bs queda fijo desde que se genera el cobro hasta que vence (por ejemplo, 3 días). Si vence sin pagarse, se recalcula con el tipo de cambio nuevo.
-- La app muestra los dos valores: "US$ 5,50 + impuestos · hoy Bs 77".
+- La app muestra los dos valores: "US$ 5,50 al mes · hoy Bs 64".
 - Si ese día no se puede obtener el tipo de cambio, se usa el último disponible y se registra cuál fue.
 - La tasa de 0,16 es configurable y hay que confirmarla con un contador según el régimen ante el SIN. No incluye la comisión de la pasarela de pago.
 
@@ -128,6 +144,7 @@ Los primeros **20 negocios que pagan** tienen **50% de descuento durante 12 mese
 
 - **Cupo:** lo ocupa el negocio al activarse su primer cobro con descuento (`activate_plan_charge` pone `businesses.founder_since`). Un cobro generado y sin pagar no ocupa cupo.
 - **Cobro:** `create_plan_charge` aplica el descuento si el negocio ya es fundador y está dentro de sus 12 meses, o si todavía quedan cupos. Lo guarda en `plan_charges.discount`, y `usd` ya va con descuento.
+- **Plan anual:** el descuento cubre solo los meses de fundador que le quedan al negocio (los empezados cuentan enteros), guardados en `plan_charges.discount_months`: `usd = anual × (1 − descuento × meses / 12)`. Quien paga el año en su mes 11 lleva 2 meses al 50% y 10 a precio normal (55 × (1 − 0,5 × 2/12) = US$ 50,42). Un fundador nuevo (su período empieza al pagar) lleva los 12. `founderMonthsLeft` y `discounted` en `src/data/plans.ts` repiten la cuenta para mostrarla.
 - **Caso borde:** si varios cobros con descuento se generan con el último cupo libre, todos se respetan al pagarse (el monto se mostró fijo). Puede pasarse de 20 por uno o dos.
 - **Barra:** `PromoBar` muestra los cupos reales de `public.founder_promo()` en `/`, `/planes` y en `/app` (solo a quien tiene un negocio propio en Gratis; ahí se puede ocultar). Sin cupos, o con la promo apagada, no aparece.
 - **Configurar o apagar:** en `public.billing_settings` (`founder_active`, `founder_slots`, `founder_discount`, `founder_months`):
@@ -135,5 +152,29 @@ Los primeros **20 negocios que pagan** tienen **50% de descuento durante 12 mese
 ```sh
 pnpm dlx supabase db query --db-url "$DB_URL" "update public.billing_settings set founder_active = false;"
 ```
+
+### Afiliados
+
+Socios aprobados a mano (contadores, distribuidores, técnicos) recomiendan Caja Simple con su link y ganan un % de lo que pagan los negocios que traen (migración `20261112130000_affiliates.sql`).
+
+- **Alta:** solo con SQL, sobre una cuenta que ya existe. `rate` es la fracción (0,30 = 30 %, tope 0,5). Se puede subir a quien trae volumen (por ejemplo, 40 % desde 5 negocios que pagan).
+
+```sh
+pnpm dlx supabase db query --db-url "$DB_URL" "insert into public.affiliates (id, code, rate, payout_details) select id, 'contador-juan', 0.30, 'BCP 123…' from public.profiles where email = '…';"
+```
+
+- **Link:** `/r/<código>` (`src/pages/r/[codigo].astro`) guarda la cookie `ref` por 60 días (no pisa una anterior) y lleva a `/planes`. Al crear la cuenta (`signup.ts`, o `callback.ts` con Google o al confirmar el correo), `claimReferral` llama a `public.claim_referral`, que deja `profiles.referred_by` solo si la cuenta tiene menos de 7 días, no tiene referido, no es la del afiliado y nunca pagó un plan. Cada negocio que crea después copia `referred_by` (trigger `businesses_copy_referral`), así que una transferencia no cambia de afiliado.
+- **Descuento del referido:** `billing_settings.referral_discount` (20 %) en el **primer cobro** del negocio, sobre el cobro entero (también el anual). No se suma al de fundador: `create_plan_charge` aplica el mayor y lo guarda en `plan_charges.discount_reason` (`fundador` o `referido`). El de recomendación no ocupa cupo de fundador.
+- **Comisión:** al activar cada cobro, `activate_plan_charge` crea una fila en `referral_commissions` si el negocio tiene un afiliado activo y el pago cae dentro de los `referral_months` (12) desde el **primer pago** del negocio: `round(amount_bs × rate × meses / meses_del_período)`. Mensual: 1 mes. Anual: los meses que quedan de la ventana (`private.commission_months`; los empezados cuentan enteros). Se calcula sobre lo cobrado en Bs, ya con descuento.
+- **Pago al afiliado:** cada comisión queda retenida `referral_hold_days` (30) días. Una vez al mes, a quien tenga Bs 100 o más por cobrar, se le paga por QR o transferencia y se marca:
+
+```sh
+pnpm dlx supabase db query --db-url "$DB_URL" "select a.code, sum(c.amount_bs) from public.referral_commissions c join public.affiliates a on a.id = c.affiliate_id where c.paid_out_at is null and c.payable_at <= now() group by 1 having sum(c.amount_bs) >= 100;"
+pnpm dlx supabase db query --db-url "$DB_URL" "select private.pay_commissions('<id del afiliado>', 'QR 12/11');"
+```
+
+- **Lo que ve el afiliado:** `/app/cuenta/afiliado` (link, totales retenido / por cobrar / cobrado, comisiones y condiciones) y, en la página de plan de sus negocios, `AffiliateInvite`. Quien no es afiliado recibe 404.
+- **Dar de baja:** `update public.affiliates set active = false where code = '…';`. Los negocios que ya trajo dejan de generar comisión; las ya creadas se pagan igual.
+- Sin NIT, las comisiones salen como gasto personal: confirmarlo con el contador al inscribirse.
 
 Pendiente: la factura electrónica.

@@ -1,0 +1,195 @@
+---
+// Programa de afiliados (docs/planes-de-suscripcion.md › Afiliados): el link del afiliado, sus comisiones y las reglas.
+// Solo para quien tiene ficha de afiliado activa; a los demás, 404.
+import { Copy, HandCoins, Wallet } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import Layout from "@/layouts/Layout.astro";
+import { affiliateSummary, myAffiliate } from "@/data/queries";
+import { shortDate, stamp } from "@/lib/dates";
+import { plural } from "@/lib/format";
+
+const affiliate = myAffiliate(Astro.locals);
+if (!affiliate) return Astro.rewrite("/404");
+const { commissions, totals, referrals } = await affiliateSummary(Astro.locals.supabase);
+const link = `${Astro.url.origin}/r/${affiliate.code}`;
+const pct = `${Math.round(affiliate.rate * 100)}%`;
+const bs = (n: number) => `Bs ${n.toLocaleString("es-BO")}`;
+const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", pagada: "chip-income" } as const;
+---
+
+<Layout title="Afiliados">
+  <PageHeader title="Programa de afiliados" description={`Ganas el ${pct} de lo que paguen los negocios que lleguen con tu enlace, durante sus primeros 12 meses.`} />
+
+  <div class="affiliate-page">
+    <section class="card block" aria-labelledby="link-title">
+      <h2 class="card-title" id="link-title"><HandCoins size={20} stroke-width={1.75} />Tu enlace</h2>
+      <div class="link-row">
+        <label class="sr-only" for="affiliate-link">Tu enlace de afiliado</label>
+        <input id="affiliate-link" class="input num" type="text" value={link} readonly />
+        <button type="button" class="btn btn-primary" data-copy-link><Copy size={18} stroke-width={1.75} aria-hidden="true" /><span>Copiar enlace</span></button>
+      </div>
+      <p class="field-hint">
+        {plural(referrals.people, "cuenta creada", "cuentas creadas")} con tu enlace · {plural(referrals.businesses, "negocio", "negocios")} ·
+        {plural(referrals.paying, "negocio pagó", "negocios pagaron")} su plan.
+      </p>
+    </section>
+
+    <section class="totals" aria-label="Tus comisiones">
+      <div class="card total"><span class="label">Retenido</span><strong class="num">{bs(totals.held)}</strong><span class="hint">30 días desde el pago del cliente</span></div>
+      <div class="card total"><span class="label">Por cobrar</span><strong class="num">{bs(totals.payable)}</strong><span class="hint">Se paga cada mes, desde Bs 100</span></div>
+      <div class="card total"><span class="label">Cobrado</span><strong class="num">{bs(totals.paid)}</strong><span class="hint">En total</span></div>
+    </section>
+
+    <section aria-labelledby="commissions-title">
+      <h2 class="card-title" id="commissions-title"><Wallet size={20} stroke-width={1.75} />Comisiones</h2>
+      {commissions.length === 0 ? (
+        <p class="field-hint">Todavía no hay comisiones. Aparecen aquí cuando un negocio que llegó con tu enlace paga su plan.</p>
+      ) : (
+        <div class="table-wrap card" role="region" aria-label="Tabla de comisiones" tabindex="0">
+          <table class="commissions">
+            <caption class="sr-only">Comisiones por cada pago de un negocio referido</caption>
+            <thead>
+              <tr>
+                <th scope="col">Pago</th>
+                <th scope="col">Negocio</th>
+                <th scope="col" class="right">Cobro</th>
+                <th scope="col" class="right">Comisión</th>
+                <th scope="col">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {commissions.map((c) => (
+                <tr>
+                  <td class="muted num">{stamp(c.createdAt)}</td>
+                  <td>{c.businessName}</td>
+                  <td class="right num">{bs(c.chargeBs)}</td>
+                  <td class="right num">
+                    {bs(c.amountBs)}
+                    <span class="muted"> · {Math.round(c.rate * 100)}%{c.months > 1 ? ` × ${c.months} meses` : ""}</span>
+                  </td>
+                  <td>
+                    <span class:list={["chip", statusTone[c.status]]}>{c.status === "retenida" ? `Retenida hasta el ${shortDate(c.payableAt.slice(0, 10))}` : c.status === "por pagar" ? "Por cobrar" : "Cobrada"}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+
+    <section class="card block" aria-labelledby="rules-title">
+      <h2 class="card-title" id="rules-title">Condiciones</h2>
+      <ul class="rules">
+        <li>Ganas el {pct} de lo que paga, en bolivianos, cada negocio que llegó con tu enlace, durante los 12 meses que siguen a su primer pago. Un plan anual cuenta solo por los meses que caen dentro de esos 12.</li>
+        <li>El negocio tiene un descuento en su primer pago. Si le toca el precio fundador, se aplica el mayor de los dos.</li>
+        <li>Vale para cuentas nuevas: la persona tiene que crear su cuenta con tu enlace (dura 60 días en su navegador) y no haber pagado antes.</li>
+        <li>No cuentan tus propios negocios.</li>
+        <li>Cada comisión queda retenida 30 días después del pago del cliente. Te pagamos una vez al mes, cuando lo por cobrar llega a Bs 100.</li>
+      </ul>
+    </section>
+  </div>
+</Layout>
+
+<script>
+  import { toast } from "@/scripts/dialogs";
+
+  const field = document.querySelector<HTMLInputElement>("#affiliate-link");
+  field?.addEventListener("focus", () => field.select());
+  document.querySelector("[data-copy-link]")?.addEventListener("click", async () => {
+    if (!field) return;
+    try {
+      await navigator.clipboard.writeText(field.value);
+      toast("Enlace copiado.", "success");
+    } catch {
+      field.focus();
+      toast("No se pudo copiar. El enlace quedó seleccionado: cópialo a mano.", "warning");
+    }
+  });
+</script>
+
+<style>
+  .affiliate-page {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .link-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .link-row .input {
+    flex: 1 1 16rem;
+    min-width: 0;
+  }
+
+  .link-row .btn {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .totals {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  .total {
+    display: grid;
+    gap: 0.25rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .total .label,
+  .total .hint {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .total strong {
+    font-size: var(--text-xl);
+  }
+
+  .commissions {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+
+  .commissions th,
+  .commissions td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .commissions th {
+    color: var(--color-text-muted);
+    font-weight: var(--font-medium);
+  }
+
+  .commissions tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .commissions .right {
+    text-align: right;
+  }
+
+  .muted {
+    color: var(--color-text-muted);
+  }
+
+  .rules {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding-left: 1.25rem;
+    color: var(--color-text-muted);
+  }
+</style>

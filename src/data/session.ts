@@ -23,6 +23,8 @@ export interface SessionData {
   /** Los avisos más recientes de la bandeja y cuántos hay sin leer en total. */
   notifications: Notification[];
   unread: number;
+  /** Si es afiliada (docs/planes-de-suscripcion.md › Afiliados): su código para el link /r/<código> y su % (0,3 = 30%). */
+  affiliate: { code: string; rate: number } | null;
 }
 
 type Locals = App.Locals;
@@ -47,15 +49,22 @@ export async function loadSession(sb: Supabase, userId: string): Promise<Session
       sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
       sb.from("businesses").select("*, branches(*)").order("created_at"),
       sb.from("employees").select(EMPLOYEE_COLUMNS).eq("person_id", userId).eq("status", "activo"),
-    ]).then(([profile, businesses, employments]) => {
+      sb.from("affiliates").select("code, rate").eq("id", userId).eq("active", true).maybeSingle(),
+    ]).then(([profile, businesses, employments, affiliate]) => {
       fail(profile.error);
       // Se lanza (no se devuelve): así no queda en la caché.
       if (!profile.data) throw new MissingProfile();
       fail(businesses.error);
       fail(employments.error);
-      return { profile: profile.data, businesses: businesses.data ?? [], employments: employments.data ?? [] };
+      fail(affiliate.error);
+      return {
+        profile: profile.data,
+        businesses: businesses.data ?? [],
+        employments: employments.data ?? [],
+        affiliate: affiliate.data ? { code: affiliate.data.code, rate: Number(affiliate.data.rate) } : null,
+      };
     });
-  const [{ profile, businesses, employments }, inbox, unread] = await Promise.all([
+  const [{ profile, businesses, employments, affiliate }, inbox, unread] = await Promise.all([
     cached(`s:${userId}`, 600, rows, (r) => [userVersion(userId), ...r.businesses.map((b) => businessVersion(b.id))]),
     sb.from("notifications").select("*, employee:employees(status), reopen:reopen_requests(status), join:join_requests(status), stock:stock_requests(status)").order("created_at", { ascending: false }).limit(60),
     sb.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
@@ -111,7 +120,8 @@ export async function loadSession(sb: Supabase, userId: string): Promise<Session
               : n.employee?.status === "invitado",
       }) as unknown as Notification,
   );
-  return { user: toPerson(profile), memberships, notifications, unread: unread.count ?? 0 };
+  // Una sesión cacheada de antes de los afiliados no trae el campo.
+  return { user: toPerson(profile), memberships, notifications, unread: unread.count ?? 0, affiliate: affiliate ?? null };
 }
 
 const session = (locals: Locals) => {
@@ -121,6 +131,7 @@ const session = (locals: Locals) => {
 
 export const currentUser = (locals: Locals) => session(locals).user;
 export const myBusinesses = (locals: Locals) => session(locals).memberships;
+export const myAffiliate = (locals: Locals) => session(locals).affiliate;
 export const inbox = (locals: Locals) => ({ notifications: session(locals).notifications, unread: session(locals).unread });
 export const membership = (locals: Locals, businessSlug: string) => myBusinesses(locals).find((m) => m.business.slug === businessSlug);
 

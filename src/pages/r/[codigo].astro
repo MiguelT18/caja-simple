@@ -1,0 +1,14 @@
+---
+// Link de afiliado: guarda su código hasta que la persona crea su cuenta (claimReferral) y la lleva a los planes.
+// La base valida el código al reclamarlo; aquí solo se descarta lo que no puede ser un código.
+import { REFERRAL_COOKIE } from "@/lib/auth";
+
+export const prerender = false;
+
+const code = (Astro.params.codigo ?? "").toLowerCase();
+// La primera recomendación gana: un segundo link no pisa la cookie.
+if (/^[a-z0-9]+(-[a-z0-9]+)*$/.test(code) && code.length <= 30 && !Astro.cookies.has(REFERRAL_COOKIE)) {
+  Astro.cookies.set(REFERRAL_COOKIE, code, { path: "/", maxAge: 60 * 60 * 24 * 60, httpOnly: true, sameSite: "lax", secure: import.meta.env.PROD });
+}
+return Astro.redirect("/planes", 303);
+---
