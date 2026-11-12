@@ -475,6 +475,7 @@ const daysLabel = (weekdays: number[] | null) =>
             id={id}
             title={shift ? `Editar turno ${shift.name}` : "Agregar turno"}
             action="saveShift"
+            draft={!shift}
             submitLabel="Guardar"
             hidden={{ branchId: branch.id, id: shift?.id }}
           >

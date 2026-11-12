@@ -189,6 +189,7 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
         title={isOwner ? "Registrar movimiento de stock" : "Pedir entrada de mercadería"}
         description={isOwner ? "Cambia el stock de la sucursal y queda en el registro con tu nombre." : "Quien administra el negocio recibe tu pedido. El stock sube cuando lo acepte."}
         action={isOwner ? "recordStockMove" : "requestStockEntry"}
+        draft
         submitLabel={isOwner ? "Guardar" : "Enviar pedido"}
         hidden={{ branchId: branch.id }}
         success={isOwner ? "Stock actualizado" : "Pedido enviado. El stock sube cuando quien administra el negocio lo acepte."}

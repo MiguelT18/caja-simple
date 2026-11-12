@@ -4,6 +4,7 @@ import type { Product } from "@/data/types";
 import { Label } from "@/components/ui/label";
 import { refreshRegions } from "@/scripts/refresh";
 import { toast } from "@/scripts/dialogs";
+import { clearDraft } from "@/scripts/drafts";
 
 /**
  * Campo con etiqueta, ayuda y error. El control (hijo) recibe aria-invalid y aria-describedby enlazados a la ayuda
@@ -136,6 +137,36 @@ export function useActionForm(
   }
   const submitProps = { "aria-disabled": busy || undefined, "aria-busy": busy || undefined };
   return { busy, errors, message, setMessage, onSubmit, submitProps };
+}
+
+/**
+ * useState que queda como borrador en localStorage (ver scripts/drafts.ts): vuelve al recargar o reabrir.
+ * Se lee después de montar, para que el HTML del servidor y el primero del navegador coincidan.
+ * `clear()` vuelve a `initial` y borra lo guardado (al guardar con éxito o al descartar).
+ */
+export function useStoredState<T>(key: string, initial: T) {
+  const [value, setValue] = useState(initial);
+  const loaded = useRef(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) setValue(JSON.parse(raw));
+    } catch {}
+    loaded.current = true;
+  }, [key]);
+  useEffect(() => {
+    if (!loaded.current) return;
+    try {
+      if (JSON.stringify(value) === JSON.stringify(initial)) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+    // `initial` es un valor de arranque: no cambia.
+  }, [key, value]);
+  const clear = () => {
+    clearDraft(key);
+    setValue(initial);
+  };
+  return [value, setValue, clear] as const;
 }
 
 /** Casilla con su texto: decide si se muestra un grupo de campos. */

@@ -3,6 +3,7 @@
 //   toast("No se pudo guardar.", "error")                                              → aviso flotante
 //   flashToast("Gasto guardado.")                                                      → aviso que se muestra tras recargar
 //   announce("3 productos")                                                            → solo para lectores de pantalla
+// Un diálogo de mayor prioridad (confirmDialog) tapa al que está abierto debajo ([data-covered]) y lo devuelve al cerrarse.
 
 interface ConfirmOptions {
   title?: string;
@@ -47,10 +48,24 @@ export function confirmDialog(message: string, { title = "¿Seguro?", confirmLab
   ok.textContent = confirmLabel;
   ok.className = `btn ${danger ? "btn-danger" : "btn-primary"}`;
   dialog.returnValue = "";
+  const back = document.activeElement as HTMLElement | null;
+  // El diálogo de abajo se oculta un momento: así queda claro que primero hay que responder este.
+  const covered = [...document.querySelectorAll<HTMLElement>('dialog.modal[open], [role="dialog"][data-state="open"]')].filter((el) => el !== dialog);
+  for (const el of covered) el.setAttribute("data-covered", "");
   dialog.showModal();
   // El foco empieza en Cancelar: Enter no confirma algo destructivo sin querer.
   dialog.querySelector<HTMLButtonElement>('button[value="cancel"]')!.focus();
-  return new Promise<boolean>((resolve) => dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok"), { once: true }));
+  return new Promise<boolean>((resolve) =>
+    dialog.addEventListener(
+      "close",
+      () => {
+        for (const el of covered) el.removeAttribute("data-covered");
+        if (back?.isConnected) back.focus();
+        resolve(dialog.returnValue === "ok");
+      },
+      { once: true },
+    ),
+  );
 }
 
 // Regiones vivas fijas, creadas al cargar: los lectores de pantalla solo anuncian bien lo que se escribe

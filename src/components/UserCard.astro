@@ -26,12 +26,20 @@ const helpHref = `/app/ayuda?desde=${encodeURIComponent(Astro.url.pathname)}`;
   <a href={helpHref} class="icon-btn user-action" aria-label="Ayuda y comentarios" title="Ayuda y comentarios">
     <LifeBuoy size={18} stroke-width={1.75} />
   </a>
-  <form method="post" action="/api/auth/logout">
+  <form method="post" action="/api/auth/logout" data-logout>
     <button type="submit" class="icon-btn user-action" aria-label="Cerrar sesión" title="Cerrar sesión">
       <LogOut size={18} stroke-width={1.75} />
     </button>
   </form>
 </div>
+
+<script>
+  import { clearAllDrafts } from "../scripts/drafts";
+  // Al salir se borran los borradores: en un equipo compartido, la próxima persona no ve lo que escribió esta.
+  document.addEventListener("submit", (event) => {
+    if ((event.target as HTMLElement).matches("form[data-logout]")) clearAllDrafts();
+  });
+</script>
 
 <style>
   .user-card {
