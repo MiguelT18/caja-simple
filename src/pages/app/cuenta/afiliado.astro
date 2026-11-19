@@ -1,19 +1,45 @@
 ---
-// Programa de afiliados (docs/planes-de-suscripcion.md › Afiliados): el link del afiliado, sus comisiones y las reglas.
+// Programa de afiliados (docs/planes-de-suscripcion.md › Afiliados): el link del afiliado, su saldo, el rendimiento
+// en un rango de días (?desde=&hasta=&periodo=, como Reportes), sus comisiones y las reglas.
 // Solo para quien tiene ficha de afiliado activa; a los demás, 404.
-import { Copy, HandCoins, Wallet } from "@lucide/astro";
+import { CalendarRange, Copy, HandCoins, MessageCircle, ScrollText, Wallet } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
+import DonutChart from "@/components/app/charts/DonutChart";
+import WeekChart from "@/components/app/charts/WeekChart";
+import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { affiliateSummary, myAffiliate } from "@/data/queries";
-import { shortDate, stamp } from "@/lib/dates";
-import { plural } from "@/lib/format";
+import { affiliateSummary, commissionsByPeriod, myAffiliate } from "@/data/queries";
+import { addDays, parseRange, shortDate, today as todayOf, type Period } from "@/lib/dates";
 
 const affiliate = myAffiliate(Astro.locals);
 if (!affiliate) return Astro.rewrite("/404");
-const { commissions, totals, referrals } = await affiliateSummary(Astro.locals.supabase);
+
+const MAX_DAYS = 366;
+const today = todayOf();
+// Los pagos son mensuales: sin rango elegido, los últimos 30 días (parseRange solo trae 7).
+const params = new URLSearchParams(Astro.url.searchParams);
+if (!params.has("desde")) params.set("desde", addDays(params.get("hasta") ?? today, -29));
+const range = parseRange(params, today, MAX_DAYS);
+const periods: Record<Period, string> = { dia: "Por día", semana: "Por semana", mes: "Por mes" };
+const asked = Astro.url.searchParams.get("periodo");
+const period: Period = asked === "dia" || asked === "semana" || asked === "mes" ? asked : range.days > 92 ? "mes" : range.days > 31 ? "semana" : "dia";
+
+const { inRange, totals, range: summary, referrals } = await affiliateSummary(Astro.locals.supabase, range);
+const monthFormat = new Intl.DateTimeFormat("es-BO", { month: "short", year: "numeric", timeZone: "UTC" });
+const periodLabel = (date: string) =>
+  period === "mes" ? monthFormat.format(new Date(`${date}T12:00:00Z`)).replace(".", "") : period === "semana" ? `Sem. del ${shortDate(date)}` : shortDate(date);
+const rows = commissionsByPeriod(inRange, range.from, range.to, period).map((r) => ({ ...r, label: periodLabel(r.date) }));
+const chartConfig = {
+  sales: { label: "Pagado por tus referidos", color: "var(--color-primary)" },
+  expenses: { label: "Tu comisión", color: "var(--color-income)" },
+};
+const statusName = { retenida: "Retenida", "por pagar": "Por cobrar", pagada: "Cobrada" } as const;
+
 const link = `${Astro.url.origin}/r/${affiliate.code}`;
 const pct = `${Math.round(affiliate.rate * 100)}%`;
+const share = `https://wa.me/?text=${encodeURIComponent(`Yo uso Caja Simple para llevar la caja del negocio: ventas, gastos y cuadre, desde el celular. Con este enlace tienes un descuento en tu primer pago: ${link}`)}`;
 const bs = (n: number) => `Bs ${n.toLocaleString("es-BO")}`;
+const rangeText = `del ${shortDate(range.from)} al ${shortDate(range.to)}`;
 const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", pagada: "chip-income" } as const;
 ---
 
@@ -21,71 +47,108 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
   <PageHeader title="Programa de afiliados" description={`Ganas el ${pct} de lo que paguen los negocios que lleguen con tu enlace, durante sus primeros 12 meses.`} />
 
   <div class="affiliate-page">
-    <section class="card block" aria-labelledby="link-title">
-      <h2 class="card-title" id="link-title"><HandCoins size={20} stroke-width={1.75} />Tu enlace</h2>
+    <section class="card panel" aria-labelledby="link-title">
+      <h2 class="card-title" id="link-title"><HandCoins size={20} stroke-width={1.75} aria-hidden="true" />Tu enlace</h2>
       <div class="link-row">
         <label class="sr-only" for="affiliate-link">Tu enlace de afiliado</label>
         <input id="affiliate-link" class="input num" type="text" value={link} readonly />
         <button type="button" class="btn btn-primary" data-copy-link><Copy size={18} stroke-width={1.75} aria-hidden="true" /><span>Copiar enlace</span></button>
+        <a class="btn btn-secondary" href={share} target="_blank" rel="noopener">
+          <MessageCircle size={18} stroke-width={1.75} aria-hidden="true" />WhatsApp<span class="sr-only"> (se abre en otra pestaña)</span>
+        </a>
       </div>
-      <p class="field-hint">
-        {plural(referrals.people, "cuenta creada", "cuentas creadas")} con tu enlace · {plural(referrals.businesses, "negocio", "negocios")} ·
-        {plural(referrals.paying, "negocio pagó", "negocios pagaron")} su plan.
-      </p>
+      <dl class="mini-stats">
+        <div><dt>Cuentas creadas</dt><dd class="num">{referrals.people}</dd></div>
+        <div><dt>Negocios</dt><dd class="num">{referrals.businesses}</dd></div>
+        <div><dt>Negocios que pagaron</dt><dd class="num">{referrals.paying}</dd></div>
+      </dl>
     </section>
 
-    <section class="totals" aria-label="Tus comisiones">
-      <div class="card total"><span class="label">Retenido</span><strong class="num">{bs(totals.held)}</strong><span class="hint">30 días desde el pago del cliente</span></div>
-      <div class="card total"><span class="label">Por cobrar</span><strong class="num">{bs(totals.payable)}</strong><span class="hint">Se paga cada mes, desde Bs 100</span></div>
-      <div class="card total"><span class="label">Cobrado</span><strong class="num">{bs(totals.paid)}</strong><span class="hint">En total</span></div>
+    <section aria-labelledby="balance-title">
+      <h2 class="section-title" id="balance-title"><Wallet size={20} stroke-width={1.75} aria-hidden="true" />Tu saldo</h2>
+      <dl class="balance">
+        <div class="card stat"><dt>Retenido</dt><dd class="num">{bs(totals.held)}</dd><dd class="note">30 días desde el pago del cliente</dd></div>
+        <div class="card stat"><dt>Por cobrar</dt><dd class="num amount-income">{bs(totals.payable)}</dd><dd class="note">Te pagamos cada mes, desde Bs 100</dd></div>
+        <div class="card stat"><dt>Cobrado</dt><dd class="num">{bs(totals.paid)}</dd><dd class="note">Desde que eres afiliado</dd></div>
+      </dl>
     </section>
 
-    <section aria-labelledby="commissions-title">
-      <h2 class="card-title" id="commissions-title"><Wallet size={20} stroke-width={1.75} />Comisiones</h2>
-      {commissions.length === 0 ? (
-        <p class="field-hint">Todavía no hay comisiones. Aparecen aquí cuando un negocio que llegó con tu enlace paga su plan.</p>
-      ) : (
-        <div class="table-wrap card" role="region" aria-label="Tabla de comisiones" tabindex="0">
-          <table class="commissions">
-            <caption class="sr-only">Comisiones por cada pago de un negocio referido</caption>
-            <thead>
-              <tr>
-                <th scope="col">Pago</th>
-                <th scope="col">Negocio</th>
-                <th scope="col" class="right">Cobro</th>
-                <th scope="col" class="right">Comisión</th>
-                <th scope="col">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {commissions.map((c) => (
-                <tr>
-                  <td class="muted num">{stamp(c.createdAt)}</td>
-                  <td>{c.businessName}</td>
-                  <td class="right num">{bs(c.chargeBs)}</td>
-                  <td class="right num">
-                    {bs(c.amountBs)}
-                    <span class="muted"> · {Math.round(c.rate * 100)}%{c.months > 1 ? ` × ${c.months} meses` : ""}</span>
-                  </td>
-                  <td>
-                    <span class:list={["chip", statusTone[c.status]]}>{c.status === "retenida" ? `Retenida hasta el ${shortDate(c.payableAt.slice(0, 10))}` : c.status === "por pagar" ? "Por cobrar" : "Cobrada"}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <section aria-labelledby="performance-title" data-region="affiliate-performance">
+      <h2 class="section-title" id="performance-title"><CalendarRange size={20} stroke-width={1.75} aria-hidden="true" />Rendimiento</h2>
+      <RangeFilter from={range.from} to={range.to} max={today} maxDays={MAX_DAYS}>
+        <div class="field">
+          <label class="field-label" for="range-period">Agrupar</label>
+          <select class="input" id="range-period" name="periodo">
+            {Object.entries(periods).map(([value, label]) => <option value={value} selected={value === period}>{label}</option>)}
+          </select>
         </div>
-      )}
+      </RangeFilter>
+
+      <dl class="card totals">
+        <div><dt>Pagado por tus referidos</dt><dd class="num">{bs(summary.charged)}</dd></div>
+        <div><dt>Tu comisión</dt><dd class="num amount-income">{bs(summary.commission)}</dd></div>
+        <div><dt>Pagos</dt><dd class="num">{summary.payments}</dd></div>
+        <div><dt>Negocios que pagaron</dt><dd class="num">{summary.businesses}</dd></div>
+      </dl>
+
+      <div class="charts">
+        <section class="card panel" aria-labelledby="period-title">
+          <h3 class="card-title" id="period-title">{periods[period]}</h3>
+          <WeekChart client:visible days={rows} config={chartConfig} caption={`Pagado por tus referidos y tu comisión ${periods[period].toLowerCase()}, ${rangeText}`} empty={`Sin pagos de tus referidos ${rangeText}.`} />
+        </section>
+        <section class="card panel" aria-labelledby="status-title">
+          <h3 class="card-title" id="status-title">Tu comisión por estado</h3>
+          <DonutChart client:visible items={summary.byStatus.filter((s) => s.value > 0).map((s) => ({ name: statusName[s.status], value: s.value }))} totalLabel="Comisión" empty={`Sin comisiones ${rangeText}.`} />
+        </section>
+      </div>
+
+      <section class="card panel" aria-labelledby="commissions-title">
+        <h3 class="card-title" id="commissions-title">Comisiones {rangeText}</h3>
+        {inRange.length === 0 ? (
+          <p class="empty">Sin comisiones {rangeText}. Aparecen aquí cuando un negocio que llegó con tu enlace paga su plan.</p>
+        ) : (
+          <div class="table-wrap" role="region" aria-label="Tabla de comisiones" tabindex="0">
+            <table class="commissions">
+              <caption class="sr-only">Comisiones por cada pago de un negocio referido, {rangeText}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Pago</th>
+                  <th scope="col">Negocio</th>
+                  <th scope="col" class="end">Cobro</th>
+                  <th scope="col" class="end">Comisión</th>
+                  <th scope="col">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inRange.map((c) => (
+                  <tr>
+                    <td class="muted num">{shortDate(c.date)}</td>
+                    <td>{c.businessName}</td>
+                    <td class="end num">{bs(c.chargeBs)}</td>
+                    <td class="end num">
+                      {bs(c.amountBs)}
+                      <span class="muted"> · {Math.round(c.rate * 100)}%{c.months > 1 ? ` × ${c.months} meses` : ""}</span>
+                    </td>
+                    <td>
+                      <span class:list={["chip", statusTone[c.status]]}>{c.status === "retenida" ? `Retenida hasta el ${shortDate(c.payableAt.slice(0, 10))}` : statusName[c.status]}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </section>
 
-    <section class="card block" aria-labelledby="rules-title">
-      <h2 class="card-title" id="rules-title">Condiciones</h2>
+    <section class="card panel" aria-labelledby="rules-title">
+      <h2 class="card-title" id="rules-title"><ScrollText size={20} stroke-width={1.75} aria-hidden="true" />Condiciones</h2>
       <ul class="rules">
         <li>Ganas el {pct} de lo que paga, en bolivianos, cada negocio que llegó con tu enlace, durante los 12 meses que siguen a su primer pago. Un plan anual cuenta solo por los meses que caen dentro de esos 12.</li>
         <li>El negocio tiene un descuento en su primer pago. Si le toca el precio fundador, se aplica el mayor de los dos.</li>
         <li>Vale para cuentas nuevas: la persona tiene que crear su cuenta con tu enlace (dura 60 días en su navegador) y no haber pagado antes.</li>
         <li>No cuentan tus propios negocios.</li>
-        <li>Cada comisión queda retenida 30 días después del pago del cliente. Te pagamos una vez al mes, cuando lo por cobrar llega a Bs 100.</li>
+        <li>Cada comisión queda retenida 30 días después del pago del cliente. Te pagamos una vez al mes, cuando lo que tienes por cobrar llega a Bs 100.</li>
       </ul>
     </section>
   </div>
@@ -111,13 +174,46 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
 <style>
   .affiliate-page {
     display: grid;
-    gap: 1.5rem;
+    gap: 2rem;
+  }
+
+  .affiliate-page > section {
+    min-width: 0;
+  }
+
+  .panel {
+    display: grid;
+    gap: 1.25rem;
+    min-width: 0;
+    padding: clamp(1.25rem, 3vw, 1.75rem);
+  }
+
+  /* Los hijos de un grid no se encogen solos: sin esto, la tabla ensancha la card y la página en el celular. */
+  .panel > * {
+    min-width: 0;
+  }
+
+  .card-title,
+  .section-title {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .section-title {
+    margin: 0 0 1rem;
+  }
+
+  .card-title :global(svg),
+  .section-title :global(svg) {
+    flex: none;
+    color: var(--color-primary);
   }
 
   .link-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.625rem;
   }
 
   .link-row .input {
@@ -127,31 +223,87 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
 
   .link-row .btn {
     display: inline-flex;
+    flex: 0 1 auto;
     gap: 0.5rem;
     align-items: center;
     justify-content: center;
   }
 
+  .mini-stats,
+  .balance,
   .totals {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    margin: 0;
+  }
+
+  .mini-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--color-border);
   }
 
-  .total {
+  .balance {
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1rem;
+  }
+
+  .stat {
     display: grid;
-    gap: 0.25rem;
-    padding: 1rem 1.25rem;
+    align-content: start;
+    gap: 0.375rem;
+    padding: 1.25rem 1.5rem;
   }
 
-  .total .label,
-  .total .hint {
+  .totals {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+    padding: clamp(1.25rem, 3vw, 1.75rem);
+  }
+
+  .mini-stats div,
+  .totals div {
+    display: grid;
+    align-content: start;
+    gap: 0.375rem;
+  }
+
+  dt {
     color: var(--color-text-muted);
     font-size: var(--text-sm);
   }
 
-  .total strong {
+  dd {
+    margin: 0;
     font-size: var(--text-xl);
+    font-weight: var(--font-semibold);
+    letter-spacing: -0.03em;
+  }
+
+  dd.note {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--font-regular);
+    letter-spacing: normal;
+  }
+
+  .charts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  @media (min-width: 1024px) {
+    .charts {
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    }
+  }
+
+  .empty {
+    margin: 0;
+    color: var(--color-text-muted);
   }
 
   .commissions {
@@ -162,7 +314,7 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
 
   .commissions th,
   .commissions td {
-    padding: 0.625rem 0.75rem;
+    padding: 0.75rem 0.875rem;
     border-bottom: 1px solid var(--color-border);
     text-align: left;
     white-space: nowrap;
@@ -177,7 +329,7 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
     border-bottom: 0;
   }
 
-  .commissions .right {
+  .commissions .end {
     text-align: right;
   }
 
@@ -187,9 +339,17 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
 
   .rules {
     display: grid;
-    gap: 0.5rem;
+    gap: 0.625rem;
+    max-width: 72ch;
     margin: 0;
     padding-left: 1.25rem;
     color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 480px) {
+    .link-row .btn {
+      flex: 1 1 auto;
+    }
   }
 </style>

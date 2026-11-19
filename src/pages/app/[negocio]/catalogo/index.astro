@@ -23,6 +23,6 @@ const limits = planLimits[business.plan];
   />
 
   <div data-region="catalog">
-    <ProductCatalog client:load products={catalog} categories={categories} businessId={business.id} canEdit branches={ctx.membership.branches.map((b) => ({ id: b.id, name: b.name }))} limits={limits} planHref={`${businessHref(business)}/plan`} />
+    <ProductCatalog client:load products={catalog} categories={categories} businessId={business.id} canEdit branches={ctx.membership.branches.map((b) => ({ id: b.id, name: b.name }))} limits={limits} planHref={`${businessHref(business)}/plan`} catalogHref={`${businessHref(business)}/catalogo`} fields={business.productForm.fields} />
   </div>
 </Layout>

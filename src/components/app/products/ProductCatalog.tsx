@@ -2,7 +2,7 @@ import { actions } from "astro:actions";
 import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { Layers, LayoutGrid, List, Lock, Package, Plus, Search, TriangleAlert, Upload } from "lucide-react";
-import type { Category, Product } from "@/data/types";
+import type { Category, Product, ProductField } from "@/data/types";
 import type { CatalogEntry } from "@/data/queries";
 import type { PlanLimits } from "@/data/plans";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,6 @@ import { ProductCard } from "./ProductCard";
 import { DETAIL_TRANSITION, ProductDetail } from "./ProductDetail";
 import { ProductTable } from "./ProductTable";
 import { CategoryManager } from "./CategoryManager";
-import { ProductForm } from "./ProductForm";
 import { ImportProducts } from "./ImportProducts";
 import { InventoryForm } from "./InventoryForm";
 import { AddToBranch } from "./AddToBranch";
@@ -59,6 +58,10 @@ interface Props {
   limits?: Pick<PlanLimits, "products" | "stock" | "bulk">;
   /** Página del plan, para los enlaces de lo que es de un plan pago. */
   planHref?: string;
+  /** Catálogo del negocio (/app/[negocio]/catalogo): crear y editar un producto es en su página (catalogo/nuevo, catalogo/[id]). */
+  catalogHref?: string;
+  /** Campos propios del negocio, para mostrarlos en el detalle. */
+  fields?: ProductField[];
 }
 
 const OPEN: Pick<PlanLimits, "products" | "stock" | "bulk"> = { products: null, stock: true, bulk: true };
@@ -87,6 +90,8 @@ export default function ProductCatalog({
   branches = [],
   limits = OPEN,
   planHref = "#",
+  catalogHref = "",
+  fields = [],
 }: Props) {
   const mode = branchId ? "branch" : "business";
   const [products, setProducts] = useState(initialProducts);
@@ -98,21 +103,12 @@ export default function ProductCatalog({
   const [filter, setFilter] = useState<string>(ALL);
   const [lowOnly, setLowOnly] = useState(false);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState<Item | "new" | "combo" | null>(null);
-  // Productos con que empieza un combo nuevo (la idea «Arma un combo» del Resumen enlaza con ?combo=a,b).
-  const [comboSeed, setComboSeed] = useState<string[]>([]);
-  const startCombo = (seed: string[] = []) => {
-    setComboSeed(seed);
-    setEditing("combo");
+  // En la sucursal se edita el precio y el stock en un diálogo; en el negocio, el producto en su propia página.
+  const [editing, setEditing] = useState<Product | null>(null);
+  const edit = (product: Item) => {
+    if (mode === "branch") return setEditing(product as Product);
+    location.assign(`${catalogHref}/${product.id}`);
   };
-  useEffect(() => {
-    const url = new URL(location.href);
-    const seed = url.searchParams.get("combo");
-    if (!seed || mode !== "business" || !canEdit) return;
-    url.searchParams.delete("combo");
-    history.replaceState(history.state, "", url);
-    startCombo(seed.split(",").slice(0, 20));
-  }, []);
   // Por id: tras guardar, el detalle muestra los datos nuevos que llegan como props.
   const [detailId, setDetailId] = useState<string | null>(null);
   const detail = detailId ? products.find((p) => p.id === detailId) : undefined;
@@ -243,18 +239,22 @@ export default function ProductCatalog({
               )}
               {products.length > 0 &&
                 (limits.bulk ? (
-                  <Button variant="outline" className="h-11" onClick={() => startCombo()}>
-                    <Layers />
-                    Armar combo
+                  <Button asChild variant="outline" className="h-11">
+                    <a href={`${catalogHref}/nuevo?tipo=combo`}>
+                      <Layers />
+                      Armar combo
+                    </a>
                   </Button>
                 ) : (
                   <PaidOnly href={planHref} icon={Layers}>
                     Armar combo
                   </PaidOnly>
                 ))}
-              <Button className="h-11" onClick={() => setEditing("new")}>
-                <Plus />
-                Agregar producto
+              <Button asChild className="h-11">
+                <a href={`${catalogHref}/nuevo`}>
+                  <Plus />
+                  Agregar producto
+                </a>
               </Button>
             </>
           )}
@@ -350,9 +350,11 @@ export default function ProductCatalog({
                 : "Todavía no hay productos en esta sucursal. Quien administra el negocio los agrega desde el catálogo."}
           </p>
           {canEdit && mode === "business" && (
-            <Button onClick={() => setEditing("new")}>
-              <Plus />
-              Agregar producto
+            <Button asChild>
+              <a href={`${catalogHref}/nuevo`}>
+                <Plus />
+                Agregar producto
+              </a>
             </Button>
           )}
         </div>
@@ -368,7 +370,7 @@ export default function ProductCatalog({
         <ProductTable
           items={pager.pageItems as { product: Product; categoryId: string | null }[]}
           categories={categories}
-          onEdit={canEdit ? setEditing : undefined}
+          onEdit={canEdit ? edit : undefined}
         />
       ) : (
         // Con espacio, mosaicos con foto; en un contenedor angosto (celular), filas compactas con miniatura cuadrada.
@@ -385,7 +387,7 @@ export default function ProductCatalog({
                   categories={categories}
                   onMove={canEdit && mode === "business" ? (id) => move(product, id) : undefined}
                   onDelete={canEdit && mode === "business" ? () => remove(product) : undefined}
-                  onEdit={canEdit ? () => setEditing(product) : undefined}
+                  onEdit={canEdit ? () => edit(product) : undefined}
                   onOpen={() => openDetail(product.id)}
                 />
               </li>
@@ -405,32 +407,20 @@ export default function ProductCatalog({
               category={index >= 0 ? categories[index] : null}
               color={index >= 0 ? colorOf(index) : "var(--color-text-subtle)"}
               onClose={closeDetail}
+              fields={fields}
               onEdit={
                 canEdit && (mode === "business" || !("soldIn" in detail))
                   ? () => {
-                      // El detalle se cierra sin animar y se abre el formulario de edición.
+                      // El detalle se cierra sin animar y se abre la edición.
                       setDetailId(null);
-                      setEditing(detail);
+                      edit(detail);
                     }
                   : undefined
               }
             />
           );
         })()}
-      {editing && mode === "business" && (
-        <ProductForm
-          businessId={businessId}
-          categories={categories}
-          product={editing === "new" || editing === "combo" ? undefined : editing}
-          combo={editing === "combo"}
-          comboSeed={comboSeed}
-          catalog={products as CatalogEntry[]}
-          branches={branches}
-          withStock={limits.stock}
-          onClose={() => setEditing(null)}
-        />
-      )}
-      {editing && typeof editing !== "string" && mode === "branch" && !("soldIn" in editing) && (
+      {editing && mode === "branch" && (
         <InventoryForm businessId={businessId} branchId={branchId!} product={editing} stockLocked={!limits.stock} planHref={planHref} onClose={() => setEditing(null)} />
       )}
       {filtered && visible.length > 0 && (

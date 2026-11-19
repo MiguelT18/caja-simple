@@ -112,7 +112,7 @@ const branchLinks = m
                     href={href}
                     class="nav-link"
                     data-astro-prefetch
-                    aria-current={currentPath === href ? "page" : undefined}
+                    aria-current={currentPath === href || (id === "catalogo" && currentPath.startsWith(`${href}/`)) ? "page" : undefined}
                     aria-describedby={i === 0 ? "nav-reorder-hint" : undefined}
                   >
                     <Icon size={18} stroke-width={1.75} />

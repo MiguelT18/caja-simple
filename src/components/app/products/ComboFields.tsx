@@ -2,7 +2,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import type { CatalogEntry } from "@/data/queries";
 import { formatBs } from "@/lib/format";
-import { Field, selectClass } from "./form";
+import { Field, MoneyInput, selectClass } from "./form";
 
 /**
  * Lo que incluye un combo (productos del catálogo con su cantidad) y su precio en cada sucursal. Al crear, se ofrece
@@ -108,7 +108,7 @@ export function ComboFields({
       </fieldset>
 
       <fieldset className="grid min-w-0 gap-3 border-0 p-0">
-        <legend className="mb-1 text-sm font-semibold">Precio del combo (Bs)</legend>
+        <legend className="mb-1 text-sm font-semibold">Precio del combo</legend>
         {rows.length === 0 ? (
           <p className="field-hint m-0">
             {parts.length === 0
@@ -139,14 +139,9 @@ export function ComboFields({
                 )}
                 {/* Deshabilitado no se envía: precio y sucursal siguen en el mismo orden (ver saveProduct). */}
                 <Field id={`combo-price-${b.id}`} label={product ? b.name : `Precio en ${b.name}`} hint={separately(b.id)}>
-                  <input
+                  <MoneyInput
                     id={`combo-price-${b.id}`}
                     name="price"
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                    className="input"
                     defaultValue={b.price ?? undefined}
                     placeholder="Al vender"
                     disabled={!on}

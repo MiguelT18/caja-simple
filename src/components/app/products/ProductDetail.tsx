@@ -1,5 +1,6 @@
 import { CircleSlash, Layers, Pencil, ScanBarcode, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ProductField } from "@/data/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -36,13 +37,17 @@ export function ProductDetail({
   color,
   onClose,
   onEdit,
+  fields = [],
 }: {
   product: Item;
   category: { id: string; name: string } | null;
   color: string;
   onClose: () => void;
   onEdit?: () => void;
+  /** Campos propios del negocio (Personalizar): los que este producto tiene se muestran como «Más datos». */
+  fields?: ProductField[];
 }) {
+  const extra = fields.filter((f) => product.attributes?.[f.id]);
   // En el negocio, una fila por sucursal; en una sucursal, solo la suya.
   const rows =
     "soldIn" in product
@@ -114,6 +119,17 @@ export function ProductDetail({
             <DialogDescription className="m-0 text-base whitespace-pre-line text-foreground [overflow-wrap:anywhere]">{product.description}</DialogDescription>
           ) : (
             <DialogDescription className="m-0">Sin descripción.{onEdit && " Puedes agregarla al editar el producto."}</DialogDescription>
+          )}
+
+          {extra.length > 0 && (
+            <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+              {extra.map((f) => (
+                <div key={f.id} className="contents">
+                  <dt className="font-semibold text-muted-foreground">{f.label}</dt>
+                  <dd className={cn("m-0 [overflow-wrap:anywhere]", f.kind === "number" && "tabular-nums")}>{product.attributes[f.id]}</dd>
+                </div>
+              ))}
+            </dl>
           )}
 
           <div className="grid grid-cols-2 gap-3">

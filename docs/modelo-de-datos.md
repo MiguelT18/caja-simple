@@ -35,10 +35,10 @@ erDiagram
 | Turno | Sucursal | nombre, inicio, fin, tono (mañana / tarde / noche), días de la semana (`weekdays`, null = todos), archivado. Cada sucursal define los suyos. Si el fin es menor que el inicio, termina al día siguiente. |
 | Horario semanal | Sucursal | día ISO, abre, cierra (`branch_hours`). Sin fila: abre todo el día; con las horas vacías: ese día no abre. |
 | Cierre de fecha | Sucursal | día, y todo el día, un rango de horas o algunos turnos; motivo (`branch_closures`). Para feriados. |
-| Producto | Negocio | nombre, categoría, código de barras, imagen. Es el **catálogo del negocio**: se define una sola vez. |
+| Producto | Negocio | nombre, categoría, código de barras, imagen, descripción y `attributes` (jsonb: los valores de los campos propios del negocio, por id del campo). Es el **catálogo del negocio**: se define una sola vez. Se crea y se edita en su propia página (`/catalogo/nuevo`, `/catalogo/[id]`), que se arma según `businesses.product_form`: tipo de venta por defecto (con stock, sin stock o precio al vender; sin él, el del rubro), secciones ocultas (foto, código, descripción, más datos) y campos propios (texto, número o lista; hasta 20). Lo cambia la dueña en «Personalizar» (`saveProductForm`); `saveProduct` solo guarda atributos de campos que existen. |
 | Categoría | Negocio | nombre. Agrupa los productos del catálogo. |
 | Promoción | Negocio | `promotions` con sus productos en `promotion_products`. Tres tipos (`kind`): `percent` (un % menos), `price` (precio especial por unidad) y `bundle` (lleva `buy`, paga `pay`). Vale en `branch_ids` (null = todas), los días ISO de `weekdays` (null = todos) y entre `starts_on` y `ends_on` (null = sin límite); `active` la pausa. La ve todo el negocio; la escribe la dueña, solo en planes pagos (trigger `promotions_check_plan`), con `save_promotion`, que guarda la promoción y sus productos en una sola transacción. Se administra en `/app/[negocio]/promociones`. |
-| Combo | Negocio | es un producto del catálogo con filas en `product_components` (producto incluido y cantidad, de 1 a 99). Se arma en Catálogo › «Armar combo» (o desde la idea «Arma un combo» del Resumen, `?combo=a,b`). Tiene precio por sucursal pero no stock propio: alcanza para lo que alcancen sus productos (`comboStock()` en `src/data/cash.ts`). No hay combos dentro de combos, y un producto que está en un combo no se borra. |
+| Combo | Negocio | es un producto del catálogo con filas en `product_components` (producto incluido y cantidad, de 1 a 99). Se arma en Catálogo › «Armar combo» (o desde la idea «Arma un combo» del Resumen, `/catalogo/nuevo?tipo=combo&con=a,b`). Tiene precio por sucursal pero no stock propio: alcanza para lo que alcancen sus productos (`comboStock()` en `src/data/cash.ts`). No hay combos dentro de combos, y un producto que está en un combo no se borra. |
 | Inventario | Sucursal × Producto | precio, stock, stock mínimo. Si no existe la fila, esa sucursal no vende el producto. Las altas en lote (`importProducts` con sucursales, `addToInventory`) solo crean filas: nunca pisan una que ya existe. |
 | Empleado | Negocio | correo, persona (vacía hasta que la invitada tenga cuenta), sucursal, turno, puesto, estado (invitado / activo). El nombre se lee del perfil de la persona. |
 | Pedido para unirse | Negocio × Persona | sucursal sugerida, mensaje, nombre y correo de quien pide (copiados), estado (pendiente / aceptada / rechazada). Ver abajo › Buscar negocios. |
@@ -88,6 +88,7 @@ erDiagram
 | `/app/[negocio]` | dueña: resumen consolidado |
 | `/app/[negocio]/sucursales` | dueña |
 | `/app/[negocio]/catalogo` | dueña |
+| `/app/[negocio]/catalogo/nuevo` · `/catalogo/[producto]` | dueña: crear (`?tipo=combo&con=a,b` arma un combo) y editar un producto, con vista previa en vivo y borrador en este equipo al crear |
 | `/app/[negocio]/empleados` | dueña |
 | `/app/[negocio]/configuracion` | dueña: nombre del negocio, sucursales, uso del plan y eliminar |
 | `/app/[negocio]/plan` | dueña: planes, precios y métodos de pago |

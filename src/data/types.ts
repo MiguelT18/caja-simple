@@ -36,6 +36,8 @@ export interface Business {
   color: BrandColor;
   /** Llegó con el link de un afiliado: su primer cobro lleva el descuento de recomendación. */
   referred?: boolean;
+  /** Cómo se arma la página de producto en este negocio (tipo por defecto, secciones ocultas, campos propios). */
+  productForm: ProductFormConfig;
 }
 
 export type BusinessKind = "tienda" | "ropa" | "restaurante";
@@ -87,6 +89,27 @@ export interface CatalogProduct {
   image?: string;
   /** Si tiene, es un combo: lo que incluye. Al venderse descuenta el stock de cada uno. */
   components?: ComboPart[];
+  /** Valores de los campos propios del negocio (ProductFormConfig.fields), por id del campo. */
+  attributes: Record<string, string>;
+}
+
+/** Cómo se vende un producto: con stock contado, sin stock (un plato), con precio al vender (una prenda) o combo. */
+export type SaleMode = "stock" | "open" | "free" | "combo";
+/** Secciones de la página de producto que el negocio puede ocultar. */
+export type ProductSection = "photo" | "barcode" | "description" | "extra";
+
+export interface ProductField {
+  id: string;
+  label: string;
+  kind: "text" | "number" | "select";
+  /** Solo en kind "select". */
+  options?: string[];
+}
+
+export interface ProductFormConfig {
+  defaultMode?: Exclude<SaleMode, "combo">;
+  hidden?: ProductSection[];
+  fields?: ProductField[];
 }
 
 export interface ComboPart {
