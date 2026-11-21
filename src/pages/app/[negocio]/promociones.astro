@@ -10,6 +10,8 @@ import { plural } from "@/lib/format";
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
 const { business, catalog } = ctx;
+// Solo planes pagos (la base también lo exige): en Gratis la sección no existe.
+if (!planLimits[business.plan].promotions) return Astro.redirect(`${businessHref(business)}/plan`);
 const promotions = await businessPromotions(Astro.locals.supabase, business.id);
 const products = catalog.map((p) => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name, "es"));
 const branches = ctx.membership.branches.map((b) => ({ id: b.id, name: b.name }));
@@ -30,8 +32,6 @@ const branches = ctx.membership.branches.map((b) => ({ id: b.id, name: b.name })
       products={products}
       branches={branches}
       today={today()}
-      canEdit={planLimits[business.plan].promotions}
-      planHref={`${businessHref(business)}/plan`}
     />
   </div>
 </Layout>

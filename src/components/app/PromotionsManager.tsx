@@ -1,7 +1,7 @@
 // Promociones del negocio: lista con su estado de hoy y diálogo para crear o editar. La base aplica el descuento al vender.
 import { actions } from "astro:actions";
 import { useMemo, useState } from "react";
-import { BadgePercent, Lock, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { BadgePercent, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import type { Promotion } from "@/data/promotions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,16 +33,12 @@ export default function PromotionsManager({
   products,
   branches,
   today,
-  canEdit,
-  planHref,
 }: {
   businessId: string;
   promotions: Promotion[];
   products: Option[];
   branches: Option[];
   today: string;
-  canEdit: boolean;
-  planHref: string;
 }) {
   const [editing, setEditing] = useState<Promotion | "new" | null>(null);
   const productName = useMemo(() => new Map(products.map((p) => [p.id, p.name])), [products]);
@@ -64,23 +60,13 @@ export default function PromotionsManager({
 
   return (
     <div className="grid gap-4">
-      {canEdit ? (
-        <div>
-          <Button className="h-11" onClick={() => setEditing("new")} disabled={products.length === 0}>
-            <Plus />
-            Nueva promoción
-          </Button>
-          {products.length === 0 && <p className="field-hint mt-2">Primero agrega productos al catálogo.</p>}
-        </div>
-      ) : (
-        <p className="notice flex flex-wrap items-center gap-2">
-          <Lock className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-          Las promociones son de los planes pagos. Las que ya tienes se ven, pero no se aplican al vender.{" "}
-          <a href={planHref} className="font-semibold underline">
-            Ver planes
-          </a>
-        </p>
-      )}
+      <div>
+        <Button className="h-11" onClick={() => setEditing("new")} disabled={products.length === 0}>
+          <Plus />
+          Nueva promoción
+        </Button>
+        {products.length === 0 && <p className="field-hint mt-2">Primero agrega productos al catálogo.</p>}
+      </div>
 
       {promotions.length === 0 ? (
         <div className="grid justify-items-center gap-2 rounded-xl border border-dashed p-8 text-center">
@@ -111,22 +97,20 @@ export default function PromotionsManager({
                     {branches.length > 1 && ` · ${where}`}
                   </p>
                 </div>
-                {canEdit && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" className="h-10" onClick={() => setEditing(p)} aria-label={`Editar «${p.name}»`}>
-                      <Pencil />
-                      Editar
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-10" onClick={() => toggle(p)} aria-label={`${p.active ? "Pausar" : "Activar"} «${p.name}»`}>
-                      {p.active ? <Pause /> : <Play />}
-                      {p.active ? "Pausar" : "Activar"}
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-10" onClick={() => remove(p)} aria-label={`Borrar «${p.name}»`}>
-                      <Trash2 />
-                      Borrar
-                    </Button>
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" className="h-10" onClick={() => setEditing(p)} aria-label={`Editar «${p.name}»`}>
+                    <Pencil />
+                    Editar
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-10" onClick={() => toggle(p)} aria-label={`${p.active ? "Pausar" : "Activar"} «${p.name}»`}>
+                    {p.active ? <Pause /> : <Play />}
+                    {p.active ? "Pausar" : "Activar"}
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-10" onClick={() => remove(p)} aria-label={`Borrar «${p.name}»`}>
+                    <Trash2 />
+                    Borrar
+                  </Button>
+                </div>
               </li>
             );
           })}
