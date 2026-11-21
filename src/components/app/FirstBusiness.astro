@@ -164,107 +164,114 @@ const next = ["Agrega tus productos con precio y stock", "Abre el primer turno y
 </section>
 
 <script>
+  import { onPage } from "@/scripts/refresh";
+
   // Vista previa con la MediaCard de «Tus negocios»: nombre, monograma y el logo ya achicado que muestra PhotoField.
-  const form = document.getElementById("onboarding") as HTMLFormElement | null;
-  if (form) {
-    const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
-    const card = $("[data-preview]");
-    const name = card.querySelector<HTMLElement>(".title")!;
-    const monogram = card.querySelector<HTMLElement>(".monogram")!;
-    const art = monogram.parentElement!;
-    // El arte de MediaCard sin foto no trae <img>: se agrega uno para el logo elegido.
-    const logo: HTMLImageElement = art.insertBefore(Object.assign(document.createElement("img"), { alt: "", hidden: true }), art.firstChild);
-    const source = form.querySelector<HTMLImageElement>('[data-photo-field]:has([name="image"]) [data-photo-preview]');
+  onPage(() => {
+    const form = document.getElementById("onboarding") as HTMLFormElement | null;
+    if (form) {
+      const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
+      const card = $("[data-preview]");
+      const name = card.querySelector<HTMLElement>(".title")!;
+      const monogram = card.querySelector<HTMLElement>(".monogram")!;
+      const art = monogram.parentElement!;
+      // El arte de MediaCard sin foto no trae <img>: se agrega uno para el logo elegido.
+      const logo: HTMLImageElement = art.insertBefore(Object.assign(document.createElement("img"), { alt: "", hidden: true }), art.firstChild);
+      const source = form.querySelector<HTMLImageElement>('[data-photo-field]:has([name="image"]) [data-photo-preview]');
 
-    const paint = () => {
-      const n = String(new FormData(form).get("name") ?? "").trim();
-      name.textContent = n || "Tu negocio";
-      monogram.textContent = (n || "Tu negocio").split(/\s+/).slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase();
-    };
-    form.addEventListener("input", paint);
-    form.addEventListener("change", paint);
-    paint();
-
-    if (source) {
-      const sync = () => {
-        logo.hidden = source.hidden || !source.getAttribute("src");
-        if (!logo.hidden) logo.src = source.src;
-        monogram.hidden = !logo.hidden;
+      const paint = () => {
+        const n = String(new FormData(form).get("name") ?? "").trim();
+        name.textContent = n || "Tu negocio";
+        monogram.textContent = (n || "Tu negocio").split(/\s+/).slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase();
       };
-      new MutationObserver(sync).observe(source, { attributes: true, attributeFilter: ["src", "hidden"] });
+      form.addEventListener("input", paint);
+      form.addEventListener("change", paint);
+      paint();
+
+      if (source) {
+        const sync = () => {
+          logo.hidden = source.hidden || !source.getAttribute("src");
+          if (!logo.hidden) logo.src = source.src;
+          monogram.hidden = !logo.hidden;
+        };
+        new MutationObserver(sync).observe(source, { attributes: true, attributeFilter: ["src", "hidden"] });
+      }
     }
-  }
+  });
 </script>
 
 <script>
   import { peopleSearch } from "@/scripts/people-search";
+  import { onPage } from "@/scripts/refresh";
 
   // «Tu equipo»: filas de invitación. El turno se elige entre los que tiene ahora el editor de turnos (por su nombre:
   // todavía no existen en la base) y se actualiza cuando esos cambian.
-  const team = document.querySelector<HTMLElement>("[data-team]");
-  const teamForm = document.getElementById("onboarding") as HTMLFormElement | null;
-  if (team && teamForm) {
-    const rows = team.querySelector<HTMLOListElement>("[data-team-rows]")!;
-    const template = team.querySelector<HTMLTemplateElement>("[data-team-template]")!;
-    const empty = team.querySelector<HTMLElement>("[data-team-empty]")!;
-    const add = team.querySelector<HTMLButtonElement>("[data-team-add]")!;
-    let counter = 0;
+  onPage(() => {
+    const team = document.querySelector<HTMLElement>("[data-team]");
+    const teamForm = document.getElementById("onboarding") as HTMLFormElement | null;
+    if (team && teamForm) {
+      const rows = team.querySelector<HTMLOListElement>("[data-team-rows]")!;
+      const template = team.querySelector<HTMLTemplateElement>("[data-team-template]")!;
+      const empty = team.querySelector<HTMLElement>("[data-team-empty]")!;
+      const add = team.querySelector<HTMLButtonElement>("[data-team-add]")!;
+      let counter = 0;
 
-    const shiftNames = () =>
-      [...teamForm.querySelectorAll<HTMLInputElement>('[name="shiftName"]')].map((i) => i.value.trim()).filter(Boolean);
+      const shiftNames = () =>
+        [...teamForm.querySelectorAll<HTMLInputElement>('[name="shiftName"]')].map((i) => i.value.trim()).filter(Boolean);
 
-    const syncShifts = () => {
-      const names = shiftNames();
-      for (const select of rows.querySelectorAll<HTMLSelectElement>("[data-team-shift]")) {
-        const current = select.value;
-        select.replaceChildren(...names.map((n) => new Option(n, n)));
-        select.value = names.includes(current) ? current : (names[0] ?? "");
-      }
-    };
+      const syncShifts = () => {
+        const names = shiftNames();
+        for (const select of rows.querySelectorAll<HTMLSelectElement>("[data-team-shift]")) {
+          const current = select.value;
+          select.replaceChildren(...names.map((n) => new Option(n, n)));
+          select.value = names.includes(current) ? current : (names[0] ?? "");
+        }
+      };
 
-    const renumber = () => {
-      [...rows.children].forEach((row, i) => {
-        row.querySelector<HTMLElement>("[data-team-title]")!.textContent = `Persona ${i + 1}`;
-        row.querySelector<HTMLElement>("[data-team-remove]")!.setAttribute("aria-label", `Quitar a la persona ${i + 1}`);
+      const renumber = () => {
+        [...rows.children].forEach((row, i) => {
+          row.querySelector<HTMLElement>("[data-team-title]")!.textContent = `Persona ${i + 1}`;
+          row.querySelector<HTMLElement>("[data-team-remove]")!.setAttribute("aria-label", `Quitar a la persona ${i + 1}`);
+        });
+        empty.hidden = rows.children.length > 0;
+        add.hidden = rows.children.length >= 10;
+      };
+
+      add.addEventListener("click", () => {
+        const fragment = template.content.cloneNode(true) as DocumentFragment;
+        const index = String(counter++);
+        for (const el of fragment.querySelectorAll<HTMLElement>("[id], [for]")) {
+          if (el.id) el.id = el.id.replace("__i__", index);
+          const target = el.getAttribute("for");
+          if (target) el.setAttribute("for", target.replace("__i__", index));
+        }
+        const row = fragment.querySelector<HTMLElement>("[data-team-row]")!;
+        rows.append(row);
+        const person = row.querySelector<HTMLInputElement>('[name="invitePerson"]')!;
+        peopleSearch(person, row.querySelector<HTMLInputElement>('[name="invitePersonId"]')!);
+        syncShifts();
+        renumber();
+        person.focus();
       });
-      empty.hidden = rows.children.length > 0;
-      add.hidden = rows.children.length >= 10;
-    };
 
-    add.addEventListener("click", () => {
-      const fragment = template.content.cloneNode(true) as DocumentFragment;
-      const index = String(counter++);
-      for (const el of fragment.querySelectorAll<HTMLElement>("[id], [for]")) {
-        if (el.id) el.id = el.id.replace("__i__", index);
-        const target = el.getAttribute("for");
-        if (target) el.setAttribute("for", target.replace("__i__", index));
-      }
-      const row = fragment.querySelector<HTMLElement>("[data-team-row]")!;
-      rows.append(row);
-      const person = row.querySelector<HTMLInputElement>('[name="invitePerson"]')!;
-      peopleSearch(person, row.querySelector<HTMLInputElement>('[name="invitePersonId"]')!);
-      syncShifts();
-      renumber();
-      person.focus();
-    });
+      rows.addEventListener("click", (event) => {
+        const button = (event.target as Element).closest("[data-team-remove]");
+        if (!button) return;
+        const row = button.closest("[data-team-row]")!;
+        const next = row.nextElementSibling ?? row.previousElementSibling;
+        row.remove();
+        renumber();
+        (next?.querySelector<HTMLElement>("[data-team-remove]") ?? add).focus();
+      });
 
-    rows.addEventListener("click", (event) => {
-      const button = (event.target as Element).closest("[data-team-remove]");
-      if (!button) return;
-      const row = button.closest("[data-team-row]")!;
-      const next = row.nextElementSibling ?? row.previousElementSibling;
-      row.remove();
-      renumber();
-      (next?.querySelector<HTMLElement>("[data-team-remove]") ?? add).focus();
-    });
-
-    // Cambia un nombre de turno, o se agrega o quita uno.
-    teamForm.addEventListener("input", (event) => {
-      if ((event.target as HTMLInputElement).name === "shiftName") syncShifts();
-    });
-    const shiftRows = teamForm.querySelector("[data-shifts-editor] [data-rows]");
-    if (shiftRows) new MutationObserver(syncShifts).observe(shiftRows, { childList: true });
-  }
+      // Cambia un nombre de turno, o se agrega o quita uno.
+      teamForm.addEventListener("input", (event) => {
+        if ((event.target as HTMLInputElement).name === "shiftName") syncShifts();
+      });
+      const shiftRows = teamForm.querySelector("[data-shifts-editor] [data-rows]");
+      if (shiftRows) new MutationObserver(syncShifts).observe(shiftRows, { childList: true });
+    }
+  });
 </script>
 
 <style>

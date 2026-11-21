@@ -1,5 +1,5 @@
 // Al navegar dentro de /app, el área principal se vuelve el esqueleto de la página destino mientras
-// el servidor la prepara. Es navegación normal del navegador: solo cambia lo que se ve mientras espera.
+// el servidor la prepara (el ClientRouter cambia después solo el contenido; el menú lateral queda).
 // Los esqueletos son los <template data-skeleton> de src/components/app/PageSkeleton.astro.
 
 import { announce } from "./dialogs";
@@ -18,10 +18,9 @@ function skeletonFor(pathname: string): Variant {
   return "table";
 }
 
-let original: Node[] | null = null;
-const originalPath = location.pathname;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
+/** Marca en el menú lateral la sección de `pathname`, antes de que llegue la página (el menú no se vuelve a pintar). */
 function markCurrent(pathname: string) {
   // Solo las secciones: la biblioteca de sucursales marca la actual con aria-current="true" y no se toca.
   for (const link of document.querySelectorAll<HTMLAnchorElement>("nav a.nav-link[href]")) {
@@ -41,7 +40,6 @@ export function showPageSkeleton(url: URL) {
 
   clearTimeout(timer);
   timer = setTimeout(() => {
-    original ??= [...main.childNodes];
     // El anuncio va en una región fija fuera de <main>: una que se crea junto con el cambio no se lee.
     announce("Cargando…");
     main.replaceChildren(template.content.cloneNode(true));
@@ -49,25 +47,23 @@ export function showPageSkeleton(url: URL) {
   }, DELAY);
 }
 
-document.addEventListener("click", (event) => {
-  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-  const link = (event.target as Element).closest?.("a[href]");
-  if (!(link instanceof HTMLAnchorElement) || link.target || link.hasAttribute("download")) return;
+// Toda navegación dentro de /app (enlaces, formularios GET, navigate(), Atrás) pasa por aquí.
+document.addEventListener("astro:before-preparation", (event) => {
+  const { to, from, sourceElement } = event;
+  if (!to.pathname.startsWith("/app") || (to.pathname === from.pathname && to.search === from.search)) return;
   // La tarjeta que pasa al encabezado (view transition) tiene que seguir en pantalla cuando llega la página nueva.
-  if (link.closest("[data-morph]")) return;
-  const url = new URL(link.href);
-  if (url.origin !== location.origin || !url.pathname.startsWith("/app")) return;
-  if (url.pathname === location.pathname && url.search === location.search) return;
-  showPageSkeleton(url);
+  if (sourceElement?.closest("[data-morph]")) return markCurrent(to.pathname);
+  showPageSkeleton(to);
 });
 
-// Al volver con «Atrás», el navegador puede restaurar esta página tal como quedó: devuelve el contenido.
-window.addEventListener("pageshow", (event) => {
-  if (!event.persisted) return;
+// La página nueva trae su menú lateral: el que se conserva copia de él qué enlaces son los actuales.
+document.addEventListener("astro:before-swap", (event) => {
   clearTimeout(timer);
-  const main = document.querySelector("main");
-  if (main && original) main.replaceChildren(...original);
-  main?.removeAttribute("aria-busy");
-  original = null;
-  markCurrent(originalPath);
+  const links = event.newDocument.querySelectorAll<HTMLAnchorElement>(".sidebar a[href]");
+  const current = new Map([...links].map((a) => [a.getAttribute("href"), a.getAttribute("aria-current")]));
+  for (const link of document.querySelectorAll<HTMLAnchorElement>(".sidebar a[href]")) {
+    const value = current.get(link.getAttribute("href"));
+    if (value) link.setAttribute("aria-current", value);
+    else if (current.has(link.getAttribute("href"))) link.removeAttribute("aria-current");
+  }
 });

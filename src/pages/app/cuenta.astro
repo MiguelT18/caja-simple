@@ -195,103 +195,108 @@ import CodeInput from "@/components/CodeInput.astro";
 
   <script>
     import { actions } from "astro:actions";
+    import { onPage } from "@/scripts/refresh";
 
-    // Activar 2FA: al abrir el diálogo se pide a Supabase un factor nuevo y se muestra su QR.
-    const enroll = document.querySelector<HTMLDialogElement>("#totp-enroll");
-    document.querySelector('[data-open-dialog="totp-enroll"]')?.addEventListener("click", async () => {
-      if (!enroll) return;
-      const notice = enroll.querySelector<HTMLElement>("[data-form-notice]")!;
-      const box = enroll.querySelector<HTMLElement>("[data-totp-qr]")!;
-      const skeleton = box.querySelector<HTMLElement>(".qr-skeleton")!;
-      box.querySelector("img")?.remove();
-      skeleton.hidden = false;
-      notice.textContent = "";
-      const { data, error } = await actions.enrollTotp().catch(() => ({ data: undefined, error: new Error("No hay conexión. Intenta de nuevo.") }));
-      if (error || !data) {
-        // Sin QR no hay nada que esperar: se quita el esqueleto y queda el mensaje.
+    onPage(() => {
+      const toggle = document.querySelector<HTMLButtonElement>("[data-push-switch]");
+      if (!toggle) return;
+
+      // Activar 2FA: al abrir el diálogo se pide a Supabase un factor nuevo y se muestra su QR.
+      const enroll = document.querySelector<HTMLDialogElement>("#totp-enroll");
+      document.querySelector('[data-open-dialog="totp-enroll"]')?.addEventListener("click", async () => {
+        if (!enroll) return;
+        const notice = enroll.querySelector<HTMLElement>("[data-form-notice]")!;
+        const box = enroll.querySelector<HTMLElement>("[data-totp-qr]")!;
+        const skeleton = box.querySelector<HTMLElement>(".qr-skeleton")!;
+        box.querySelector("img")?.remove();
+        skeleton.hidden = false;
+        notice.textContent = "";
+        const { data, error } = await actions.enrollTotp().catch(() => ({ data: undefined, error: new Error("No hay conexión. Intenta de nuevo.") }));
+        if (error || !data) {
+          // Sin QR no hay nada que esperar: se quita el esqueleto y queda el mensaje.
+          skeleton.hidden = true;
+          notice.textContent = error?.message ?? "No se pudo preparar el código.";
+          return;
+        }
+        enroll.querySelector<HTMLInputElement>('input[name="factorId"]')!.value = data.factorId;
+        enroll.querySelector("[data-totp-secret]")!.textContent = data.secret;
+        const img = Object.assign(new Image(180, 180), { src: data.qr, alt: "Código QR para tu app de autenticación" });
+        box.append(img);
         skeleton.hidden = true;
-        notice.textContent = error?.message ?? "No se pudo preparar el código.";
-        return;
+      });
+
+      // Push: el interruptor suscribe o da de baja este navegador.
+      const status = document.querySelector<HTMLElement>("[data-push-status]")!;
+      const vapidKey = document.querySelector<HTMLElement>("[data-vapid-key]")!.dataset.vapidKey ?? "";
+
+      const set = (on: boolean, message: string, enabled = true) => {
+        toggle.setAttribute("aria-checked", String(on));
+        toggle.removeAttribute("aria-busy");
+        toggle.disabled = !enabled;
+        status.textContent = message;
+      };
+
+      // La clave pública VAPID viene en base64url; pushManager la quiere en bytes.
+      const keyBytes = (base64: string) => {
+        const raw = atob((base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+        return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+      };
+
+      async function init() {
+        const iphone = /iPhone|iPad/.test(navigator.userAgent) && !matchMedia("(display-mode: standalone)").matches;
+        if (!vapidKey) return set(false, "Los avisos push todavía no están configurados en este servidor.", false);
+        if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+          return set(false, iphone ? "En iPhone, primero agrega Caja Simple a tu pantalla de inicio (Compartir → Agregar a inicio) y ábrela desde ahí." : "Este navegador no puede recibir avisos push.", false);
+        }
+        if (Notification.permission === "denied") return set(false, "Bloqueaste los avisos para este sitio. Actívalos en los ajustes del navegador y vuelve a esta página.", false);
+        const registration = await navigator.serviceWorker.register("/sw.js");
+        const subscription = await registration.pushManager.getSubscription();
+        set(Boolean(subscription), subscription ? "Activadas: los avisos te llegan a este dispositivo." : "Desactivadas en este dispositivo.");
       }
-      enroll.querySelector<HTMLInputElement>('input[name="factorId"]')!.value = data.factorId;
-      enroll.querySelector("[data-totp-secret]")!.textContent = data.secret;
-      const img = Object.assign(new Image(180, 180), { src: data.qr, alt: "Código QR para tu app de autenticación" });
-      box.append(img);
-      skeleton.hidden = true;
-    });
 
-    // Push: el interruptor suscribe o da de baja este navegador.
-    const toggle = document.querySelector<HTMLButtonElement>("[data-push-switch]")!;
-    const status = document.querySelector<HTMLElement>("[data-push-status]")!;
-    const vapidKey = document.querySelector<HTMLElement>("[data-vapid-key]")!.dataset.vapidKey ?? "";
-
-    const set = (on: boolean, message: string, enabled = true) => {
-      toggle.setAttribute("aria-checked", String(on));
-      toggle.removeAttribute("aria-busy");
-      toggle.disabled = !enabled;
-      status.textContent = message;
-    };
-
-    // La clave pública VAPID viene en base64url; pushManager la quiere en bytes.
-    const keyBytes = (base64: string) => {
-      const raw = atob((base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
-      return Uint8Array.from(raw, (c) => c.charCodeAt(0));
-    };
-
-    async function init() {
-      const iphone = /iPhone|iPad/.test(navigator.userAgent) && !matchMedia("(display-mode: standalone)").matches;
-      if (!vapidKey) return set(false, "Los avisos push todavía no están configurados en este servidor.", false);
-      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-        return set(false, iphone ? "En iPhone, primero agrega Caja Simple a tu pantalla de inicio (Compartir → Agregar a inicio) y ábrela desde ahí." : "Este navegador no puede recibir avisos push.", false);
-      }
-      if (Notification.permission === "denied") return set(false, "Bloqueaste los avisos para este sitio. Actívalos en los ajustes del navegador y vuelve a esta página.", false);
-      const registration = await navigator.serviceWorker.register("/sw.js");
-      const subscription = await registration.pushManager.getSubscription();
-      set(Boolean(subscription), subscription ? "Activadas: los avisos te llegan a este dispositivo." : "Desactivadas en este dispositivo.");
-    }
-
-    toggle.addEventListener("click", async () => {
-      const on = toggle.getAttribute("aria-checked") === "true";
-      // aria-busy y no disabled: el interruptor conserva el foco mientras cambia.
-      if (toggle.getAttribute("aria-busy") === "true") return;
-      toggle.setAttribute("aria-busy", "true");
-      status.textContent = on ? "Desactivando…" : "Activando…";
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        if (on) {
-          const subscription = await registration.pushManager.getSubscription();
-          if (subscription) {
-            await actions.deletePushSubscription({ endpoint: subscription.endpoint });
-            await subscription.unsubscribe();
+      toggle.addEventListener("click", async () => {
+        const on = toggle.getAttribute("aria-checked") === "true";
+        // aria-busy y no disabled: el interruptor conserva el foco mientras cambia.
+        if (toggle.getAttribute("aria-busy") === "true") return;
+        toggle.setAttribute("aria-busy", "true");
+        status.textContent = on ? "Desactivando…" : "Activando…";
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          if (on) {
+            const subscription = await registration.pushManager.getSubscription();
+            if (subscription) {
+              await actions.deletePushSubscription({ endpoint: subscription.endpoint });
+              await subscription.unsubscribe();
+            }
+            return set(false, "Desactivadas en este dispositivo.");
           }
-          return set(false, "Desactivadas en este dispositivo.");
+          if ((await Notification.requestPermission()) !== "granted") return init();
+          const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(vapidKey) });
+          const { p256dh, auth } = subscription.toJSON().keys ?? {};
+          const { error } = await actions.savePushSubscription({ endpoint: subscription.endpoint, p256dh: p256dh ?? "", auth: auth ?? "" });
+          if (error) {
+            await subscription.unsubscribe();
+            return set(false, `No se pudo activar: ${error.message}`);
+          }
+          set(true, "Activadas: los avisos te llegan a este dispositivo.");
+        } catch (e) {
+          console.error(e);
+          // «push service error»: el navegador no consiguió canal con su servicio de push (Brave con el push apagado,
+          // Chromium sin servicios de Google, o una red que bloquea fcm.googleapis.com). No es algo de la app.
+          const pushService = e instanceof DOMException && e.name === "AbortError" && /push service/i.test(e.message);
+          set(
+            on,
+            pushService
+              ? "Tu navegador no pudo conectarse con su servicio de avisos. En Brave, activa «Usar los servicios de Google para mensajes push» en la privacidad del navegador; si no, prueba con Chrome o Edge, o desde otra red (sin VPN ni bloqueador)."
+              : "Algo falló al cambiar los avisos. Intenta de nuevo.",
+          );
         }
-        if ((await Notification.requestPermission()) !== "granted") return init();
-        const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(vapidKey) });
-        const { p256dh, auth } = subscription.toJSON().keys ?? {};
-        const { error } = await actions.savePushSubscription({ endpoint: subscription.endpoint, p256dh: p256dh ?? "", auth: auth ?? "" });
-        if (error) {
-          await subscription.unsubscribe();
-          return set(false, `No se pudo activar: ${error.message}`);
-        }
-        set(true, "Activadas: los avisos te llegan a este dispositivo.");
-      } catch (e) {
-        console.error(e);
-        // «push service error»: el navegador no consiguió canal con su servicio de push (Brave con el push apagado,
-        // Chromium sin servicios de Google, o una red que bloquea fcm.googleapis.com). No es algo de la app.
-        const pushService = e instanceof DOMException && e.name === "AbortError" && /push service/i.test(e.message);
-        set(
-          on,
-          pushService
-            ? "Tu navegador no pudo conectarse con su servicio de avisos. En Brave, activa «Usar los servicios de Google para mensajes push» en la privacidad del navegador; si no, prueba con Chrome o Edge, o desde otra red (sin VPN ni bloqueador)."
-            : "Algo falló al cambiar los avisos. Intenta de nuevo.",
-        );
-      }
-    });
+      });
 
-    init().catch((e) => {
-      console.error(e);
-      set(false, "No pudimos revisar los avisos de este navegador.", false);
+      init().catch((e) => {
+        console.error(e);
+        set(false, "No pudimos revisar los avisos de este navegador.", false);
+      });
     });
   </script>
 </Layout>

@@ -2,18 +2,30 @@
 //   <section data-region="totales"> → refreshRegions() trae esta misma página otra vez y cambia cada región por la nueva.
 // Las islas React se conservan (con su estado: búsqueda, página, filtro) y reciben los props nuevos.
 // Los scripts que se atan a elementos al cargar escuchan «regions:swapped» para volver a atarse a las regiones nuevas.
+// La app navega con el ClientRouter de Astro (Layout.astro): onPage() y onRegions() corren en cada página, no solo en la primera.
+import { navigate } from "astro:transitions/client";
+
+// Mientras se navega a otra página, actualizar esta no tiene sentido: <main> ya puede ser el esqueleto y, sin regiones,
+// el respaldo de recargar devolvía a la página que se estaba dejando.
+let navigating = false;
+if (typeof document !== "undefined") {
+  document.addEventListener("astro:before-preparation", () => (navigating = true));
+  document.addEventListener("astro:page-load", () => (navigating = false));
+}
 
 /**
  * Cambia las regiones `names` (todas, si no se pasan) por las de `url` (por defecto, esta misma página).
  * Sin regiones o sin red, recarga: nunca queda peor que antes.
  * Con `keepFocus` (avisos en vivo, que nadie pidió con un clic): el foco vuelve al mismo control de la región nueva
- * y, si no estaba en una región, no se toca.
+ * y, si no estaba en una región, no se toca. Esos avisos nunca navegan: si algo falla, la página queda como estaba.
  */
 export async function refreshRegions(names?: string[], url = location.href, { keepFocus = false } = {}) {
-  dropPrerendered();
+  if (navigating) return;
+  const from = location.href;
+  const fallback = () => (keepFocus ? undefined : navigate(url));
   const selector = (name: string) => `[data-region="${CSS.escape(name)}"]`;
   const current = [...document.querySelectorAll<HTMLElement>("[data-region]")].filter((el) => !names || names.includes(el.dataset.region!));
-  if (current.length === 0) return location.assign(url);
+  if (current.length === 0) return fallback();
 
   let fresh: Document;
   try {
@@ -21,8 +33,10 @@ export async function refreshRegions(names?: string[], url = location.href, { ke
     if (!response.ok) throw new Error(String(response.status));
     fresh = new DOMParser().parseFromString(await response.text(), "text/html");
   } catch {
-    return location.assign(url);
+    return fallback();
   }
+  // Se navegó a otra página mientras llegaba esta: lo que trajo ya no corresponde.
+  if (navigating || location.href !== from) return;
 
   const focusedId = document.activeElement?.id;
   const swapped: HTMLElement[] = [];
@@ -44,7 +58,7 @@ export async function refreshRegions(names?: string[], url = location.href, { ke
     const name = next.dataset.region!;
     if ((names && !names.includes(name)) || document.querySelector(selector(name))) continue;
     const anchor = next.previousElementSibling?.id && document.getElementById(next.previousElementSibling.id);
-    if (!anchor) return location.assign(url);
+    if (!anchor) return fallback();
     anchor.after(next);
     swapped.push(next);
   }
@@ -81,18 +95,29 @@ function keepIslands(now: HTMLElement, next: HTMLElement) {
   });
 }
 
-/** Corre `init` sobre la página al cargar y sobre cada región nueva. */
+/**
+ * Corre `init` en cada página: al cargar y después de cada navegación. `signal` se corta al dejar la página: úsalo en
+ * lo que se ata a window o document, intervalos y conexiones, para que no sigan corriendo en la página siguiente.
+ */
+export function onPage(init: (signal: AbortSignal) => void) {
+  eachPage(() => {
+    const controller = new AbortController();
+    document.addEventListener("astro:before-swap", () => controller.abort(), { once: true });
+    init(controller.signal);
+  });
+}
+
+/** Corre `init` sobre cada página y sobre cada región nueva. */
 export function onRegions(init: (root: ParentNode) => void) {
-  init(document);
+  eachPage(() => init(document));
   document.addEventListener("regions:swapped", (event) => {
     for (const region of (event as CustomEvent<{ regions: HTMLElement[] }>).detail.regions) init(region);
   });
 }
 
-/**
- * Descarta las páginas que Chrome preparó en segundo plano (astro.config.mjs › clientPrerender): después de guardar
- * algo tendrían datos viejos. Al quitar las reglas, el navegador cancela esos prerenders y el próximo clic pide la página.
- */
-function dropPrerendered() {
-  document.querySelectorAll('script[type="speculationrules"]').forEach((rules) => rules.remove());
+
+// Sin ClientRouter (la landing, el acceso) no hay «astro:page-load»: la página es una sola y se corre ya.
+function eachPage(run: () => void) {
+  if (document.querySelector('meta[name="astro-view-transitions-enabled"]')) document.addEventListener("astro:page-load", run);
+  else run();
 }

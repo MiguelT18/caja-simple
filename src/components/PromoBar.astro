@@ -54,7 +54,7 @@ const left = promo.left === 1 ? "Queda 1 cupo" : `Quedan ${promo.left} cupos`;
 
 {
   dismissible && (
-    <script is:inline>
+    <script is:inline data-astro-rerun>
       // Antes de pintar: si ya la ocultaste con estos mismos cupos, no aparece (sin parpadeo).
       (() => {
         const bar = document.currentScript?.previousElementSibling;

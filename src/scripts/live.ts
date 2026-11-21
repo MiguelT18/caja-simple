@@ -7,6 +7,8 @@ import { announcement, createBatcher, type LiveEvent } from "./live-core";
 export type LiveStatus = { live: boolean; updatedAt: number };
 
 interface Options {
+  /** Al cortarse, se cierra la conexión y deja de consultar (al dejar la página). */
+  signal: AbortSignal;
   /** Canal: «negocio:<id>». */
   topic: string;
   /** Regiones (data-region) que se actualizan. */
@@ -48,6 +50,7 @@ export function watchLive(o: Options) {
   // pudo armarse antes de ese cambio).
   let again = "";
   const refresh = async (text = ""): Promise<void> => {
+    if (o.signal.aborted) return;
     if (busy) {
       again = text || again || " ";
       return;
@@ -78,20 +81,25 @@ export function watchLive(o: Options) {
   // Respaldo: cada minuto, solo mientras Realtime no está y la pestaña se ve.
   // Solo al cambiar de estado: realtime-js reintenta cada pocos segundos y cada error reiniciaría la cuenta del minuto.
   const setLive = (value: boolean) => {
-    if (value === live && (live || poll)) return;
+    if (o.signal.aborted || (value === live && (live || poll))) return;
     live = value;
     clearInterval(poll);
     poll = live ? undefined : setInterval(() => !document.hidden && refresh(), POLL);
     status();
   };
 
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) return;
-    if (pending || Date.now() - updatedAt > POLL) {
-      pending = false;
-      void refresh();
-    } else status();
-  });
+  document.addEventListener(
+    "visibilitychange",
+    () => {
+      if (document.hidden) return;
+      if (pending || Date.now() - updatedAt > POLL) {
+        pending = false;
+        void refresh();
+      } else status();
+    },
+    { signal: o.signal },
+  );
+  o.signal.addEventListener("abort", () => clearInterval(poll));
 
   // Solo el access token: lo da el servidor, que es el único que renueva la sesión.
   let token: Token | undefined;
@@ -114,6 +122,8 @@ export function watchLive(o: Options) {
     });
     // Sin esto el canal puede unirse antes de que llegue el token, como anónimo, y la base lo rechaza.
     await client.setAuth();
+    if (o.signal.aborted) return client.disconnect();
+    o.signal.addEventListener("abort", () => void client.removeAllChannels().then(() => client.disconnect()));
     const channel = client.channel(o.topic, { config: { private: true } });
     channel.on("broadcast", { event: "*" }, ({ event, payload }) => {
       if (o.branch && payload?.branch !== o.branch) return;

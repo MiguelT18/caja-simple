@@ -91,6 +91,9 @@ function regions() {
     politeRegion = liveRegion("polite");
     assertiveRegion = liveRegion("assertive");
   }
+  // Al navegar, el ClientRouter cambia el <body>: las regiones vuelven a la página nueva.
+  if (!toastRegion.isConnected) document.body.append(toastRegion);
+  for (const region of [politeRegion!, assertiveRegion!]) if (!region.isConnected) document.body.append(region);
   return { toasts: toastRegion, polite: politeRegion!, assertive: assertiveRegion! };
 }
 

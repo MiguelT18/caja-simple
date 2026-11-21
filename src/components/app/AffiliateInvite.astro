@@ -57,32 +57,35 @@ const share = `https://wa.me/?text=${encodeURIComponent(`Yo llevo la caja de mi 
 
 <script>
   import { toast } from "@/scripts/dialogs";
+  import { onPage } from "@/scripts/refresh";
 
-  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-affiliate-copy]")) {
-    const field = button.closest(".affiliate")!.querySelector<HTMLInputElement>("[data-affiliate-link]")!;
-    const label = button.querySelector<HTMLElement>("[data-copy-label]")!;
-    let timer: ReturnType<typeof setTimeout>;
-    // Tocar el campo lo selecciona entero: se puede copiar a mano si el portapapeles no está disponible.
-    field.addEventListener("focus", () => field.select());
-    button.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(field.value);
-      } catch {
-        field.focus();
-        field.select();
-        toast("No se pudo copiar. El enlace quedó seleccionado: cópialo con el menú del teclado.", "warning");
-        return;
-      }
-      button.toggleAttribute("data-copied", true);
-      label.textContent = "Copiado";
-      toast("Enlace copiado.", "success");
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        button.removeAttribute("data-copied");
-        label.textContent = "Copiar enlace";
-      }, 2500);
-    });
-  }
+  onPage(() => {
+    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-affiliate-copy]")) {
+      const field = button.closest(".affiliate")!.querySelector<HTMLInputElement>("[data-affiliate-link]")!;
+      const label = button.querySelector<HTMLElement>("[data-copy-label]")!;
+      let timer: ReturnType<typeof setTimeout>;
+      // Tocar el campo lo selecciona entero: se puede copiar a mano si el portapapeles no está disponible.
+      field.addEventListener("focus", () => field.select());
+      button.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(field.value);
+        } catch {
+          field.focus();
+          field.select();
+          toast("No se pudo copiar. El enlace quedó seleccionado: cópialo con el menú del teclado.", "warning");
+          return;
+        }
+        button.toggleAttribute("data-copied", true);
+        label.textContent = "Copiado";
+        toast("Enlace copiado.", "success");
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          button.removeAttribute("data-copied");
+          label.textContent = "Copiar enlace";
+        }, 2500);
+      });
+    }
+  });
 </script>
 
 <style>

@@ -26,7 +26,7 @@ const helpHref = `/app/ayuda?desde=${encodeURIComponent(Astro.url.pathname)}`;
   <a href={helpHref} class="icon-btn user-action" aria-label="Ayuda y comentarios" title="Ayuda y comentarios">
     <LifeBuoy size={18} stroke-width={1.75} />
   </a>
-  <form method="post" action="/api/auth/logout" data-logout>
+  <form method="post" action="/api/auth/logout" data-logout data-astro-reload>
     <button type="submit" class="icon-btn user-action" aria-label="Cerrar sesión" title="Cerrar sesión">
       <LogOut size={18} stroke-width={1.75} />
     </button>

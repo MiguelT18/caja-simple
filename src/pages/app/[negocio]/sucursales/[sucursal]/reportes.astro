@@ -197,7 +197,9 @@ const csvHref = `reportes.csv?desde=${range.from}&hasta=${range.to}`;
 </Layout>
 
 <script>
-  document.querySelector("[data-print]")?.addEventListener("click", () => window.print());
+  import { onPage } from "@/scripts/refresh";
+
+  onPage(() => document.querySelector("[data-print]")?.addEventListener("click", () => window.print()));
 </script>
 
 <style>

@@ -142,143 +142,147 @@ const MAX_IMAGES = 5;
 <script>
   import { setBusy } from "@/scripts/busy";
   import { shrinkImage } from "@/scripts/shrink-image";
+  import { onPage } from "@/scripts/refresh";
 
   const MAX = 5;
   // Vercel corta el cuerpo en 4,5 MB y Astro en 4 MB: dejamos aire para el texto.
   const MAX_TOTAL = 3.5 * 1024 * 1024;
   const TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-  const form = document.querySelector<HTMLFormElement>("#feedback-form")!;
-  const message = form.querySelector<HTMLTextAreaElement>("textarea")!;
-  const count = form.querySelector<HTMLElement>("[data-count]")!;
-  const help = form.querySelector<HTMLElement>("[data-help]")!;
-  const submit = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
-  const drop = form.querySelector<HTMLElement>("[data-drop]")!;
-  const list = form.querySelector<HTMLUListElement>("[data-shot-list]")!;
-  const input = form.querySelector<HTMLInputElement>("[data-shot-input]")!;
-  const pick = form.querySelector<HTMLElement>("[data-shot-pick]")!;
-  const shotCount = form.querySelector<HTMLElement>("[data-shot-count]")!;
-  const hint = form.querySelector<HTMLElement>("[data-shot-hint]")!;
-  const error = form.querySelector<HTMLElement>("#feedback-form-images-error")!;
-  const defaultHint = hint.textContent!;
+  onPage(() => {
+    const form = document.querySelector<HTMLFormElement>("#feedback-form");
+    if (!form) return;
+    const message = form.querySelector<HTMLTextAreaElement>("textarea")!;
+    const count = form.querySelector<HTMLElement>("[data-count]")!;
+    const help = form.querySelector<HTMLElement>("[data-help]")!;
+    const submit = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
+    const drop = form.querySelector<HTMLElement>("[data-drop]")!;
+    const list = form.querySelector<HTMLUListElement>("[data-shot-list]")!;
+    const input = form.querySelector<HTMLInputElement>("[data-shot-input]")!;
+    const pick = form.querySelector<HTMLElement>("[data-shot-pick]")!;
+    const shotCount = form.querySelector<HTMLElement>("[data-shot-count]")!;
+    const hint = form.querySelector<HTMLElement>("[data-shot-hint]")!;
+    const error = form.querySelector<HTMLElement>("#feedback-form-images-error")!;
+    const defaultHint = hint.textContent!;
 
-  // Tipo: cambia el ejemplo y la pista del mensaje.
-  form.addEventListener("change", (e) => {
-    const radio = e.target as HTMLInputElement;
-    if (radio.name !== "kind") return;
-    message.placeholder = radio.dataset.placeholder ?? "";
-    help.textContent = radio.dataset.help ?? "";
-  });
-
-  const updateCount = () => (count.textContent = `${message.value.length} / 2000`);
-  message.addEventListener("input", updateCount);
-
-  // Capturas: la lista vive aquí y se copia al input, así el formulario envía exactamente estas.
-  let files: { file: File; url: string }[] = [];
-
-  function render() {
-    list.replaceChildren(
-      ...files.map(({ file, url }, i) => {
-        const li = document.createElement("li");
-        li.className = "shot";
-        const img = Object.assign(document.createElement("img"), { src: url, alt: `Imagen ${i + 1}: ${file.name}`, decoding: "async" });
-        const remove = Object.assign(document.createElement("button"), { type: "button", className: "shot-remove", textContent: "Quitar" });
-        remove.setAttribute("aria-label", `Quitar imagen ${i + 1}`);
-        remove.addEventListener("click", () => {
-          URL.revokeObjectURL(files[i].url);
-          files.splice(i, 1);
-          sync();
-          (list.querySelectorAll<HTMLButtonElement>(".shot-remove")[Math.min(i, files.length - 1)] ?? input).focus();
-        });
-        li.append(img, remove);
-        return li;
-      }),
-    );
-    list.hidden = files.length === 0;
-    shotCount.textContent = `${files.length} de ${MAX}`;
-    const full = files.length >= MAX;
-    // Sin `disabled` en el input: un input deshabilitado no se envía con el formulario.
-    pick.toggleAttribute("aria-disabled", full);
-    hint.textContent = full ? `Llegaste al máximo de ${MAX}.` : defaultHint;
-  }
-
-  function sync() {
-    const transfer = new DataTransfer();
-    for (const { file } of files) transfer.items.add(file);
-    input.files = transfer.files;
-    const total = files.reduce((sum, { file }) => sum + file.size, 0);
-    error.textContent = total > MAX_TOTAL ? "Las imágenes pesan demasiado juntas. Quita alguna." : "";
-    render();
-  }
-
-  async function add(incoming: File[]) {
-    const images = incoming.filter((f) => f.type.startsWith("image/"));
-    const room = MAX - files.length;
-    error.textContent = "";
-    if (images.length === 0 || room <= 0) {
-      sync();
-      if (incoming.length > 0) error.textContent = room <= 0 ? `Ya tienes ${MAX} imágenes. Quita alguna para agregar otra.` : "Solo se pueden adjuntar imágenes.";
-      return;
-    }
-    setBusy(submit, true, "Preparando imágenes…");
-    const small = await Promise.all(images.slice(0, room).map((f) => shrinkImage(f, 1600)));
-    setBusy(submit, false);
-    const valid = small.filter((f) => TYPES.includes(f.type));
-    files.push(...valid.map((file) => ({ file, url: URL.createObjectURL(file) })));
-    sync();
-    if (valid.length < small.length) error.textContent = "Alguna imagen no se pudo leer. Usa JPG, PNG o WebP.";
-    else if (images.length > room) error.textContent = `Solo se agregaron ${room}: el máximo es ${MAX}.`;
-  }
-
-  pick.addEventListener("click", (e) => {
-    if (files.length >= MAX) e.preventDefault();
-  });
-
-  input.addEventListener("change", () => {
-    // El input refleja la lista: lo recién elegido se suma a lo que ya había.
-    const picked = [...(input.files ?? [])].filter((f) => !files.some((x) => x.file === f));
-    add(picked);
-  });
-
-  drop.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    drop.classList.add("dragging");
-  });
-  drop.addEventListener("dragleave", () => drop.classList.remove("dragging"));
-  drop.addEventListener("drop", (e) => {
-    e.preventDefault();
-    drop.classList.remove("dragging");
-    add([...(e.dataTransfer?.files ?? [])]);
-  });
-  // Pegar una captura en cualquier parte del formulario (el texto se pega normal).
-  form.addEventListener("paste", (e) => {
-    const pasted = [...(e.clipboardData?.files ?? [])];
-    if (pasted.length === 0) return;
-    e.preventDefault();
-    add(pasted);
-  });
-
-  form.addEventListener("submit", (e) => {
-    // Si pesan demasiado, ni se intenta: action-forms ignora el envío ya cancelado.
-    if (files.reduce((s, { file }) => s + file.size, 0) > MAX_TOTAL) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      input.focus();
-    }
-  }, { capture: true });
-
-  // Al guardar, data-reset vacía el formulario: también las capturas y el contador.
-  form.addEventListener("reset", () => {
-    for (const { url } of files) URL.revokeObjectURL(url);
-    files = [];
-    setTimeout(() => {
-      sync();
-      updateCount();
-      form.querySelector<HTMLInputElement>("input[name=kind]:checked")?.dispatchEvent(new Event("change", { bubbles: true }));
+    // Tipo: cambia el ejemplo y la pista del mensaje.
+    form.addEventListener("change", (e) => {
+      const radio = e.target as HTMLInputElement;
+      if (radio.name !== "kind") return;
+      message.placeholder = radio.dataset.placeholder ?? "";
+      help.textContent = radio.dataset.help ?? "";
     });
-  });
 
-  render();
+    const updateCount = () => (count.textContent = `${message.value.length} / 2000`);
+    message.addEventListener("input", updateCount);
+
+    // Capturas: la lista vive aquí y se copia al input, así el formulario envía exactamente estas.
+    let files: { file: File; url: string }[] = [];
+
+    function render() {
+      list.replaceChildren(
+        ...files.map(({ file, url }, i) => {
+          const li = document.createElement("li");
+          li.className = "shot";
+          const img = Object.assign(document.createElement("img"), { src: url, alt: `Imagen ${i + 1}: ${file.name}`, decoding: "async" });
+          const remove = Object.assign(document.createElement("button"), { type: "button", className: "shot-remove", textContent: "Quitar" });
+          remove.setAttribute("aria-label", `Quitar imagen ${i + 1}`);
+          remove.addEventListener("click", () => {
+            URL.revokeObjectURL(files[i].url);
+            files.splice(i, 1);
+            sync();
+            (list.querySelectorAll<HTMLButtonElement>(".shot-remove")[Math.min(i, files.length - 1)] ?? input).focus();
+          });
+          li.append(img, remove);
+          return li;
+        }),
+      );
+      list.hidden = files.length === 0;
+      shotCount.textContent = `${files.length} de ${MAX}`;
+      const full = files.length >= MAX;
+      // Sin `disabled` en el input: un input deshabilitado no se envía con el formulario.
+      pick.toggleAttribute("aria-disabled", full);
+      hint.textContent = full ? `Llegaste al máximo de ${MAX}.` : defaultHint;
+    }
+
+    function sync() {
+      const transfer = new DataTransfer();
+      for (const { file } of files) transfer.items.add(file);
+      input.files = transfer.files;
+      const total = files.reduce((sum, { file }) => sum + file.size, 0);
+      error.textContent = total > MAX_TOTAL ? "Las imágenes pesan demasiado juntas. Quita alguna." : "";
+      render();
+    }
+
+    async function add(incoming: File[]) {
+      const images = incoming.filter((f) => f.type.startsWith("image/"));
+      const room = MAX - files.length;
+      error.textContent = "";
+      if (images.length === 0 || room <= 0) {
+        sync();
+        if (incoming.length > 0) error.textContent = room <= 0 ? `Ya tienes ${MAX} imágenes. Quita alguna para agregar otra.` : "Solo se pueden adjuntar imágenes.";
+        return;
+      }
+      setBusy(submit, true, "Preparando imágenes…");
+      const small = await Promise.all(images.slice(0, room).map((f) => shrinkImage(f, 1600)));
+      setBusy(submit, false);
+      const valid = small.filter((f) => TYPES.includes(f.type));
+      files.push(...valid.map((file) => ({ file, url: URL.createObjectURL(file) })));
+      sync();
+      if (valid.length < small.length) error.textContent = "Alguna imagen no se pudo leer. Usa JPG, PNG o WebP.";
+      else if (images.length > room) error.textContent = `Solo se agregaron ${room}: el máximo es ${MAX}.`;
+    }
+
+    pick.addEventListener("click", (e) => {
+      if (files.length >= MAX) e.preventDefault();
+    });
+
+    input.addEventListener("change", () => {
+      // El input refleja la lista: lo recién elegido se suma a lo que ya había.
+      const picked = [...(input.files ?? [])].filter((f) => !files.some((x) => x.file === f));
+      add(picked);
+    });
+
+    drop.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      drop.classList.add("dragging");
+    });
+    drop.addEventListener("dragleave", () => drop.classList.remove("dragging"));
+    drop.addEventListener("drop", (e) => {
+      e.preventDefault();
+      drop.classList.remove("dragging");
+      add([...(e.dataTransfer?.files ?? [])]);
+    });
+    // Pegar una captura en cualquier parte del formulario (el texto se pega normal).
+    form.addEventListener("paste", (e) => {
+      const pasted = [...(e.clipboardData?.files ?? [])];
+      if (pasted.length === 0) return;
+      e.preventDefault();
+      add(pasted);
+    });
+
+    form.addEventListener("submit", (e) => {
+      // Si pesan demasiado, ni se intenta: action-forms ignora el envío ya cancelado.
+      if (files.reduce((s, { file }) => s + file.size, 0) > MAX_TOTAL) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        input.focus();
+      }
+    }, { capture: true });
+
+    // Al guardar, data-reset vacía el formulario: también las capturas y el contador.
+    form.addEventListener("reset", () => {
+      for (const { url } of files) URL.revokeObjectURL(url);
+      files = [];
+      setTimeout(() => {
+        sync();
+        updateCount();
+        form.querySelector<HTMLInputElement>("input[name=kind]:checked")?.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    });
+
+    render();
+  });
 </script>
 
 <style>

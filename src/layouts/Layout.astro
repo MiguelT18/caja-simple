@@ -1,4 +1,5 @@
 ---
+import { ClientRouter } from 'astro:transitions';
 import BaseHead from '../components/BaseHead.astro';
 import '../styles/app.css';
 import '../styles/app-surface.css';
@@ -22,6 +23,8 @@ const { title, context } = Astro.props;
 <html lang="es">
 	<head>
 		<BaseHead title={title} />
+		<!-- Navegar dentro de /app cambia solo el contenido: el menú lateral se conserva (Sidebar, transition:persist). -->
+		<ClientRouter />
 	</head>
 	<!-- Dentro de un negocio, su color es el acento (src/data/brand.ts); fuera, el ámbar. -->
 	<body class="app-surface" style={context ? brandStyle(context.membership.business.color) : undefined}>
@@ -41,6 +44,11 @@ const { title, context } = Astro.props;
 		<script>
 			import '../scripts/action-forms.ts';
 			import '../scripts/nav-skeleton.ts';
+			// Vender tiene su propio estado (carrito, cola sin conexión, atajos de teclado): entra y sale con la página entera.
+			document.addEventListener('astro:before-preparation', (e) => {
+				const pos = (url: URL) => url.pathname.endsWith('/registrar-venta');
+				if (pos(e.to) || pos(e.from)) e.preventDefault();
+			});
 			// El service worker da los avisos push, la página sin conexión y Vender sin conexión.
 			if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 			// La rueda del mouse sobre un número enfocado lo cambia sin querer (un precio de 7 pasa a 6): se suelta el foco y la página baja.

@@ -27,55 +27,61 @@ const { topic, names, regions, branch } = Astro.props;
   import { ago } from "@/scripts/live-core";
   import { watchLive } from "@/scripts/live";
   import { formatBs } from "@/lib/format";
+  import { onPage } from "@/scripts/refresh";
 
-  const bar = document.querySelector<HTMLElement>("[data-live-topic]");
-  if (bar) {
-    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const announce = bar.querySelector<HTMLElement>("[data-live-announce]")!;
-    // Los «hace X min» de la página se reescriben solos.
-    const paint = () => {
-      for (const el of document.querySelectorAll<HTMLElement>("[data-ago]")) el.textContent = ago(Date.now() - Number(el.dataset.ago));
-    };
-    setInterval(paint, 30_000);
-
-    // Montos antes de actualizar: lo que cambió cuenta hasta el valor nuevo y se resalta un momento.
-    let before = new Map<string, number>();
-    const amounts = () => new Map([...document.querySelectorAll<HTMLElement>("[data-live]")].map((el) => [el.dataset.live!, Number(el.dataset.amount)]));
-    const tween = (el: HTMLElement, from: number, to: number) => {
-      const sign = el.dataset.sign as "+" | "−" | undefined;
-      const start = performance.now();
-      const tick = (t: number) => {
-        const k = Math.min(1, (t - start) / 400);
-        el.textContent = formatBs(from + (to - from) * (1 - (1 - k) ** 3), sign);
-        if (k < 1) requestAnimationFrame(tick);
+  // Al dejar la página (signal), se corta la conexión y los relojes: no siguen actualizando la página siguiente.
+  onPage((signal) => {
+    const bar = document.querySelector<HTMLElement>("[data-live-topic]");
+    if (bar) {
+      const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const announce = bar.querySelector<HTMLElement>("[data-live-announce]")!;
+      // Los «hace X min» de la página se reescriben solos.
+      const paint = () => {
+        for (const el of document.querySelectorAll<HTMLElement>("[data-ago]")) el.textContent = ago(Date.now() - Number(el.dataset.ago));
       };
-      requestAnimationFrame(tick);
-    };
+      const clock = setInterval(paint, 30_000);
+      signal.addEventListener("abort", () => clearInterval(clock));
 
-    watchLive({
-      topic: bar.dataset.liveTopic!,
-      regions: bar.dataset.liveRegions!.split(","),
-      names: JSON.parse(bar.dataset.branchNames ?? "{}"),
-      branch: bar.dataset.liveBranch,
-      onStatus: paint,
-      onAnnounce: (message) => {
-        // Vaciar y volver a poner: el lector repite el aviso aunque sea igual al anterior.
-        announce.textContent = "";
-        setTimeout(() => (announce.textContent = message), 50);
-      },
-      beforeRefresh: () => (before = amounts()),
-      afterRefresh: () => {
-        for (const el of document.querySelectorAll<HTMLElement>("[data-live]")) {
-          const from = before.get(el.dataset.live!);
-          const to = Number(el.dataset.amount);
-          if (from === undefined || from === to) continue;
-          el.classList.add("is-changed");
-          setTimeout(() => el.classList.remove("is-changed"), 1500);
-          if (!reduceMotion) tween(el, from, to);
-        }
-      },
-    });
-  }
+      // Montos antes de actualizar: lo que cambió cuenta hasta el valor nuevo y se resalta un momento.
+      let before = new Map<string, number>();
+      const amounts = () => new Map([...document.querySelectorAll<HTMLElement>("[data-live]")].map((el) => [el.dataset.live!, Number(el.dataset.amount)]));
+      const tween = (el: HTMLElement, from: number, to: number) => {
+        const sign = el.dataset.sign as "+" | "−" | undefined;
+        const start = performance.now();
+        const tick = (t: number) => {
+          const k = Math.min(1, (t - start) / 400);
+          el.textContent = formatBs(from + (to - from) * (1 - (1 - k) ** 3), sign);
+          if (k < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      };
+
+      watchLive({
+        signal,
+        topic: bar.dataset.liveTopic!,
+        regions: bar.dataset.liveRegions!.split(","),
+        names: JSON.parse(bar.dataset.branchNames ?? "{}"),
+        branch: bar.dataset.liveBranch,
+        onStatus: paint,
+        onAnnounce: (message) => {
+          // Vaciar y volver a poner: el lector repite el aviso aunque sea igual al anterior.
+          announce.textContent = "";
+          setTimeout(() => (announce.textContent = message), 50);
+        },
+        beforeRefresh: () => (before = amounts()),
+        afterRefresh: () => {
+          for (const el of document.querySelectorAll<HTMLElement>("[data-live]")) {
+            const from = before.get(el.dataset.live!);
+            const to = Number(el.dataset.amount);
+            if (from === undefined || from === to) continue;
+            el.classList.add("is-changed");
+            setTimeout(() => el.classList.remove("is-changed"), 1500);
+            if (!reduceMotion) tween(el, from, to);
+          }
+        },
+      });
+    }
+  });
 </script>
 
 <style>

@@ -18,6 +18,7 @@ import { ImportProducts } from "./ImportProducts";
 import { InventoryForm } from "./InventoryForm";
 import { AddToBranch } from "./AddToBranch";
 import { safeAction } from "./form";
+import { navigate } from "astro:transitions/client";
 import { announce, confirmDialog, toast } from "@/scripts/dialogs";
 import { refreshRegions } from "@/scripts/refresh";
 
@@ -107,7 +108,7 @@ export default function ProductCatalog({
   const [editing, setEditing] = useState<Product | null>(null);
   const edit = (product: Item) => {
     if (mode === "branch") return setEditing(product as Product);
-    location.assign(`${catalogHref}/${product.id}`);
+    void navigate(`${catalogHref}/${product.id}`);
   };
   // Por id: tras guardar, el detalle muestra los datos nuevos que llegan como props.
   const [detailId, setDetailId] = useState<string | null>(null);

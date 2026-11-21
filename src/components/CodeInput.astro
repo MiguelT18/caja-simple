@@ -44,34 +44,38 @@ const { id, name = "code", label, autosubmit = true, ...rest } = Astro.props;
 </div>
 
 <script>
-  for (const input of document.querySelectorAll<HTMLInputElement>("[data-code-input]")) {
-    const slots = [...input.parentElement!.querySelectorAll<HTMLElement>(".slot")];
-    const paint = () => {
-      const digits = input.value.replace(/\D/g, "").slice(0, 6);
-      if (digits !== input.value) input.value = digits;
-      const focused = document.activeElement === input;
-      slots.forEach((slot, i) => {
-        slot.textContent = digits[i] ?? "";
-        slot.classList.toggle("is-active", focused && i === Math.min(digits.length, 5));
+  import { onPage } from "../scripts/refresh";
+
+  onPage(() => {
+    for (const input of document.querySelectorAll<HTMLInputElement>("[data-code-input]")) {
+      const slots = [...input.parentElement!.querySelectorAll<HTMLElement>(".slot")];
+      const paint = () => {
+        const digits = input.value.replace(/\D/g, "").slice(0, 6);
+        if (digits !== input.value) input.value = digits;
+        const focused = document.activeElement === input;
+        slots.forEach((slot, i) => {
+          slot.textContent = digits[i] ?? "";
+          slot.classList.toggle("is-active", focused && i === Math.min(digits.length, 5));
+        });
+      };
+      input.addEventListener("input", () => {
+        paint();
+        if (input.value.length === 6 && "autosubmit" in input.dataset) input.form?.requestSubmit();
       });
-    };
-    input.addEventListener("input", () => {
+      // Con los 6 ya puestos (p. ej., un código que no pasó), escribir o pegar empieza uno nuevo: no hay que borrar antes.
+      input.addEventListener("beforeinput", (e) => {
+        if (input.value.length === 6 && (e.inputType === "insertText" || e.inputType === "insertFromPaste")) input.value = "";
+      });
+      // El cursor siempre al final: las casillas no muestran una posición en medio.
+      const toEnd = () => input.setSelectionRange(input.value.length, input.value.length);
+      input.addEventListener("focus", () => (toEnd(), paint()));
+      input.addEventListener("click", toEnd);
+      input.addEventListener("blur", paint);
+      // Un formulario que se vacía (form.reset() al cerrar un diálogo) también vacía las casillas.
+      input.form?.addEventListener("reset", () => setTimeout(paint));
       paint();
-      if (input.value.length === 6 && "autosubmit" in input.dataset) input.form?.requestSubmit();
-    });
-    // Con los 6 ya puestos (p. ej., un código que no pasó), escribir o pegar empieza uno nuevo: no hay que borrar antes.
-    input.addEventListener("beforeinput", (e) => {
-      if (input.value.length === 6 && (e.inputType === "insertText" || e.inputType === "insertFromPaste")) input.value = "";
-    });
-    // El cursor siempre al final: las casillas no muestran una posición en medio.
-    const toEnd = () => input.setSelectionRange(input.value.length, input.value.length);
-    input.addEventListener("focus", () => (toEnd(), paint()));
-    input.addEventListener("click", toEnd);
-    input.addEventListener("blur", paint);
-    // Un formulario que se vacía (form.reset() al cerrar un diálogo) también vacía las casillas.
-    input.form?.addEventListener("reset", () => setTimeout(paint));
-    paint();
-  }
+    }
+  });
 </script>
 
 <style>

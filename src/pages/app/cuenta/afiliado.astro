@@ -156,18 +156,21 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
 
 <script>
   import { toast } from "@/scripts/dialogs";
+  import { onPage } from "@/scripts/refresh";
 
-  const field = document.querySelector<HTMLInputElement>("#affiliate-link");
-  field?.addEventListener("focus", () => field.select());
-  document.querySelector("[data-copy-link]")?.addEventListener("click", async () => {
-    if (!field) return;
-    try {
-      await navigator.clipboard.writeText(field.value);
-      toast("Enlace copiado.", "success");
-    } catch {
-      field.focus();
-      toast("No se pudo copiar. El enlace quedó seleccionado: cópialo a mano.", "warning");
-    }
+  onPage(() => {
+    const field = document.querySelector<HTMLInputElement>("#affiliate-link");
+    field?.addEventListener("focus", () => field.select());
+    document.querySelector("[data-copy-link]")?.addEventListener("click", async () => {
+      if (!field) return;
+      try {
+        await navigator.clipboard.writeText(field.value);
+        toast("Enlace copiado.", "success");
+      } catch {
+        field.focus();
+        toast("No se pudo copiar. El enlace quedó seleccionado: cópialo a mano.", "warning");
+      }
+    });
   });
 </script>
 
