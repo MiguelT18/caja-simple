@@ -20,18 +20,26 @@ export interface ExpenseRow {
   time: string;
   concept: string;
   category: string;
-  shift: { name: string; tone: ShiftTone };
+  /** Sin turno: se pagó fuera de la caja. */
+  shift?: { name: string; tone: ShiftTone };
   by: string;
   amount: number;
   /** Anulado: se ve tachado, con su rótulo, y no suma. */
   voided?: boolean;
   /** Muestra «Editar» y «Eliminar» (la base decide igual). */
   canEdit?: boolean;
+  /** Salda un pendiente: `date` es el día que tocaba y este, el del pago. */
+  paidOn?: string;
+  /** Pago de un pendiente hecho fuera de la caja: solo se puede anular. */
+  outside?: boolean;
 }
 
 const dayLabel = new Intl.DateTimeFormat("es-BO", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
-const when = (g: ExpenseRow) => `${dayLabel.format(new Date(`${g.date}T12:00:00Z`))} · ${g.time}`;
+const day = (date: string) => dayLabel.format(new Date(`${date}T12:00:00Z`));
+// Un pendiente pagado: el día que tocaba; cuándo se pagó va en paidLine.
+const when = (g: ExpenseRow) => (g.paidOn ? day(g.date) : `${day(g.date)} · ${g.time}`);
+const paidLine = (g: ExpenseRow) => g.paidOn && `Pagado el ${day(g.paidOn)} · ${g.time}`;
 
 /** Historial de gastos, 10 por página. En un contenedor angosto (celular) es una lista; desde 42rem, la tabla. */
 export default function ExpensesTable({
@@ -52,13 +60,17 @@ export default function ExpensesTable({
   const withActions = rows.some((g) => g.canEdit);
 
   async function remove(g: ExpenseRow) {
-    const ok = await confirmDialog(`«${g.concept}» por ${formatBs(g.amount)} queda registrado como anulado y deja de contar en la caja.`, {
+    const ok = await confirmDialog(
+      g.outside
+        ? `El pago de ${formatBs(g.amount)} a «${g.concept}» queda anulado y ese monto vuelve a Por pagar.`
+        : `«${g.concept}» por ${formatBs(g.amount)} queda registrado como anulado y deja de contar en la caja.`,
+      {
       title: "¿Eliminar el gasto?",
       confirmLabel: "Eliminar gasto",
       danger: true,
     });
     if (!ok) return;
-    const { error } = await safeAction(() => actions.voidExpense({ expenseId: g.id }));
+    const { error } = await safeAction(() => (g.outside ? actions.voidPendingPayment({ paymentId: g.id }) : actions.voidExpense({ expenseId: g.id })));
     if (error) return toast(error.message, "error");
     toast("Gasto eliminado.", "success");
     await refreshRegions();
@@ -74,10 +86,12 @@ export default function ExpensesTable({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setEditing(g)}>
-            <Pencil />
-            Editar
-          </DropdownMenuItem>
+          {!g.outside && (
+            <DropdownMenuItem onSelect={() => setEditing(g)}>
+              <Pencil />
+              Editar
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem variant="destructive" onSelect={() => remove(g)}>
             <Trash2 />
             Eliminar
@@ -93,6 +107,8 @@ export default function ExpensesTable({
     </>
   );
   const voidedChip = (g: ExpenseRow) => g.voided && <span className="chip chip-warning">Anulado</span>;
+  const shiftCell = (g: ExpenseRow) => (g.shift ? <ShiftBadge shift={g.shift} /> : <span className="chip chip-info">Fuera de la caja</span>);
+  const amountOf = (g: ExpenseRow) => (g.outside ? <span className="tabular-nums">{formatBs(g.amount)}</span> : amount(g));
   return (
     <div className="@container">
       {/* Lista: concepto y monto arriba; cuándo y quién debajo; categoría y turno al pie. */}
@@ -102,17 +118,17 @@ export default function ExpensesTable({
             <div className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{g.concept}</span>
               <span className="inline-flex shrink-0 items-center gap-1">
-                <span className={`${amountClass(g)} font-bold tabular-nums`}>{amount(g)}</span>
+                <span className={`${g.outside ? "" : amountClass(g)} font-bold tabular-nums`}>{amountOf(g)}</span>
                 {menu(g)}
               </span>
             </div>
             <p className="m-0 text-sm text-muted-foreground tabular-nums">
-              {when(g)}
+              {g.paidOn ? `Tocaba el ${when(g)} · ${paidLine(g)}` : when(g)}
               {g.by && ` · ${g.by}`}
             </p>
             <div className="flex flex-wrap gap-1.5">
               <span className="chip chip-neutral">{g.category}</span>
-              <ShiftBadge shift={g.shift} />
+              {shiftCell(g)}
               {voidedChip(g)}
             </div>
           </li>
@@ -141,6 +157,7 @@ export default function ExpensesTable({
               <TableRow key={g.id}>
                 <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                   {when(g)}
+                  {g.paidOn && <span className="block text-xs">{paidLine(g)}</span>}
                 </TableCell>
                 <TableCell>
                   <span className="inline-flex flex-wrap items-center gap-1.5">
@@ -151,11 +168,9 @@ export default function ExpensesTable({
                 <TableCell>
                   <span className="chip chip-neutral">{g.category}</span>
                 </TableCell>
-                <TableCell>
-                  <ShiftBadge shift={g.shift} />
-                </TableCell>
+                <TableCell>{shiftCell(g)}</TableCell>
                 <TableCell className="text-muted-foreground">{g.by}</TableCell>
-                <TableCell className={`${amountClass(g)} text-right tabular-nums`}>{amount(g)}</TableCell>
+                <TableCell className={`${g.outside ? "" : amountClass(g)} text-right tabular-nums`}>{amountOf(g)}</TableCell>
                 {withActions && <TableCell className="text-right">{menu(g)}</TableCell>}
               </TableRow>
             ))}
@@ -172,7 +187,7 @@ export default function ExpensesTable({
 function EditDialog({ expense, categories, onClose }: { expense: ExpenseRow; categories: string[]; onClose: () => void }) {
   const save = useActionForm((form) => actions.updateExpense(form) as never, onClose, (form) => `Gasto «${form.get("concept") ?? expense.concept}» actualizado.`);
   return (
-    <AppDialog title="Editar gasto" description={`${when(expense)} · turno ${expense.shift.name.toLowerCase()}`} onClose={onClose}>
+    <AppDialog title="Editar gasto" description={`${when(expense)}${expense.shift ? ` · turno ${expense.shift.name.toLowerCase()}` : ""}`} onClose={onClose}>
         <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
           <input type="hidden" name="expenseId" value={expense.id} />
           <Field id="edit-concept" label="Concepto" error={save.errors.concept}>

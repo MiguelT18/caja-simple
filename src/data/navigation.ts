@@ -1,4 +1,4 @@
-import { BadgePercent, HandCoins, BriefcaseBusiness, Search, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
+import { BadgePercent, CalendarClock, HandCoins, BriefcaseBusiness, Search, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
 import { catalogLabel } from "./kinds";
 import type { Branch } from "./types";
 import { branchHref, businessHref, type Membership } from "./queries";
@@ -49,6 +49,7 @@ export function appNav(m?: Membership, branch?: Branch, affiliate = false) {
         { id: "resumen", label: "Resumen del negocio", href: base, icon: ChartColumn },
         { id: "catalogo", label: catalogLabel(m.business.kind), href: `${base}/catalogo`, icon: Package },
         { id: "promociones", label: "Promociones", href: `${base}/promociones`, icon: BadgePercent },
+        { id: "por-pagar", label: "Por pagar", href: `${base}/por-pagar`, icon: CalendarClock },
         { id: "empleados", label: "Empleados", href: `${base}/empleados`, icon: Users },
         { id: "configuracion", label: "Configuración", href: `${base}/configuracion`, icon: Settings },
       ],

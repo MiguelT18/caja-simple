@@ -1,0 +1,100 @@
+---
+import PageHeader from "@/components/PageHeader.astro";
+import PayablesCard from "@/components/app/PayablesCard";
+import Layout from "@/layouts/Layout.astro";
+import { headerBackdrop, membership, paidSince, payables } from "@/data/queries";
+import { today as todayOf } from "@/lib/dates";
+import { formatBs } from "@/lib/format";
+import { dueState } from "@/lib/payables";
+
+// Vista general de la dueña: lo que falta pagar en cada sucursal y sus gastos fijos.
+const m = membership(Astro.locals, Astro.params.negocio!);
+if (!m || m.role !== "dueño") return Astro.rewrite("/404");
+const today = todayOf();
+const branchIds = m.branches.map((b) => b.id);
+const [owed, paidThisMonth, backdrop] = await Promise.all([
+  payables(Astro.locals.supabase, branchIds, today),
+  paidSince(Astro.locals.supabase, branchIds, `${today.slice(0, 8)}01`),
+  headerBackdrop(Astro.locals, m),
+]);
+const total = owed.pending.reduce((s, p) => s + p.balance, 0);
+const late = owed.pending.filter((p) => dueState(p.dueOn, today).tone === "late").reduce((s, p) => s + p.balance, 0);
+---
+
+<Layout title={`Por pagar · ${m.business.name}`} context={{ membership: m }}>
+  <PageHeader {...backdrop} title="Por pagar" live description="Gastos fijos y pendientes de todas tus sucursales. Al pagarlos, quedan con el día que tocaba." />
+
+  <dl class="card totals" data-region="payables-totals">
+    <div>
+      <dt>Por pagar</dt>
+      <dd class="num">{formatBs(total)}</dd>
+    </div>
+    <div>
+      <dt>Vencido</dt>
+      <dd class:list={["num", late > 0 && "amount-expense"]}>{formatBs(late)}</dd>
+    </div>
+    <div>
+      <dt>Pagado este mes</dt>
+      <dd class="num">{formatBs(paidThisMonth)}</dd>
+    </div>
+  </dl>
+
+  <div class="branches" data-region="payables">
+    {
+      m.branches.map((b) => (
+        <PayablesCard
+          client:load
+          branchId={b.id}
+          title={m.branches.length > 1 ? b.name : "Por pagar"}
+          pending={owed.pending.filter((p) => p.branchId === b.id)}
+          fixed={owed.fixed.filter((f) => f.branchId === b.id)}
+          today={today}
+          userId={Astro.locals.userId!}
+          isOwner
+          canAdd
+          cashShift={null}
+        />
+      ))
+    }
+  </div>
+</Layout>
+
+<style>
+  .totals {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin: 0 0 1.5rem;
+    padding: 1.25rem;
+  }
+
+  .totals div {
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  .totals dt {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .totals dd {
+    margin: 0;
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl-lh);
+    font-weight: var(--font-bold);
+  }
+
+  .branches {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  @media (max-width: 480px) {
+    .totals {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1rem;
+      padding: 1rem;
+    }
+  }
+</style>

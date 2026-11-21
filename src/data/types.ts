@@ -232,6 +232,8 @@ export interface Expense {
   amount: number;
   /** Lo que se anuló (el monto original), o null. */
   voided: number | null;
+  /** Salda un pendiente: el día que tocaba pagar (`date` sigue siendo el del turno, para el cuadre). */
+  owedOn: string | null;
 }
 
 export interface DaySummary {

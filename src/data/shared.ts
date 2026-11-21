@@ -8,7 +8,7 @@ import { cents, shiftCash } from "./cash";
 import type { Branch, Business, ClosedShift, Expense, Order, Recorder, Sale, SaleLine, StockMove, StockRequest } from "./types";
 
 /** Nombres de quienes registraron movimientos. RLS solo deja ver a quien comparte negocio. */
-async function recorders(sb: Supabase, ids: (string | null)[]) {
+export async function recorders(sb: Supabase, ids: (string | null)[]) {
   const unique = [...new Set(ids.filter((id): id is string => !!id))];
   const map = new Map<string, Recorder>();
   if (unique.length === 0) return map;
@@ -17,7 +17,7 @@ async function recorders(sb: Supabase, ids: (string | null)[]) {
   for (const p of data ?? []) map.set(p.id, { firstName: p.first_name, lastName: p.last_name });
   return map;
 }
-const unknownRecorder: Recorder = { firstName: "—", lastName: "" };
+export const unknownRecorder: Recorder = { firstName: "—", lastName: "" };
 
 /**
  * URL firmada para cada foto (los buckets son privados). Por defecto vale un día: la misma URL todo el día deja que
@@ -112,6 +112,7 @@ export async function movements(sb: Supabase, branchIds: string[], from: string,
     category: g.category,
     amount: g.voided_at ? 0 : Number(g.amount),
     voided: g.voided_at ? Number(g.amount) : null,
+    owedOn: g.owed_on,
   }));
   return { sales: saleList, expenses: expenseList };
 }

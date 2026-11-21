@@ -46,7 +46,10 @@ erDiagram
 | Suscripción push | Persona | endpoint y claves de un navegador donde activó los avisos. |
 | Venta | Sucursal | turno, empleado, hora, líneas (producto, cantidad). El precio sale del inventario de esa sucursal. |
 | Pedido abierto | Sucursal | nombre (mesa, cliente), líneas como las de una venta (`items` jsonb), venta (`sale_id`, vacío mientras está abierto). No descuenta stock hasta cobrarse. |
-| Gasto | Sucursal | turno, empleado, hora, concepto, categoría, monto. |
+| Gasto | Sucursal | turno, empleado, hora, concepto, categoría, monto; `owed_on` si salda un pendiente. |
+| Gasto fijo | Sucursal | concepto, categoría, monto habitual, frecuencia (semanal, quincenal, mensual), primer pago, días para pagar. Solo la dueña. |
+| Pendiente | Sucursal | lo que se debe: día que tocaba (`owed_on`), vencimiento opcional, monto; de un gasto fijo o suelto. Se cancela, no se borra. |
+| Pago de pendiente | Pendiente | monto (parcial o total), de la caja (`expense_id`) o fuera de ella. |
 | Cierre de turno | Sucursal × Turno | apertura, estado (en curso / cerrado), diferencia (contado − esperado). |
 
 ## Reglas
@@ -60,6 +63,7 @@ erDiagram
 - La fecha de caja de una apertura la pone la base (`private.shift_date`): la de hoy, o la de ayer si el turno cruza la medianoche y se abre pasada ella (22:00–06:00 abierto a las 00:30). Con más de 24 h abierto, la barra del turno avisa que hay que cerrarlo.
 - Toda venta y todo gasto pertenecen a una sucursal, un turno y un empleado.
 - Esperado en caja = apertura + ventas **en efectivo** − gastos del turno, sin contar lo anulado. QR y transferencia no entran al cajón (`shiftCash()` en `src/data/cash.ts` y `private.on_shift_closed_notify`).
+- **Gastos fijos y pendientes** (`20261121161612_fixed_expenses_payables.sql`): cada período de un gasto fijo se vuelve un pendiente, con el monto habitual (la dueña lo corrige si la factura llega distinta). Los genera `private.generate_fixed_expenses()` cada noche (cron `fixed-expenses`) y al guardar el fijo; se pone al día sola y nunca repite un período (`unique (fixed_expense_id, owed_on)`). Las fechas se cuentan desde el primer pago: el 31 cae el 30 o el 28 y vuelve al 31 (`occurrence()` en `src/lib/payables.ts` repite la cuenta). Un pendiente se paga en una o varias veces con `pay_pending_expense`: **de la caja** (quien trabaja en la sucursal, con el turno abierto) crea un gasto del turno de hoy, que resta del cuadre de hoy, con `owed_on` = el día que tocaba; **fuera de la caja** (la dueña o una empleada) no toca ningún turno. El gasto conserva el `business_date` del turno porque el cuadre empareja por turno y día; la app lo muestra con `owed_on` y «Pagado el…». Lo pagado sale de `pending_balances`: un pago de la caja deja de contar si se anula su gasto; uno de fuera se anula en el historial de Gastos. Anotan pendientes sueltos la dueña o quien trabaja ahí; corrige monto y vencimiento solo la dueña; cancela la dueña o quien lo anotó.
 - Cada venta lleva su método de pago (`efectivo`, `qr`, `transferencia`).
 - Ventas y gastos no se borran: se anulan (`voided_at`, `voided_by`) y siguen a la vista, tachados y sin sumar. Una venta anulada devuelve su stock. Solo quien registró algo lo anula o corrige, y mientras su turno sigue abierto; la dueña no.
 - Los montos van en bolivianos (Bs) y se muestran con signo (ver DESIGN.md).
@@ -91,6 +95,7 @@ erDiagram
 | `/app/[negocio]/sucursales` | dueña |
 | `/app/[negocio]/catalogo` | dueña |
 | `/app/[negocio]/catalogo/nuevo` · `/catalogo/[producto]` | dueña: crear (`?tipo=combo&con=a,b` arma un combo) y editar un producto, con vista previa en vivo y borrador en este equipo al crear |
+| `/app/[negocio]/por-pagar` | dueña: pendientes y gastos fijos de todas las sucursales |
 | `/app/[negocio]/empleados` | dueña |
 | `/app/[negocio]/configuracion` | dueña: nombre del negocio, sucursales, uso del plan y eliminar |
 | `/app/[negocio]/plan` | dueña: planes, precios y métodos de pago |
