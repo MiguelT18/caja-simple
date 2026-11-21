@@ -126,12 +126,12 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
 
   /**
    * ¿Puede esta persona anular o editar el movimiento? Solo para mostrar los botones: la base decide
-   * (la dueña siempre; quien lo registró, mientras ese turno sigue abierto).
+   * (quien lo registró, mientras ese turno sigue abierto; la dueña no).
    */
   const canCorrect = (mv: { recordedById: string | null; shiftId: string; date: string; voided: number | null }) =>
     mv.voided === null &&
-    (m.role === "dueño" ||
-      (mv.recordedById === locals.userId && closes.some((c) => c.status === "en-curso" && c.shift_id === mv.shiftId && c.business_date === mv.date)));
+    mv.recordedById === locals.userId &&
+    closes.some((c) => c.status === "en-curso" && c.shift_id === mv.shiftId && c.business_date === mv.date);
 
   /**
    * Comprobante de una venta por QR o transferencia: su enlace, si falta, y si esta persona lo puede adjuntar
@@ -164,6 +164,8 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
   return {
     ...m,
     membership: m,
+    /** ¿Opera la caja aquí? Solo con ficha activa en esta sucursal: la dueña, si se agregó como empleada (la base decide igual). */
+    works: m.employee?.branchId === branch.id,
     backdrop,
     branch,
     today: day,
@@ -201,11 +203,12 @@ export function shiftBarData(ctx: NonNullable<Awaited<ReturnType<typeof branchCo
   // La foto de la sucursal (la misma del encabezado) en el arte de la barra.
   const image = "image" in ctx.backdrop ? ctx.backdrop.image : undefined;
   if (!shift) {
-    // La empleada ve solo su turno (si tiene); la dueña, todos. Se ofrece solo el que está en su horario: se abre o, si ya
-    // se cerró hoy, se reabre (la dueña directo; la empleada lo pide y la dueña decide). Fuera de horario, desde cuándo.
+    // Quien no trabaja aquí (la dueña sin ficha en la sucursal) solo mira. Quien trabaja ve solo su turno, y solo el que
+    // está en su horario: se abre o, si ya se cerró hoy, pide reabrirlo (la dueña decide). Fuera de horario, desde cuándo.
     // La base decide igual (horario y turno propio): su error sale en un toast.
-    const own = ctx.role !== "dueño" ? ctx.shifts.find((s) => s.id === ctx.membership.employee?.shiftId) : undefined;
-    const candidates = (own ? [own] : ctx.shifts).filter((s) => !ctx.closedNow(s));
+    if (!ctx.works) return { branchName: ctx.branch.name, image, shiftsHref: href("turnos"), readonly: true };
+    const own = ctx.shifts.find((s) => s.id === ctx.membership.employee?.shiftId);
+    const candidates = (own ? [own] : []).filter((s) => !ctx.closedNow(s));
     const now = candidates.find((s) => inShiftWindow(s));
     if (!now) {
       const next = [...candidates].sort((a, b) => minutesUntilOpen(a) - minutesUntilOpen(b)).at(0);
@@ -215,7 +218,7 @@ export function shiftBarData(ctx: NonNullable<Awaited<ReturnType<typeof branchCo
     if (closed.close.status === "cerrado" && closed.closeId) {
       return {
         branchName: ctx.branch.name, image, shiftsHref: href("turnos"),
-        reopen: { closeId: closed.closeId, shiftName: now.name, pending: ctx.reopenPending.has(closed.closeId), direct: ctx.role === "dueño" },
+        reopen: { closeId: closed.closeId, shiftName: now.name, pending: ctx.reopenPending.has(closed.closeId) },
       };
     }
     return {
@@ -232,7 +235,8 @@ export function shiftBarData(ctx: NonNullable<Awaited<ReturnType<typeof branchCo
     branchName: ctx.branch.name,
     image,
     shiftsHref: href("turnos"),
-    saleHref: href("registrar-venta"),
+    // Quien no trabaja aquí ve la caja del turno, sin registrar venta.
+    saleHref: ctx.works ? href("registrar-venta") : undefined,
     shift: { name: shift.name, tone: shift.tone, start: shift.start, end: shift.end },
     openedOn: totals.openedOn,
     // Un turno olvidado: más de 24 h abierto.

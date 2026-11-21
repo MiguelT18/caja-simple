@@ -27,7 +27,8 @@ export function appNav(m?: Membership, branch?: Branch, affiliate = false) {
       key: "branch",
       title: branch.name,
       items: [
-        { id: "vender", label: "Vender", href: href("registrar-venta"), icon: ShoppingCart },
+        // Vende quien trabaja en la sucursal; la dueña, solo si se agregó como empleada ahí.
+        ...(m.role !== "dueño" || m.employee?.branchId === branch.id ? [{ id: "vender", label: "Vender", href: href("registrar-venta"), icon: ShoppingCart }] : []),
         ...(m.role === "dueño" ? [{ id: "resumen", label: "Resumen", href: href(), icon: LayoutDashboard }] : []),
         { id: "ventas", label: "Ventas", href: href("ventas"), icon: Receipt },
         { id: "gastos", label: "Gastos", href: href("gastos"), icon: Wallet },

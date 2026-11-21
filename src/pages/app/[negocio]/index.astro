@@ -72,7 +72,7 @@ const ideas = stats
   : [];
 const periodLabel = periods.find((p) => p.value === range.period)!.label;
 const ticket = (revenue: number, sales: number) => (sales ? revenue / sales : 0);
-const firstBranch = branchSummary[0]?.branch;
+const workBranch = branchSummary.find((b) => b.branch.id === ctx.membership.employee?.branchId)?.branch;
 // Con menos ventas que esto, un «más vendido» o una hora pico no dicen nada: se pide más datos en vez de mostrar cifras.
 const MIN_SALES = 5;
 // En vivo (src/scripts/live.ts): canal del negocio y nombres de sucursal para el anuncio.
@@ -247,9 +247,15 @@ const longerPeriod = periods.find((p) => p.value === "todo") ?? periods[periods.
             <span class="bar" style={`--fill: ${(Math.min(statsSales, MIN_SALES) / MIN_SALES) * 100}%`} aria-hidden="true" />
           </div>
           <div class="stats-empty-actions">
-            {firstBranch && (
-              <a href={branchHref(business, firstBranch, "registrar-venta")} class="btn btn-primary">
+            {/* La dueña vende solo donde se agregó como empleada; si no, quien vende es su equipo. */}
+            {workBranch ? (
+              <a href={branchHref(business, workBranch, "registrar-venta")} class="btn btn-primary">
                 Ir a Vender
+                <ArrowRight size={18} stroke-width={2} />
+              </a>
+            ) : (
+              <a href={`${businessHref(business)}/empleados`} class="btn btn-primary">
+                Invitar a tu equipo
                 <ArrowRight size={18} stroke-width={2} />
               </a>
             )}

@@ -1,5 +1,5 @@
 ---
-import { UserPlus } from "@lucide/astro";
+import { BadgeCheck, UserPlus } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import EmployeesTable from "@/components/app/EmployeesTable";
 import FormInput from "@/components/app/FormInput.astro";
@@ -38,8 +38,33 @@ const rows = employees.map((e) => {
 
 <Layout title={`Empleados · ${business.name}`} context={{ membership: ctx.membership }}>
   <PageHeader {...ctx.backdrop} title="Empleados" live description={`${plural(employees.length, "persona", "personas")} en las sucursales de ${business.name}. Entran gratis, siempre.`}>
+    {/* La dueña no vende ni abre turnos como dueña: para hacerlo, se agrega a una sucursal (entra activa, sin invitación). */}
+    {!ctx.membership.employee && (
+      <button type="button" class="btn btn-secondary" data-open-dialog="work-here"><BadgeCheck size={18} stroke-width={2} />Trabajar tú</button>
+    )}
     <button type="button" class="btn btn-primary" data-open-dialog="invite"><UserPlus size={18} stroke-width={2} />Invitar empleado</button>
   </PageHeader>
+
+  {
+    !ctx.membership.employee && (
+      <Modal
+        id="work-here"
+        title="Trabajar tú en una sucursal"
+        description="Como dueña ves todo, pero las ventas, los gastos y los turnos los registra quien trabaja en la sucursal. Agrégate y abres tu turno, vendes y cierras la caja como cualquier empleada."
+        action="inviteEmployee"
+        reload
+        submitLabel="Agregarme"
+        success="Listo: ya trabajas en esa sucursal."
+        hidden={{ businessId: business.id, personId: Astro.locals.userId ?? undefined, person: "Tú" }}
+      >
+        <FormInput form="work-here-form" name="jobTitle" label="Puesto" placeholder="Ej.: Encargada" required maxlength={60} />
+        <div class="field-row-2">
+          <FormInput form="work-here-form" name="branchId" label="Sucursal" required options={branches.map((b) => ({ value: b.id, label: b.name }))} />
+          <FormInput form="work-here-form" name="shiftId" label="Turno" required options={shiftOptions} />
+        </div>
+      </Modal>
+    )
+  }
 
   <Modal
     id="invite"

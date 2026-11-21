@@ -13,6 +13,8 @@ const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx) return Astro.rewrite("/404");
 const { branch, business, categories, products, currentShift: shift, today } = ctx;
+// Vende solo quien trabaja en la sucursal: la dueña sin ficha aquí ve las ventas (la base tampoco la deja vender).
+if (!ctx.works) return Astro.redirect(branchHref(business, branch, "ventas"), 303);
 // Pedidos abiertos: solo sirven con turno (cargarlos es para seguir vendiendo o cobrar).
 // Promociones de hoy en esta sucursal, por producto: la base aplica el descuento; aquí solo se muestra.
 const [orders, promos] = await Promise.all([
@@ -60,10 +62,10 @@ const colorOf = (categoryId?: string) => {
             <p>Pediste reabrir el turno {bar.reopen.shiftName.toLowerCase()}. Puedes vender cuando quien administra el negocio lo acepte.</p>
           ) : (
             <>
-              <p>El turno {bar.reopen.shiftName.toLowerCase()} ya se cerró hoy. {bar.reopen.direct ? "Reábrelo para seguir vendiendo." : "Pide reabrirlo para seguir vendiendo."}</p>
+              <p>El turno {bar.reopen.shiftName.toLowerCase()} ya se cerró hoy. Pide reabrirlo para seguir vendiendo.</p>
               <button type="button" class="btn btn-primary" data-open-dialog="bar-reopen-shift">
                 <RotateCcw size={18} stroke-width={1.75} />
-                {bar.reopen.direct ? "Reabrir turno" : "Pedir reabrir"}
+                Pedir reabrir
               </button>
             </>
           )

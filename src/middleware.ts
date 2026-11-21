@@ -33,7 +33,6 @@ const LIVE_ACTIONS = new Set([
   "openShift",
   "closeShift",
   "saveCloseNote",
-  "reopenShift",
   "recordStockMove",
   "saveInventory",
   "removeInventory",

@@ -1811,7 +1811,6 @@ export type Database = {
         };
         Returns: string;
       };
-      reopen_shift: { Args: { p_close: string }; Returns: undefined };
       request_join: {
         Args: { p_branch?: string; p_business: string; p_message?: string };
         Returns: string;

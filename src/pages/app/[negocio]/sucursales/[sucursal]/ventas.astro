@@ -64,7 +64,8 @@ const rows = [...salesHistory]
     description={`Lo que se vendió ${rangeText} en ${branch.name}.`}
   >
     {
-      currentShift ? (
+      // Registra quien trabaja en la sucursal; la dueña sin ficha aquí solo mira.
+      !ctx.works ? null : currentShift ? (
         <a class="btn btn-primary" href={branchHref(business, branch, "registrar-venta")}>
           <Plus size={18} stroke-width={2} />
           Registrar venta

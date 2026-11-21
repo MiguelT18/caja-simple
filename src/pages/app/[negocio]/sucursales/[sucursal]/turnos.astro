@@ -18,15 +18,11 @@ const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx) return Astro.rewrite("/404");
 const { branch, closedNow, closures, currentShift, employees, hours, lastCount, reopenPending, role, shiftById, shiftTotals, shifts, today } = ctx;
 const isOwner = role === "dueño";
-// El turno de quien trabaja aquí: solo ese puede abrir (la base lo exige, private.check_shift_schedule).
-const myShiftId = ctx.membership.employee?.shiftId;
+// El turno de quien trabaja aquí: solo ese puede abrir (la base lo exige, private.check_shift_schedule). La dueña sin
+// ficha en esta sucursal no abre, no cierra ni reabre turnos (ctx.works).
+const myShiftId = ctx.works ? ctx.membership.employee?.shiftId : undefined;
 const range = parseRange(Astro.url.searchParams, today);
 const history = await closesBetween(Astro.locals.supabase, branch.id, range.from, range.to);
-// Solo el último cierre de cada turno, de hoy o de ayer, se puede reabrir (igual que public.reopen_shift).
-const latestClose = new Map<string, string>();
-for (const c of history) if (!latestClose.has(c.shiftId)) latestClose.set(c.shiftId, c.id);
-const canReopen = (c: (typeof history)[number]) =>
-  isOwner && latestClose.get(c.shiftId) === c.id && c.date >= addDays(today, -1) && !currentShift;
 const canNote = (c: (typeof history)[number]) => isOwner || c.closedById === Astro.locals.userId;
 const DAYS = DAY_NAMES.map((d, i) => ({ dow: i + 1, short: "LMXJVSD"[i], long: d.replace(/s$/, "") }));
 /** «Lun a vie», «Lun, mié, vie» o null si son todos los días. */
@@ -160,39 +156,26 @@ const daysLabel = (weekdays: number[] | null) =>
             {t.close.status === "pendiente" &&
               (currentShift ? (
                 <p class="muted">Cierra el turno {currentShift.name.toLowerCase()} antes de abrir este.</p>
-              ) : closed && !isOwner ? (
+              ) : shift.id !== myShiftId ? (
+                <p class="status chip-neutral">
+                  <LockOpen size={16} stroke-width={2} />
+                  <span>
+                    Lo abre quien trabaja en este turno.
+                    {isOwner && !ctx.works && (
+                      <>
+                        {" "}
+                        Para trabajar tú, <a href={`${businessHref(ctx.business)}/empleados`}>agrégate en Empleados</a>.
+                      </>
+                    )}
+                  </span>
+                </p>
+              ) : closed ? (
                 <p class="status chip-neutral">
                   <CalendarX2 size={16} stroke-width={2} />
                   <span>{closed}. Hoy no se abre.</span>
                 </p>
-              ) : !isOwner && shift.id !== myShiftId ? (
-                <p class="status chip-neutral">
-                  <LockOpen size={16} stroke-width={2} />
-                  <span>Lo abre quien trabaja en este turno o quien administra el negocio.</span>
-                </p>
               ) : (
-                <form
-                  id={`open-${shift.id}`}
-                  class="inline-form"
-                  data-action="openShift"
-                  data-confirm={
-                    // La dueña abre cualquier turno, pero lo confirma: lo abre a su nombre, en lugar de quien está asignado.
-                    isOwner
-                      ? [
-                          staff.length > 0
-                            ? `Vas a abrir el turno ${shift.name.toLowerCase()} a tu nombre, en lugar de ${staff.map((e) => e.firstName).join(", ").replace(/, ([^,]*)$/, " y $1")}.`
-                            : `Vas a abrir el turno ${shift.name.toLowerCase()} a tu nombre.`,
-                          !onSchedule && `Estás fuera de su horario (se abre de ${schedule}).`,
-                          closed && `Hoy no es día hábil (${closed.charAt(0).toLowerCase() + closed.slice(1)}).`,
-                          "Las ventas y los gastos que se registren contarán en este turno. ¿Abrirlo?",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")
-                      : undefined
-                  }
-                  data-confirm-label={onSchedule && !closed ? "Abrir turno" : "Abrir fuera de horario"}
-                  novalidate
-                >
+                <form id={`open-${shift.id}`} class="inline-form" data-action="openShift" novalidate>
                   <input type="hidden" name="branchId" value={branch.id} />
                   <input type="hidden" name="shiftId" value={shift.id} />
                   <FormInput
@@ -205,8 +188,7 @@ const daysLabel = (weekdays: number[] | null) =>
                     label="Dinero en caja al abrir (Bs)"
                     value={lastCount ? String(lastCount.counted) : undefined}
                     hint={[
-                      closed && `${closed}.`,
-                      !onSchedule && !isOwner && `Se abre de ${schedule}.`,
+                      !onSchedule && `Se abre de ${schedule}.`,
                       lastCount && `Lo contado al cerrar ${lastCount.shiftName ? `el turno ${lastCount.shiftName.toLowerCase()}` : "el último turno"}. Cámbialo si no es lo que hay.`,
                       overnight(shift) && "Lo que vendas pasada la medianoche cuenta para hoy.",
                     ]
@@ -222,25 +204,9 @@ const daysLabel = (weekdays: number[] | null) =>
                 </form>
               ))}
 
-            {/* Cerrado hoy: la dueña lo reabre; quien trabaja en él lo pide y la dueña acepta o rechaza en sus avisos. */}
+            {/* Cerrado hoy: quien trabaja en él pide reabrirlo y la dueña acepta o rechaza en sus avisos. */}
             {t.close.status === "cerrado" && t.closeId && !currentShift &&
-              (isOwner ? (
-                <form
-                  id={`reopen-today-${shift.id}`}
-                  class="inline-form"
-                  data-action="reopenShift"
-                  data-confirm={`¿Reabrir el turno ${shift.name.toLowerCase()}? Se borra lo contado y se puede seguir vendiendo hasta volver a cerrarlo.`}
-                  data-confirm-label="Reabrir"
-                  novalidate
-                >
-                  <input type="hidden" name="closeId" value={t.closeId} />
-                  <button type="submit" class="btn btn-secondary">
-                    <RotateCcw size={18} stroke-width={1.75} />
-                    Reabrir turno
-                  </button>
-                  <p class="notice notice-error" role="alert" data-form-notice />
-                </form>
-              ) : shift.id !== myShiftId ? null : reopenPending.has(t.closeId) ? (
+              (shift.id !== myShiftId ? null : reopenPending.has(t.closeId) ? (
                 <p class="status chip-neutral">
                   <Hourglass size={16} stroke-width={2} />
                   <span>Pediste reabrirlo. Te avisamos cuando quien administra el negocio responda.</span>
@@ -269,7 +235,7 @@ const daysLabel = (weekdays: number[] | null) =>
                 </form>
               ))}
 
-            {t.close.status === "en-curso" && t.closeId && (
+            {t.close.status === "en-curso" && t.closeId && ctx.works && (
               <form
                 id={`close-${shift.id}`}
                 class="inline-form"
@@ -416,30 +382,12 @@ const daysLabel = (weekdays: number[] | null) =>
                 </dl>
                 {c.note && <p class="close-note">«{c.note}»</p>}
                 {c.reopened && <p class="muted">Se reabrió por un error y se volvió a cerrar.</p>}
-                {(canNote(c) || canReopen(c)) && (
+                {canNote(c) && (
                   <div class="close-actions">
-                    {canNote(c) && (
-                      <button type="button" class="btn btn-secondary" data-open-dialog={`note-${c.id}`} aria-label={`${c.note ? "Editar nota" : "Agregar nota"}: ${which}`}>
-                        <MessageSquareText size={18} stroke-width={1.75} />
-                        {c.note ? "Editar nota" : "Agregar nota"}
-                      </button>
-                    )}
-                    {canReopen(c) && (
-                      <form
-                        id={`reopen-${c.id}`}
-                        data-action="reopenShift"
-                        data-confirm={`¿Reabrir el turno ${shift.name.toLowerCase()}? Se borra lo contado y se puede seguir vendiendo hasta volver a cerrarlo.`}
-                        data-confirm-label="Reabrir"
-                        novalidate
-                      >
-                        <input type="hidden" name="closeId" value={c.id} />
-                        <button type="submit" class="btn btn-secondary" aria-label={`Reabrir ${which}`}>
-                          <RotateCcw size={18} stroke-width={1.75} />
-                          Reabrir
-                        </button>
-                        <p class="notice notice-error" role="alert" data-form-notice />
-                      </form>
-                    )}
+                    <button type="button" class="btn btn-secondary" data-open-dialog={`note-${c.id}`} aria-label={`${c.note ? "Editar nota" : "Agregar nota"}: ${which}`}>
+                      <MessageSquareText size={18} stroke-width={1.75} />
+                      {c.note ? "Editar nota" : "Agregar nota"}
+                    </button>
                   </div>
                 )}
               </li>

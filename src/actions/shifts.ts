@@ -202,22 +202,12 @@ export const shifts = {
     },
   }),
 
-  /** La dueña responde un pedido de reapertura; al aceptar, el turno se reabre (mismas reglas que reopenShift). */
+  /** La dueña responde un pedido de reapertura; al aceptar, el turno se reabre (el último cierre, de hoy o de ayer). */
   answerReopen: defineAction({
     accept: "form",
     input: z.object({ requestId: uuid, accept: z.enum(["true", "false"]).transform((v) => v === "true") }),
     handler: async ({ requestId, accept }, context) => {
       check((await db(context).rpc("answer_reopen", { p_request: requestId, p_accept: accept })).error);
-      return { ok: true };
-    },
-  }),
-
-  /** Reabre el último cierre de un turno (de hoy o de ayer), si se cerró por error. Solo la dueña. */
-  reopenShift: defineAction({
-    accept: "form",
-    input: z.object({ closeId: uuid }),
-    handler: async ({ closeId }, context) => {
-      check((await db(context).rpc("reopen_shift", { p_close: closeId })).error);
       return { ok: true };
     },
   }),
