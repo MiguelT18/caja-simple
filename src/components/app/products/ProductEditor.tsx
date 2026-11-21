@@ -1,6 +1,6 @@
 import { actions } from "astro:actions";
 import { useEffect, useRef, useState } from "react";
-import { CircleCheck, Copy, ImagePlus, Layers, Lock, Package, Shirt, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { CircleCheck, CircleDot, Copy, ImagePlus, Layers, Lock, Package, Shirt, Trash2, UtensilsCrossed, X } from "lucide-react";
 import type { BusinessKind, Category, ProductFormConfig, ProductSection, SaleMode } from "@/data/types";
 import type { CatalogEntry } from "@/data/queries";
 import type { PlanLimits } from "@/data/plans";
@@ -38,20 +38,36 @@ function read(form: HTMLFormElement, branches: Branch[]): Snapshot {
   };
 }
 
-/** Una sección de la página: título, ayuda corta y su cuerpo en una superficie elevada. */
-function Section({ id, title, hint, children, aside, bare }: { id: string; title: string; hint?: string; children: React.ReactNode; aside?: React.ReactNode; bare?: boolean }) {
+/** Cómo está una sección ahora: el valor de cada campo con nombre (incluidos los ocultos). Para ver si cambió. */
+function fingerprint(section: Element) {
+  return [...section.querySelectorAll<HTMLInputElement>("input[name], select[name], textarea[name]")]
+    .map((c) => `${c.name}=${c.type === "checkbox" || c.type === "radio" ? c.checked : c.type === "file" ? (c.files?.length ?? 0) : c.value}`)
+    .join("&");
+}
+
+/**
+ * Una sección de la página: título, ayuda corta y su cuerpo en una superficie elevada. Con cambios sin guardar
+ * (`dirty`) lleva la etiqueta «Sin guardar» y un contorno: no se avisa solo con color.
+ */
+function Section({ id, title, hint, children, aside, bare, dirty }: { id: string; title: string; hint?: string; children: React.ReactNode; aside?: React.ReactNode; bare?: boolean; dirty?: Set<string> }) {
+  const changed = dirty?.has(id);
   return (
-    <section aria-labelledby={`${id}-title`} className="grid min-w-0 gap-3">
+    <section id={`section-${id}`} data-section={id} aria-labelledby={`${id}-title`} className="grid min-w-0 scroll-mt-6 gap-3">
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-1">
         <div className="grid min-w-0 gap-0.5">
-          <h2 id={`${id}-title`} className="m-0 text-xl font-extrabold tracking-[-0.02em]">
+          <h2 id={`${id}-title`} className="m-0 flex flex-wrap items-center gap-2 text-xl font-extrabold tracking-[-0.02em]">
             {title}
+            {changed && <span className="chip chip-warning text-sm font-semibold tracking-normal">Sin guardar</span>}
           </h2>
           {hint && <p className="m-0 text-sm text-[var(--color-text-muted)]">{hint}</p>}
         </div>
         {aside}
       </div>
-      {bare ? children : <div className="card grid min-w-0 gap-4 p-4 sm:p-5">{children}</div>}
+      {bare ? (
+        <div className={cn("min-w-0 rounded-xl", changed && "outline-2 outline-offset-4 outline-[var(--color-warning)]")}>{children}</div>
+      ) : (
+        <div className={cn("card grid min-w-0 gap-4 p-4 sm:p-5", changed && "outline-2 outline-offset-2 outline-[var(--color-warning)]")}>{children}</div>
+      )}
     </section>
   );
 }
@@ -106,6 +122,49 @@ export default function ProductEditor({
   };
   // Al cambiar el tipo aparecen y se van campos: la vista previa se vuelve a leer.
   useEffect(sync, [mode]);
+
+  // Cambios sin guardar, por sección: cómo está cada una contra cómo estaba la primera vez que se vio con este tipo
+  // de venta (al cambiar el tipo aparecen campos nuevos, que no son cambios). El tipo de venta se compara aparte.
+  const [dirty, setDirty] = useState<{ id: string; title: string }[]>([]);
+  const baseline = useRef(new Map<string, string>());
+  const initialMode = useRef(mode);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const checkDirty = useRef(() => {});
+  checkDirty.current = () => {
+    const form = formRef.current;
+    if (!form) return;
+    const found: { id: string; title: string }[] = [];
+    for (const el of form.querySelectorAll<HTMLElement>("[data-section]")) {
+      const id = el.dataset.section!;
+      const key = `${modeRef.current}:${id}`;
+      const now = fingerprint(el);
+      if (!baseline.current.has(key)) baseline.current.set(key, now);
+      const changed = id === "mode" ? modeRef.current !== initialMode.current : baseline.current.get(key) !== now;
+      if (changed) found.push({ id, title: el.querySelector("h2")?.firstChild?.textContent ?? id });
+    }
+    setDirty((prev) => (prev.map((d) => d.id).join() === found.map((d) => d.id).join() ? prev : found));
+  };
+  // Al escribir (input/change), al restablecer y cuando aparecen o se van campos (quitar la foto, un producto del
+  // combo): la mutación del DOM lo cubre aunque no haya evento.
+  useEffect(() => {
+    const form = formRef.current!;
+    const run = () => checkDirty.current();
+    const later = () => setTimeout(run);
+    const observer = new MutationObserver(run);
+    observer.observe(form, { subtree: true, childList: true, attributes: true, attributeFilter: ["value"] });
+    form.addEventListener("input", run);
+    form.addEventListener("change", run);
+    form.addEventListener("reset", later);
+    run();
+    return () => {
+      observer.disconnect();
+      form.removeEventListener("input", run);
+      form.removeEventListener("change", run);
+      form.removeEventListener("reset", later);
+    };
+  }, []);
+  useEffect(() => checkDirty.current(), [mode]);
 
   // Al crear, lo escrito queda como borrador hasta guardar; la foto y lo que incluye un combo no se guardan.
   const draft = creating ? draftKey("product", businessId, combo ? "combo" : "new") : undefined;
@@ -226,6 +285,8 @@ export default function ProductEditor({
   const how = isCombo ? "El stock sale de los productos que incluye" : mode === "free" ? "El precio se escribe al vender" : mode === "open" ? "Sin control de stock" : withStock ? "Con control de stock" : "Stock: plan Negocio";
   const firstPrice = rows.find((r) => r.price !== null)?.price;
 
+  const dirtyIds = new Set(dirty.map((d) => d.id));
+
   const modes = product ? (isCombo ? [] : MODES) : [...MODES, { value: "combo" as const, label: "Combo", hint: "Varios productos a un precio" }];
 
   return (
@@ -269,6 +330,7 @@ export default function ProductEditor({
 
           {modes.length > 0 && (
             <Section
+              dirty={dirtyIds}
               id="mode"
               title="¿Cómo se vende?"
               hint={product ? "Cambia los campos de abajo. El stock de cada sucursal se cambia en su inventario." : "La página muestra solo lo que sirve para ese tipo."}
@@ -317,7 +379,7 @@ export default function ProductEditor({
             </Section>
           )}
 
-          <Section id="basics" title="Lo básico" aside={modes.length === 0 ? <ProductFormSettings businessId={businessId} config={config} /> : undefined}>
+          <Section dirty={dirtyIds} id="basics" title="Lo básico" aside={modes.length === 0 ? <ProductFormSettings businessId={businessId} config={config} /> : undefined}>
             <Field id="product-name" label="Nombre" error={save.errors.name}>
               <input
                 id="product-name"
@@ -342,13 +404,14 @@ export default function ProductEditor({
           </Section>
 
           {isCombo && (
-            <Section id="combo" title="Qué incluye" hint="Al venderlo se descuenta el stock de cada producto.">
+            <Section dirty={dirtyIds} id="combo" title="Qué incluye" hint="Al venderlo se descuenta el stock de cada producto.">
               <ComboFields catalog={catalog} branches={branches} product={product} initial={comboSeed} errors={save.errors} />
             </Section>
           )}
 
           {!isCombo && (placing || soldIn.length > 0) && (
             <Section
+              dirty={dirtyIds}
               id="where"
               title={placing ? "Dónde se vende" : "Precio en cada sucursal"}
               hint={
@@ -445,7 +508,7 @@ export default function ProductEditor({
           )}
 
           {showPhoto && (
-            <Section id="photo" title="Foto" hint="Opcional. JPG, PNG o WebP; la achicamos al subirla.">
+            <Section dirty={dirtyIds} id="photo" title="Foto" hint="Opcional. JPG, PNG o WebP; la achicamos al subirla.">
               <Field id="product-image" label="Foto del producto" error={imageError}>
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--color-surface)] text-[var(--color-text-muted)]">
@@ -499,7 +562,7 @@ export default function ProductEditor({
           )}
 
           {(showBarcode || showDescription) && (
-            <Section id="details" title="Detalles">
+            <Section dirty={dirtyIds} id="details" title="Detalles">
               {showBarcode && (
                 <Field id="product-barcode" label="Código de barras" hint="Opcional. Escanéalo con un lector o con la cámara." error={save.errors.barcode}>
                   <div className="flex min-w-0 gap-2">
@@ -542,7 +605,7 @@ export default function ProductEditor({
           )}
 
           {showExtra && (
-            <Section id="extra" title="Más datos" hint="Los campos propios de tu negocio. Se cambian en «Personalizar».">
+            <Section dirty={dirtyIds} id="extra" title="Más datos" hint="Los campos propios de tu negocio. Se cambian en «Personalizar».">
               <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                 {fields.map((f) => {
                   const id = `attr-${f.id}`;
@@ -587,6 +650,53 @@ export default function ProductEditor({
               {save.message}
             </p>
           )}
+
+          {/* Al final de todo, después de la última sección. Con cambios sin guardar, dice en qué secciones están (cada
+              una lleva además su etiqueta «Sin guardar» y un contorno) y lleva a cada una. Una sola fila: en el
+              celular, Cancelar y Borrar quedan como íconos. */}
+          <div className="grid min-w-0 gap-3">
+            {dirty.length > 0 && (
+              <p className="notice m-0 flex flex-wrap items-center gap-x-2 gap-y-1 bg-[var(--color-warning-soft)] text-[var(--color-warning)]" role="status">
+                <CircleDot className="size-4 shrink-0" aria-hidden="true" />
+                <span>
+                  {creating ? "Sin guardar todavía:" : "Cambios sin guardar en"}{" "}
+                  {dirty.map((d, i) => (
+                    <span key={d.id}>
+                      {i > 0 && (i === dirty.length - 1 ? " y " : ", ")}
+                      <a href={`#section-${d.id}`} className="font-semibold text-inherit underline underline-offset-2">
+                        {d.title}
+                      </a>
+                    </span>
+                  ))}
+                  .
+                </span>
+              </p>
+            )}
+            <div className="ml-auto flex w-fit max-w-full items-center gap-1.5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1.5 shadow-[var(--shadow-md)] max-sm:w-full">
+              {product && (
+                <>
+                  <Button type="button" variant="ghost" className="h-11 text-destructive max-sm:w-11 max-sm:px-0" onClick={remove} aria-label="Borrar producto">
+                    <Trash2 />
+                    <span className="max-sm:hidden">Borrar</span>
+                  </Button>
+                  <span className="mx-1 h-6 w-px shrink-0 bg-[var(--color-border)] max-sm:hidden" aria-hidden="true" />
+                </>
+              )}
+              <Button type="button" variant="ghost" className="h-11 max-sm:w-11 max-sm:px-0" onClick={cancel} aria-label="Cancelar">
+                <X className="sm:hidden" />
+                <span className="max-sm:hidden">Cancelar</span>
+              </Button>
+              {creating && !isCombo && (
+                <Button type="submit" variant="outline" className="h-11 max-sm:flex-1" data-another {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
+                  <span className="sm:hidden">Guardar y otro</span>
+                  <span className="max-sm:hidden">Guardar y agregar otro</span>
+                </Button>
+              )}
+              <Button type="submit" className="h-11 max-sm:flex-1" {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
+                {save.busy ? "Guardando…" : product ? "Guardar cambios" : isCombo ? "Armar combo" : "Guardar"}
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Escritorio: la tarjeta del catálogo tal como queda, en vivo, al lado de lo que se escribe. */}
@@ -601,37 +711,10 @@ export default function ProductEditor({
             <li>{how}</li>
             {where && <li className="text-[var(--color-text-muted)]">{where}</li>}
           </ul>
+
         </aside>
       </div>
 
-      {/* Barra de guardar: flota pegada abajo, compacta y a la derecha, así lo de atrás se sigue viendo. En escritorio
-          main tiene su propio scroll con 3rem de padding abajo: el -2rem la deja a 1rem del borde del panel. En el
-          celular (≤768px) hace scroll la página y queda sobre la barra del iPhone. Una sola fila: en el celular,
-          Cancelar y Borrar quedan como íconos. */}
-      <div className="sticky bottom-[-2rem] z-10 ml-auto flex w-fit max-w-full items-center gap-1.5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1.5 shadow-[var(--shadow-md)] max-[768px]:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:w-full">
-        {product && (
-          <>
-            <Button type="button" variant="ghost" className="h-11 text-destructive max-sm:w-11 max-sm:px-0" onClick={remove} aria-label="Borrar producto">
-              <Trash2 />
-              <span className="max-sm:hidden">Borrar</span>
-            </Button>
-            <span className="mx-1 h-6 w-px shrink-0 bg-[var(--color-border)] max-sm:hidden" aria-hidden="true" />
-          </>
-        )}
-        <Button type="button" variant="ghost" className="h-11 max-sm:w-11 max-sm:px-0" onClick={cancel} aria-label="Cancelar">
-          <X className="sm:hidden" />
-          <span className="max-sm:hidden">Cancelar</span>
-        </Button>
-        {creating && !isCombo && (
-          <Button type="submit" variant="outline" className="h-11 max-sm:flex-1" data-another {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
-            <span className="sm:hidden">Guardar y otro</span>
-            <span className="max-sm:hidden">Guardar y agregar otro</span>
-          </Button>
-        )}
-        <Button type="submit" className="h-11 max-sm:flex-1" {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
-          {save.busy ? "Guardando…" : product ? "Guardar cambios" : isCombo ? "Armar combo" : "Guardar"}
-        </Button>
-      </div>
     </form>
   );
 }
