@@ -399,6 +399,7 @@ export type Database = {
           concept: string;
           id: string;
           occurred_at: string;
+          owed_on: string | null;
           recorded_by: string | null;
           shift_id: string;
           voided_at: string | null;
@@ -413,6 +414,7 @@ export type Database = {
           concept: string;
           id?: string;
           occurred_at?: string;
+          owed_on?: string | null;
           recorded_by?: string | null;
           shift_id: string;
           voided_at?: string | null;
@@ -426,6 +428,7 @@ export type Database = {
           concept?: string;
           id?: string;
           occurred_at?: string;
+          owed_on?: string | null;
           recorded_by?: string | null;
           shift_id?: string;
           voided_at?: string | null;
@@ -497,6 +500,54 @@ export type Database = {
             columns: ["person_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fixed_expenses: {
+        Row: {
+          amount: number;
+          archived_at: string | null;
+          branch_id: string;
+          category: string;
+          concept: string;
+          created_at: string;
+          frequency: Database["public"]["Enums"]["expense_frequency"];
+          grace_days: number | null;
+          id: string;
+          starts_on: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          archived_at?: string | null;
+          branch_id: string;
+          category: string;
+          concept: string;
+          created_at?: string;
+          frequency: Database["public"]["Enums"]["expense_frequency"];
+          grace_days?: number | null;
+          id?: string;
+          starts_on: string;
+        };
+        Update: {
+          amount?: number;
+          archived_at?: string | null;
+          branch_id?: string;
+          category?: string;
+          concept?: string;
+          created_at?: string;
+          frequency?: Database["public"]["Enums"]["expense_frequency"];
+          grace_days?: number | null;
+          id?: string;
+          starts_on?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fixed_expenses_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
             referencedColumns: ["id"];
           },
         ];
@@ -758,6 +809,161 @@ export type Database = {
             columns: ["sale_id"];
             isOneToOne: true;
             referencedRelation: "sales";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      pending_expenses: {
+        Row: {
+          amount: number;
+          branch_id: string;
+          canceled_at: string | null;
+          canceled_by: string | null;
+          category: string;
+          concept: string;
+          created_at: string;
+          created_by: string | null;
+          due_on: string | null;
+          fixed_expense_id: string | null;
+          id: string;
+          owed_on: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          branch_id: string;
+          canceled_at?: string | null;
+          canceled_by?: string | null;
+          category: string;
+          concept: string;
+          created_at?: string;
+          created_by?: string | null;
+          due_on?: string | null;
+          fixed_expense_id?: string | null;
+          id?: string;
+          owed_on?: string;
+        };
+        Update: {
+          amount?: number;
+          branch_id?: string;
+          canceled_at?: string | null;
+          canceled_by?: string | null;
+          category?: string;
+          concept?: string;
+          created_at?: string;
+          created_by?: string | null;
+          due_on?: string | null;
+          fixed_expense_id?: string | null;
+          id?: string;
+          owed_on?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pending_expenses_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_expenses_canceled_by_fkey";
+            columns: ["canceled_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_expenses_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_expenses_fixed_expense_id_fkey";
+            columns: ["fixed_expense_id"];
+            isOneToOne: false;
+            referencedRelation: "fixed_expenses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      pending_payments: {
+        Row: {
+          amount: number;
+          branch_id: string;
+          expense_id: string | null;
+          id: string;
+          paid_at: string;
+          paid_by: string | null;
+          pending_id: string;
+          voided_at: string | null;
+          voided_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          branch_id: string;
+          expense_id?: string | null;
+          id: string;
+          paid_at?: string;
+          paid_by?: string | null;
+          pending_id: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Update: {
+          amount?: number;
+          branch_id?: string;
+          expense_id?: string | null;
+          id?: string;
+          paid_at?: string;
+          paid_by?: string | null;
+          pending_id?: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pending_payments_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_payments_expense_id_fkey";
+            columns: ["expense_id"];
+            isOneToOne: true;
+            referencedRelation: "expenses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_payments_paid_by_fkey";
+            columns: ["paid_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_payments_pending_id_fkey";
+            columns: ["pending_id"];
+            isOneToOne: false;
+            referencedRelation: "pending_balances";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_payments_pending_id_fkey";
+            columns: ["pending_id"];
+            isOneToOne: false;
+            referencedRelation: "pending_expenses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_payments_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1668,6 +1874,55 @@ export type Database = {
       };
     };
     Views: {
+      pending_balances: {
+        Row: {
+          amount: number;
+          balance: number | null;
+          branch_id: string;
+          canceled_at: string | null;
+          canceled_by: string | null;
+          category: string;
+          concept: string;
+          created_at: string;
+          created_by: string | null;
+          due_on: string | null;
+          fixed_expense_id: string | null;
+          id: string;
+          owed_on: string;
+          paid: number | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "pending_expenses_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_expenses_canceled_by_fkey";
+            columns: ["canceled_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_expenses_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_expenses_fixed_expense_id_fkey";
+            columns: ["fixed_expense_id"];
+            isOneToOne: false;
+            referencedRelation: "fixed_expenses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       sale_totals: {
         Row: {
           branch_id: string;
@@ -1718,13 +1973,7 @@ export type Database = {
         }[];
       };
       answer_join: {
-        Args: {
-          p_accept: boolean;
-          p_branch?: string;
-          p_job_title?: string;
-          p_request: string;
-          p_shift?: string;
-        };
+        Args: { p_accept: boolean; p_branch?: string; p_job_title?: string; p_request: string; p_shift?: string };
         Returns: undefined;
       };
       answer_reopen: { Args: { p_accept: boolean; p_request: string }; Returns: undefined };
@@ -1790,6 +2039,10 @@ export type Database = {
           taken: number;
         }[];
       };
+      pay_pending_expense: {
+        Args: { p_amount: number; p_payment: string; p_pending: string; p_shift?: string };
+        Returns: undefined;
+      };
       record_stock_move: {
         Args: {
           p_branch: string;
@@ -1811,10 +2064,7 @@ export type Database = {
         };
         Returns: string;
       };
-      request_join: {
-        Args: { p_branch?: string; p_business: string; p_message?: string };
-        Returns: string;
-      };
+      request_join: { Args: { p_branch?: string; p_business: string; p_message?: string }; Returns: string };
       request_reopen: { Args: { p_close: string; p_reason?: string }; Returns: string };
       request_stock_entry: {
         Args: { p_branch: string; p_product: string; p_qty: number; p_reason?: string };
@@ -1840,11 +2090,7 @@ export type Database = {
         Returns: string;
       };
       search_businesses: {
-        Args: {
-          p_kind?: Database["public"]["Enums"]["business_kind"];
-          p_page?: number;
-          p_query?: string;
-        };
+        Args: { p_kind?: Database["public"]["Enums"]["business_kind"]; p_page?: number; p_query?: string };
         Returns: {
           branches: Json;
           description: string;
@@ -1877,6 +2123,7 @@ export type Database = {
       charge_method: "qr" | "transferencia" | "tarjeta";
       close_status: "en-curso" | "cerrado";
       employee_status: "activo" | "invitado";
+      expense_frequency: "semanal" | "quincenal" | "mensual";
       join_status: "pendiente" | "aceptada" | "rechazada";
       notification_kind:
         | "invitation"
@@ -1918,8 +2165,7 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof (DefaultSchema["Tables"] & DefaultSchema["Views"]) | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
@@ -1942,9 +2188,7 @@ export type Tables<
     : never;
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
@@ -1965,9 +2209,7 @@ export type TablesInsert<
     : never;
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
@@ -1988,9 +2230,7 @@ export type TablesUpdate<
     : never;
 
 export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+  DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
@@ -2004,8 +2244,7 @@ export type Enums<
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
@@ -2024,6 +2263,7 @@ export const Constants = {
       charge_method: ["qr", "transferencia", "tarjeta"],
       close_status: ["en-curso", "cerrado"],
       employee_status: ["activo", "invitado"],
+      expense_frequency: ["semanal", "quincenal", "mensual"],
       join_status: ["pendiente", "aceptada", "rechazada"],
       notification_kind: [
         "invitation",

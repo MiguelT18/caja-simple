@@ -4,11 +4,12 @@ import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import DonutChart from "@/components/app/charts/DonutChart";
 import ExpensesTable from "@/components/app/ExpensesTable";
+import PayablesCard from "@/components/app/PayablesCard";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchContext, shiftBarData, branchHref, expensesByCategory, fullName, sum } from "@/data/queries";
+import { branchContext, shiftBarData, branchHref, expensesByCategory, fullName, payables, sum } from "@/data/queries";
 import { formatBs } from "@/lib/format";
 import { addDays, longDate, parseRange, shortDate, today as todayOf } from "@/lib/dates";
 
@@ -18,6 +19,8 @@ const ctx = await branchContext(Astro.locals, negocio!, sucursal!, range);
 if (!ctx) return Astro.rewrite("/404");
 const rangeText = range.days === 7 && range.to === ctx.today ? "los últimos 7 días" : `del ${shortDate(range.from)} al ${shortDate(range.to)}`;
 const { branch, business, canCorrect, currentShift, expenseHistory, expenses, shiftById, shifts, today } = ctx;
+const isOwner = ctx.membership.role === "dueño";
+const owed = await payables(Astro.locals.supabase, [branch.id], today, range);
 // Nuevo en cada carga (la página recarga al guardar): un doble envío del mismo formulario no duplica el gasto.
 const expenseId = crypto.randomUUID();
 // Categorías ya usadas, como sugerencias del campo.
@@ -30,11 +33,14 @@ const byShift = shifts.map((shift) => ({
   total: sum(expenseHistory.filter((g) => g.shiftId === shift.id).map((g) => g.amount)),
 }));
 
-const rows = expenseHistory.map((g) => {
+const rows = [
+  ...expenseHistory.map((g) => {
   const shift = shiftById(g.shiftId);
   return {
     id: g.id,
-    date: g.date,
+    // Salda un pendiente: se muestra el día que tocaba; el del pago va debajo.
+    date: g.owedOn ?? g.date,
+    paidOn: g.owedOn ? g.date : undefined,
     time: g.time,
     concept: g.concept,
     category: g.category,
@@ -44,7 +50,21 @@ const rows = expenseHistory.map((g) => {
     voided: g.voided !== null,
     canEdit: canCorrect(g),
   };
-});
+  }),
+  // Pagos fuera de la caja: no son de ningún turno y no suman en lo que salió de la caja.
+  ...owed.outside.map((x) => ({
+    id: x.id,
+    date: x.owedOn,
+    paidOn: x.paidOn,
+    time: x.time,
+    concept: x.concept,
+    category: x.category,
+    by: fullName(x.paidBy),
+    amount: x.amount,
+    outside: true,
+    canEdit: isOwner || x.paidById === Astro.locals.userId,
+  })),
+].sort((a, b) => (b.paidOn ?? b.date).localeCompare(a.paidOn ?? a.date) || b.time.localeCompare(a.time));
 ---
 
 <Layout title={`Gastos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
@@ -120,6 +140,21 @@ const rows = expenseHistory.map((g) => {
     </section>
   </div>
 
+  <div class="payables" data-region="payables">
+    <PayablesCard
+      client:load
+      branchId={branch.id}
+      pending={owed.pending}
+      fixed={owed.fixed}
+      today={today}
+      userId={Astro.locals.userId!}
+      isOwner={isOwner}
+      canAdd={isOwner || ctx.works}
+      cashShift={ctx.works && currentShift ? { id: currentShift.id, name: currentShift.name } : null}
+      categories={usedCategories}
+    />
+  </div>
+
   <h2 class="section-title">Historial</h2>
   <RangeFilter from={range.from} to={range.to} max={today} historyStart={business.plan === "Gratis" ? addDays(today, -60) : undefined} />
   <div data-region="history">
@@ -167,6 +202,11 @@ const rows = expenseHistory.map((g) => {
     font-size: var(--text-3xl);
     line-height: var(--text-3xl-lh);
     font-weight: var(--font-bold);
+  }
+
+  /* Misma separación que entre secciones (.section-title): no queda pegada a los totales. */
+  .payables {
+    margin-top: 2.5rem;
   }
 
   .chart-card {

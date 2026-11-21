@@ -20,7 +20,7 @@ No repitas en este archivo lo que ya dicen esos documentos. Enlázalos.
 
 ```sh
 pnpm install
-astro dev --background   # servidor de dev en segundo plano; también: astro dev stop | status | logs
+pnpm astro dev --background   # servidor de dev en segundo plano; también: pnpm astro dev stop | status | logs (con pnpm: un astro global de otra versión da 500 en todo)
 pnpm build               # verificación mínima antes de dar algo por terminado
 pnpm astro check         # tipos (usa TypeScript 6: astro check no soporta la 7)
 pnpm test                # vitest: funciones puras (src/**/*.test.ts) y que planLimits coincida con las migraciones

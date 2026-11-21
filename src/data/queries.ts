@@ -14,4 +14,5 @@ export { DIRECTORY_PAGE_SIZE, joinRequests, searchBusinesses, type DirectoryBusi
 export { businessStats, statsPeriods, statsRange, type BusinessStats } from "./stats"; // estadísticas del Resumen
 export { daysSince, hourSpan, marketingIdeas, peakHour, trend, weekdayName, weekdayRange } from "./insights"; // ideas para vender más
 export { today } from "@/lib/dates";
+export { paidSince, payables, type FixedExpense, type OutsidePayment, type Payable } from "./payables"; // gastos fijos y pendientes
 export { businessPromotions, promotionsToday, type Promotion } from "./promotions"; // promociones con descuento

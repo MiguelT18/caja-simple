@@ -4,8 +4,8 @@ import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { check, db, extension, imageFile, name, uuid, uploadLimit } from "./shared";
 
-const amount = z.coerce.number({ error: "Ingresa un monto" }).positive("El monto debe ser mayor a cero").max(9_999_999);
-const expenseFields = {
+export const amount = z.coerce.number({ error: "Ingresa un monto" }).positive("El monto debe ser mayor a cero").max(9_999_999);
+export const expenseFields = {
   concept: name(120, "Ingresa el concepto"),
   category: name(40, "Ingresa la categoría"),
   amount,

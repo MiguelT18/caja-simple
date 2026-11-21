@@ -45,6 +45,9 @@ export const shortDate = (date: string) => shortFormat.format(new Date(`${date}T
 /** Hoy (AAAA-MM-DD) en Bolivia. */
 export const today = () => dayFormat.format(new Date());
 
+/** El día (AAAA-MM-DD) en Bolivia de un instante. */
+export const dayOf = (iso: string) => dayFormat.format(new Date(iso));
+
 /** «14:05». */
 export const clock = (iso: string) => clockFormat.format(new Date(iso));
 

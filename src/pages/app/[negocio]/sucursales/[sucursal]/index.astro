@@ -7,9 +7,10 @@ import WeekChart from "@/components/app/charts/WeekChart";
 import MovementsTable from "@/components/app/MovementsTable";
 import LiveStatus from "@/components/app/LiveStatus.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchContext, headerBackdrop, shiftBarData, branchHref, isLowStock, orderLabels, receiptUrls } from "@/data/queries";
+import { branchContext, headerBackdrop, shiftBarData, branchHref, isLowStock, orderLabels, payables, receiptUrls } from "@/data/queries";
 import { differenceLabel, formatBs, plural, shiftHours } from "@/lib/format";
 import { longDate } from "@/lib/dates";
+import { dueState } from "@/lib/payables";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
@@ -17,11 +18,13 @@ if (!ctx || ctx.role !== "dueño") return Astro.rewrite("/404");
 const { today, branch, expenses, products, sales, salesByCategory, salesTotal, expensesTotal, shiftById, shiftTotals, shifts, weekSummary } = ctx;
 const balance = salesTotal - expensesTotal;
 // Única página de la sucursal con la foto del negocio de fondo: la de la sucursal va en la portada (ctx.backdrop).
-const [orderNames, receipts, businessBackdrop] = await Promise.all([
+const [orderNames, receipts, businessBackdrop, owed] = await Promise.all([
   orderLabels(Astro.locals.supabase, branch.id, today, today),
   receiptUrls(Astro.locals.supabase, sales),
   headerBackdrop(Astro.locals, ctx.membership),
+  payables(Astro.locals.supabase, [branch.id], today),
 ]);
+const overdue = owed.pending.filter((p) => dueState(p.dueOn, today).tone === "late");
 const cover = ctx.backdrop;
 
 const movements = [
@@ -66,8 +69,22 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
     topic={`negocio:${ctx.business.id}`}
     names={{ [branch.id]: branch.name }}
     branch={branch.id}
-    regions={["shift-bar", "kpis", "shifts", "charts", "activity"]}
+    regions={["shift-bar", "payables-notice", "kpis", "shifts", "charts", "activity"]}
   />
+
+  <div data-region="payables-notice">
+    {
+      overdue.length > 0 && (
+        <p class="notice notice-error overdue">
+          <TriangleAlert size={18} stroke-width={1.75} aria-hidden="true" />
+          <span>
+            {overdue.length === 1 ? `«${overdue[0].concept}» venció` : `${overdue.length} pagos vencieron`}: faltan {formatBs(overdue.reduce((s, p) => s + p.balance, 0))}.{" "}
+            <a href={branchHref(ctx.business, branch, "gastos")}>Ver Por pagar</a>
+          </span>
+        </p>
+      )
+    }
+  </div>
 
   <section class="kpis" aria-label="Totales de hoy" data-region="kpis">
     <div class="kpi">
@@ -192,6 +209,23 @@ const meta = [branch.address, plural(shifts.length, "turno", "turnos"), plural(c
 </Layout>
 
 <style>
+  .overdue {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .overdue :global(svg) {
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+  }
+
+  .overdue a {
+    color: inherit;
+    font-weight: var(--font-semibold);
+  }
+
   .chart-card {
     display: grid;
     gap: 1rem;
