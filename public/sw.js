@@ -1,6 +1,6 @@
 // Service worker de Caja Simple: avisos push (ver supabase/functions/send-push), página sin conexión
 // y una copia de Vender para poder abrirla sin red (la cola de ventas vive en registrar-venta.astro).
-const SHELL = "shell-v2"; // offline.html (con todo adentro: sin red no carga otro archivo) y los archivos con hash de /_astro (no cambian nunca)
+const SHELL = "shell-v3"; // offline.html (con todo adentro: sin red no carga otro archivo) y los archivos con hash de /_astro (no cambian nunca)
 // shortcut: los /_astro de builds viejos se acumulan hasta cambiar SHELL; poda por fecha si la caché crece.
 const PAGES = "pages-v1"; // la última copia de cada página de Vender: se borra al cerrar sesión
 const SELL_PAGE = /^\/app\/[^/]+\/sucursales\/[^/]+\/registrar-venta\/?$/;

@@ -22,6 +22,8 @@ export const toBusiness = (b: Row<"businesses">): Business => ({
   // Una fila cacheada de antes de la columna no la trae: ámbar.
   color: (b.color ?? "ambar") as Business["color"],
   referred: !!b.referred_by || undefined,
+  // Una fila cacheada de antes de la columna no la trae: el formulario de siempre.
+  productForm: (b.product_form ?? {}) as Business["productForm"],
 });
 
 export const toBranch = (b: Row<"branches">): Branch => ({
@@ -85,6 +87,7 @@ export const toCatalogProduct = (
   description: p.description ?? undefined,
   image: p.image_path ? images.get(p.image_path) : undefined,
   components: p.components?.length ? p.components.map((c) => ({ productId: c.component_id, name: c.product?.name ?? "", qty: c.qty })) : undefined,
+  attributes: (p.attributes ?? {}) as Record<string, string>,
 });
 
 /** Embed de PostgREST con lo que incluye un combo (para el select de products). */

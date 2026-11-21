@@ -18,7 +18,7 @@ describe("marketingIdeas", () => {
 
   it("el combo enlaza al formulario ya lleno si trae los ids", () => {
     const [idea] = marketingIdeas({ ...base, stats: { ...empty, pairs: [{ a: "Pan", b: "Leche", aId: "x", bId: "y", times: 4 }] } });
-    expect(idea.href).toBe(`${base.catalogHref}?combo=x,y`);
+    expect(idea.href).toBe(`${base.catalogHref}/nuevo?tipo=combo&con=x,y`);
   });
 
   it("estrella ausente en otra sucursal", () => {

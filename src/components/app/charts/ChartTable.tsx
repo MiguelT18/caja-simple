@@ -6,7 +6,9 @@ import { formatBs } from "@/lib/format";
  */
 export function ChartTable({ caption, columns, rows }: { caption: string; columns: string[]; rows: { label: string; values: number[] }[] }) {
   return (
-    <table className="sr-only">
+    // Una tabla no respeta el ancho de 1px de sr-only y ensancha la página en el celular: la oculta un div.
+    <div className="sr-only">
+    <table>
       <caption>{caption}</caption>
       <thead>
         <tr>
@@ -31,6 +33,7 @@ export function ChartTable({ caption, columns, rows }: { caption: string; column
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 

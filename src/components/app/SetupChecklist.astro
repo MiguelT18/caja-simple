@@ -18,8 +18,9 @@ const at = (section: string) => (branch ? branchHref(business, branch, section) 
 const steps = [
   { done: hasProducts, title: "Agrega tus productos", note: "Arma el catálogo del negocio, uno por uno o con un CSV.", href: `${businessHref(business)}/catalogo` },
   { done: hasStock, title: "Ponles precio y stock", note: "En el inventario de la sucursal, lo que vas a vender ahí.", href: at("inventario") },
-  { done: opened, title: "Abre el primer turno", note: "Con el efectivo con el que empieza la caja.", href: at("turnos") },
-  { done: sold, title: "Registra la primera venta", note: "Desde Vender, en el celular o la computadora.", href: at("registrar-venta") },
+  // Turnos y ventas los registra quien trabaja en la sucursal (la dueña, solo si se agrega como empleada).
+  { done: opened, title: "Abre el primer turno", note: "Lo abre quien trabaja en la sucursal: invita a tu equipo o agrégate tú en Empleados.", href: `${businessHref(business)}/empleados` },
+  { done: sold, title: "Registra la primera venta", note: "Desde Vender, en el turno abierto. Aquí ves cada venta.", href: at("ventas") },
 ];
 const done = steps.filter((s) => s.done).length;
 ---

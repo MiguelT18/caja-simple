@@ -71,7 +71,7 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
   </PageHeader>
 
   <div data-region="catalog">
-    <ProductCatalog client:load products={products} categories={categories} businessId={business.id} branchId={branch.id} canEdit={isOwner} addable={addable} limits={limits} planHref={planHref} />
+    <ProductCatalog client:load products={products} categories={categories} businessId={business.id} branchId={branch.id} canEdit={isOwner} addable={addable} limits={limits} planHref={planHref} fields={business.productForm.fields} />
   </div>
 
   {

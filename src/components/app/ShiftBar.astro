@@ -99,7 +99,7 @@ const here = Astro.url.pathname.replace(/\/$/, "");
         </dl>
 
         <div class="cash">
-          {here !== data.saleHref && (
+          {data.saleHref && here !== data.saleHref && (
             <a class="sale" href={data.saleHref} title="Registrar venta">
               <span class="play-btn">
                 <Plus size={24} stroke-width={1.75} />
@@ -119,7 +119,7 @@ const here = Astro.url.pathname.replace(/\/$/, "");
       ) : (
         <button type="button" class="btn btn-primary open" data-open-dialog="bar-reopen-shift">
           <RotateCcw size={18} stroke-width={1.75} />
-          {data.reopen.direct ? "Reabrir turno" : "Pedir reabrir"}
+          Pedir reabrir
         </button>
       )
     ) : data.wait ? (
@@ -129,6 +129,8 @@ const here = Astro.url.pathname.replace(/\/$/, "");
         <span>El turno {data.wait.shiftName.toLowerCase()} se abre a partir de las <span class="num">{data.wait.from}</span>.</span>
       </p>
     ) : (
+      // La dueña sin ficha en la sucursal solo mira: no abre turnos (readonly).
+      !data.readonly &&
       here !== data.shiftsHref &&
       (data.open ? (
         // Se abre aquí mismo, sin ir a Turnos. Sin data-form-notice: los errores salen en un toast (scripts/action-forms.ts).
@@ -149,48 +151,30 @@ const here = Astro.url.pathname.replace(/\/$/, "");
 {
   !shift && data.reopen && !data.reopen.pending && (
     <dialog id="bar-reopen-shift" class="modal" aria-labelledby="bar-reopen-shift-title">
-      {
-        data.reopen.direct ? (
-          // La dueña reabre directo: el mismo turno de hoy, con lo vendido y sin lo contado (public.reopen_shift).
-          <form id="bar-reopen-shift-form" class="modal-form" method="dialog" data-action="reopenShift" data-reload data-success={`Turno ${data.reopen.shiftName.toLowerCase()} reabierto.`} novalidate>
-            <header class="modal-head">
-              <h2 id="bar-reopen-shift-title">¿Reabrir el turno {data.reopen.shiftName.toLowerCase()}?</h2>
-              <p>Ya se cerró hoy. Al reabrirlo se borra lo contado y se sigue vendiendo en el mismo turno hasta volver a cerrarlo con el arqueo.</p>
-            </header>
-            <input type="hidden" name="closeId" value={data.reopen.closeId} />
-            <p class="notice notice-error" role="alert" data-form-notice></p>
-            <div class="modal-actions">
-              <button type="button" class="btn btn-secondary" data-close-dialog>Cancelar</button>
-              <button type="submit" class="btn btn-primary">Reabrir turno</button>
-            </div>
-          </form>
-        ) : (
-          <form
-            id="bar-reopen-shift-form"
-            class="modal-form"
-            method="dialog"
-            data-action="requestReopen"
-            data-reload
-            data-success="Listo: le avisamos a quien administra el negocio."
-            novalidate
-          >
-            <header class="modal-head">
-              <h2 id="bar-reopen-shift-title">¿Pedir reabrir el turno {data.reopen.shiftName.toLowerCase()}?</h2>
-              <p>
-                Ya se cerró hoy. Para volver a abrirlo, quien administra el negocio tiene que estar de acuerdo: le llega un
-                aviso y decide. El pedido también queda en tus avisos; si acepta, sigues vendiendo en el mismo turno.
-              </p>
-            </header>
-            <input type="hidden" name="closeId" value={data.reopen.closeId} />
-            <FormInput form="bar-reopen-shift-form" name="reason" label="Motivo (opcional)" hint="Por ejemplo: lo cerré antes de tiempo, faltaba registrar una venta." maxlength={200} />
-            <p class="notice notice-error" role="alert" data-form-notice></p>
-            <div class="modal-actions">
-              <button type="button" class="btn btn-secondary" data-close-dialog>Cancelar</button>
-              <button type="submit" class="btn btn-primary">Confirmar y avisar</button>
-            </div>
-          </form>
-        )
-      }
+      <form
+        id="bar-reopen-shift-form"
+        class="modal-form"
+        method="dialog"
+        data-action="requestReopen"
+        data-reload
+        data-success="Listo: le avisamos a quien administra el negocio."
+        novalidate
+      >
+        <header class="modal-head">
+          <h2 id="bar-reopen-shift-title">¿Pedir reabrir el turno {data.reopen.shiftName.toLowerCase()}?</h2>
+          <p>
+            Ya se cerró hoy. Para volver a abrirlo, quien administra el negocio tiene que estar de acuerdo: le llega un
+            aviso y decide. El pedido también queda en tus avisos; si acepta, sigues vendiendo en el mismo turno.
+          </p>
+        </header>
+        <input type="hidden" name="closeId" value={data.reopen.closeId} />
+        <FormInput form="bar-reopen-shift-form" name="reason" label="Motivo (opcional)" hint="Por ejemplo: lo cerré antes de tiempo, faltaba registrar una venta." maxlength={200} />
+        <p class="notice notice-error" role="alert" data-form-notice></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close-dialog>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Confirmar y avisar</button>
+        </div>
+      </form>
     </dialog>
   )
 }

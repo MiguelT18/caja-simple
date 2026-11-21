@@ -1,7 +1,7 @@
 -- Datos de ejemplo para la base LOCAL (supabase db reset). Nunca se corre en producción: `db push` no lee este archivo.
 -- Todo es «Ejemplo»: no hay clientes ni métricas reales. Contraseña de todas las cuentas: ejemplo123.
 --
---   duena@ejemplo.test     dueña de «Ejemplo Tienda» (plan Sucursales pagado, 2 sucursales)
+--   duena@ejemplo.test     dueña de «Ejemplo Tienda» (plan Sucursales pagado, 2 sucursales); empleada de Ejemplo Norte, turno Mañana
 --   empleada@ejemplo.test  empleada de Ejemplo Centro, turno Mañana
 --   gratis@ejemplo.test    dueña de «Ejemplo Gratis» (plan Gratis, ya usó su prueba)
 --   nueva@ejemplo.test     sin negocio: al crear el primero recibe la prueba de 30 días
@@ -121,6 +121,14 @@ where b.slug = 'ejemplo-tienda';
 -- La base da de alta a toda empleada como «invitado» (tiene que aceptar): aquí ya aceptó.
 update public.employees set status = 'activo' where email = 'empleada@ejemplo.test';
 
+-- La dueña no opera la caja como dueña: trabaja como empleada en Ejemplo Norte, turno Mañana (entra activa sola).
+insert into public.employees (business_id, branch_id, email, job_title, person_id, shift_id, status)
+select b.id, br.id, 'duena@ejemplo.test', 'Encargada', '00000000-0000-4000-a000-000000000001', s.id, 'activo'
+from public.businesses b
+join public.branches br on br.business_id = b.id and br.slug = 'ejemplo-norte'
+join public.shifts s on s.branch_id = br.id and s.name = 'Mañana'
+where b.slug = 'ejemplo-tienda';
+
 -- Historial: la última semana de Ejemplo Tienda (hoy queda libre para abrir turno y vender) -------------------------
 set session_replication_role = replica;
 do $$
@@ -144,7 +152,8 @@ begin
       select s.*, br.slug as branch_slug from public.shifts s join public.branches br on br.id = s.branch_id
       where br.business_id = v_business and s.name in ('Mañana', 'Tarde')
     loop
-      v_by := case when v_shift.branch_slug = 'ejemplo-centro' and v_shift.name = 'Mañana'
+      -- Centro lo atiende la empleada; Norte, la dueña como empleada.
+      v_by := case when v_shift.branch_slug = 'ejemplo-centro'
         then '00000000-0000-4000-a000-000000000002'::uuid else '00000000-0000-4000-a000-000000000001'::uuid end;
       v_close := gen_random_uuid();
       v_cash := 0;

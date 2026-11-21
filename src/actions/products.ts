@@ -65,6 +65,11 @@ export const products = {
       price: z.array(z.preprocess((v) => (v === "" || v == null ? undefined : v), money.optional())).max(100).default([]),
       // Producto nuevo: stock inicial en cada sucursal elegida (mismo orden). Vacío: no se controla.
       stock: z.array(z.preprocess((v) => (v === "" || v == null ? undefined : v), count.optional())).max(100).default([]),
+      // Stock mínimo de cada sucursal (mismo orden que stock): avisa cuando baja de ahí. Vacío: 0.
+      minStock: z.array(z.preprocess((v) => (v === "" || v == null ? undefined : v), count.optional())).max(100).default([]),
+      // Campos propios del negocio (businesses.product_form): id del campo y su valor, en el mismo orden.
+      attrId: z.array(z.string().max(40)).max(20).default([]),
+      attrValue: z.array(z.string().trim().max(120, "Máximo 120 caracteres")).max(20).default([]),
       // Combo: lo que incluye (mismo orden que componentQty). Al crearlo, priceBranch lo agrega a esas sucursales.
       combo: z.coerce.boolean().default(false),
       componentId: z.array(uuid).max(20, "Un combo incluye hasta 20 productos").default([]),
@@ -72,13 +77,20 @@ export const products = {
     })
       .refine((v) => v.price.length === v.priceBranch.length, { message: "Revisa los precios", path: ["price"] })
       .refine((v) => v.stock.length === 0 || v.stock.length === v.priceBranch.length, { message: "Revisa el stock", path: ["stock"] })
+      .refine((v) => v.minStock.length === 0 || v.minStock.length === v.stock.length, { message: "Revisa el stock mínimo", path: ["minStock"] })
+      .refine((v) => v.attrId.length === v.attrValue.length, { message: "Revisa los datos del producto", path: ["attributes"] })
       .refine((v) => v.componentId.length === v.componentQty.length, { message: "Revisa las cantidades", path: ["components"] })
       .refine((v) => new Set(v.componentId).size === v.componentId.length, { message: "Hay un producto repetido", path: ["components"] })
       .refine((v) => !v.combo || v.componentQty.reduce((a, b) => a + b, 0) >= 2, { message: "Un combo lleva al menos dos productos", path: ["components"] }),
-    handler: async ({ businessId, id, name, categoryId, barcode, description, image, removeImage, priceBranch, price, stock, combo, componentId, componentQty }, context) => {
+    handler: async ({ businessId, id, name, categoryId, barcode, description, image, removeImage, priceBranch, price, stock, minStock, attrId, attrValue, combo, componentId, componentQty }, context) => {
       await uploadLimit(context, image);
       const sb = db(context);
-      const fields = { name, category_id: categoryId ?? null, barcode: barcode ?? null, description: description || null };
+      // Solo los campos que el negocio tiene hoy: uno quitado de la configuración no deja valores sueltos.
+      const config = await sb.from("businesses").select("product_form").eq("id", businessId).single();
+      check(config.error);
+      const known = new Set(((config.data!.product_form as { fields?: { id: string }[] }).fields ?? []).map((f) => f.id));
+      const attributes = Object.fromEntries(attrId.flatMap((key, i) => (known.has(key) && attrValue[i] ? [[key, attrValue[i]]] : [])));
+      const fields = { name, category_id: categoryId ?? null, barcode: barcode ?? null, description: description || null, attributes };
       const duplicate = "Ya tienes otro producto con ese código de barras.";
       const saved = id
         ? await sb.from("products").update(fields).eq("id", id).select("id, image_path").single()
@@ -109,7 +121,7 @@ export const products = {
         const { error } = await sb
           .from("inventory")
           .upsert(
-            priceBranch.map((branchId, i) => inventoryRow(businessId, branchId, product.id, { price: price[i], stock: withStock ? stock[i] : undefined })),
+            priceBranch.map((branchId, i) => inventoryRow(businessId, branchId, product.id, { price: price[i], stock: withStock ? stock[i] : undefined, minStock: minStock[i] })),
             { onConflict: "branch_id,product_id", ignoreDuplicates: true },
           );
         // Como con el combo: si no entró al inventario, no queda a medias en el catálogo.
@@ -124,6 +136,34 @@ export const products = {
         for (const r of results) check(r.error);
       }
       return { id: product.id };
+    },
+  }),
+
+  /** Cómo se arma la página de producto del negocio: tipo por defecto, secciones ocultas y campos propios. */
+  saveProductForm: defineAction({
+    input: z.object({
+      businessId: uuid,
+      defaultMode: z.enum(["stock", "open", "free"]).optional(),
+      hidden: z.array(z.enum(["photo", "barcode", "description", "extra"])).max(4).default([]),
+      fields: z
+        .array(
+          z.object({
+            id: z.string().regex(/^[a-z0-9-]{1,40}$/),
+            label: name(30, "Ponle un nombre al campo"),
+            kind: z.enum(["text", "number", "select"]),
+            options: z.array(name(30, "Escribe la opción")).max(20, "Hasta 20 opciones").optional(),
+          }),
+        )
+        .max(20, "Hasta 20 campos")
+        .default([])
+        .refine((fields) => fields.every((f) => f.kind !== "select" || (f.options?.length ?? 0) > 0), "Una lista necesita al menos una opción")
+        .refine((fields) => new Set(fields.map((f) => f.label.toLowerCase())).size === fields.length, "Hay dos campos con el mismo nombre"),
+    }),
+    handler: async ({ businessId, defaultMode, hidden, fields }, context) => {
+      const productForm = { defaultMode, hidden, fields: fields.map((f) => (f.kind === "select" ? f : { id: f.id, label: f.label, kind: f.kind })) };
+      const { error } = await db(context).from("businesses").update({ product_form: productForm }).eq("id", businessId).select("id").single();
+      check(error);
+      return { productForm };
     },
   }),
 

@@ -61,7 +61,7 @@ export function marketingIdeas({
       kind: "combo",
       text: `Arma un combo con «${pair.a}» y «${pair.b}»: se vendieron juntos ${pair.times} veces.`,
       // Con los ids, el catálogo abre «Armar combo» con los dos ya elegidos.
-      href: pair.aId && pair.bId ? `${catalogHref}?combo=${pair.aId},${pair.bId}` : catalogHref,
+      href: pair.aId && pair.bId ? `${catalogHref}/nuevo?tipo=combo&con=${pair.aId},${pair.bId}` : catalogHref,
       linkLabel: pair.aId && pair.bId ? "Armar el combo" : "Ir al catálogo",
     });
 

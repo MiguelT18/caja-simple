@@ -50,7 +50,8 @@ const rows = expenseHistory.map((g) => {
 <Layout title={`Gastos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
   <PageHeader {...ctx.backdrop} eyebrow={longDate(today)} title="Gastos" description={`Lo que salió de la caja ${rangeText} en ${branch.name}.`}>
     {
-      currentShift ? (
+      // Registra quien trabaja en la sucursal; la dueña sin ficha aquí solo mira.
+      !ctx.works ? null : currentShift ? (
         <button type="button" class="btn btn-primary" data-open-dialog="expense">
           <Plus size={18} stroke-width={2} />
           Registrar gasto
@@ -66,7 +67,7 @@ const rows = expenseHistory.map((g) => {
   {/* Región: tras guardar trae un expenseId nuevo, así el siguiente gasto no se toma por repetido. */}
   <div data-region="expense-form">
   {
-    currentShift && (
+    ctx.works && currentShift && (
       <Modal
         id="expense"
         title="Registrar gasto"

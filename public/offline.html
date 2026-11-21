@@ -18,6 +18,7 @@
       }
       body {
         margin: 0;
+        box-sizing: border-box; /* el padding va dentro de los 100dvh: sin esto la página es 2rem más alta y hace scroll */
         min-height: 100dvh;
         display: grid;
         place-items: center;
@@ -31,7 +32,7 @@
       .logo rect { fill: var(--primary); }
       .logo path { stroke: var(--on-primary); }
       h1 { font-size: 1.5rem; margin: 1rem 0 0.5rem; }
-      p { color: var(--muted); margin: 0 0 1.5rem; }
+      p { color: var(--muted); margin: 0 0 1.5rem; text-wrap: pretty; }
       button {
         font: inherit;
         font-weight: 700;
@@ -56,5 +57,6 @@
       <p>Esta página necesita internet. Si ya abriste Vender en este dispositivo, puedes seguir vendiendo ahí: las ventas se envían solas al volver la conexión.</p>
       <button type="button" onclick="location.reload()">Reintentar</button>
     </main>
+    <script>addEventListener("online", () => location.reload());</script>
   </body>
 </html>

@@ -37,6 +37,26 @@ export function Field({ id, label, error, hint, children }: { id: string; label:
 export const selectClass = "input";
 
 /**
+ * Monto en bolivianos: «Bs» va dentro del campo, así la moneda se ve mientras se escribe y no solo en la etiqueta.
+ * Dentro de Field recibe aria-describedby; se le suma «bolivianos» para el lector de pantalla.
+ */
+export function MoneyInput({ id, className, style, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { id: string }) {
+  const describedBy = [props["aria-describedby"], `${id}-unit`].filter(Boolean).join(" ");
+  return (
+    <div className="relative min-w-0">
+      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 font-semibold text-[var(--color-text-muted)]" aria-hidden="true">
+        Bs
+      </span>
+      <span id={`${id}-unit`} className="sr-only">
+        en bolivianos
+      </span>
+      {/* El padding va en style: .input (global.css) le gana a las utilidades de Tailwind. */}
+      <input id={id} type="number" inputMode="decimal" step="0.01" min="0" {...props} aria-describedby={describedBy} className={`input num ${className ?? ""}`} style={{ paddingLeft: "2.75rem", ...style }} />
+    </div>
+  );
+}
+
+/**
  * Selector de archivo: un recuadro que se toca entero, en vez del input nativo (que en el celular se ve tosco).
  * El input real queda oculto pero enfocable; dentro de Field recibe aria-invalid y aria-describedby.
  */
