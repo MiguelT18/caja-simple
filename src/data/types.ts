@@ -218,6 +218,16 @@ export interface StockRequest {
   at: string;
 }
 
+/** Stock que la dueña envió a una sucursal y espera que alguien de ahí confirme. */
+export interface StockDelivery {
+  id: string;
+  product: string;
+  qty: number;
+  reason: string | null;
+  by: string;
+  at: string;
+}
+
 export interface Expense {
   id: string;
   branchId: string;
@@ -284,6 +294,15 @@ export type Notification = {
       data: { person: string; product: string; qty: number; branch: string; reason: string | null };
     }
   | { kind: "stock_answer"; data: { accepted: boolean; person: string; product: string; qty: number; branch: string } }
+  | {
+      /** La dueña envió stock a la sucursal: alguien que trabaja ahí confirma cuánto llegó. */
+      kind: "stock_delivery";
+      requestId: string;
+      /** El envío sigue esperando que la sucursal lo confirme. */
+      pending: boolean;
+      data: { person: string; product: string; qty: number; branch: string; reason: string | null };
+    }
+  | { kind: "stock_received"; data: { person: string; product: string; qty: number; received: number; branch: string } }
   | { kind: "reopen_answer"; data: { accepted: boolean; person: string; branch: string; shift: string; date: string } }
   | { kind: "ownership"; data: { business: string; person: string } }
   | {

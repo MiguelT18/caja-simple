@@ -5,7 +5,7 @@ import type { Supabase } from "@/lib/supabase";
 import { fail } from "./mappers";
 import type { Membership } from "./session";
 import { cents, shiftCash } from "./cash";
-import type { Branch, Business, ClosedShift, Expense, Order, Recorder, Sale, SaleLine, StockMove, StockRequest } from "./types";
+import type { Branch, Business, ClosedShift, Expense, Order, Recorder, Sale, SaleLine, StockDelivery, StockMove, StockRequest } from "./types";
 
 /** Nombres de quienes registraron movimientos. RLS solo deja ver a quien comparte negocio. */
 export async function recorders(sb: Supabase, ids: (string | null)[]) {
@@ -223,6 +223,28 @@ export async function stockRequests(sb: Supabase, branchId: string, userId: stri
       by: (r.requested_by && people.get(r.requested_by)?.firstName) || "—",
       mine: r.requested_by === userId,
       at: r.created_at,
+    }),
+  );
+}
+
+/** Stock que la dueña envió a la sucursal y todavía nadie de ahí confirmó (RLS: la dueña y quien trabaja ahí). */
+export async function stockDeliveries(sb: Supabase, branchId: string) {
+  const { data, error } = await sb
+    .from("stock_deliveries")
+    .select("id, qty, reason, sent_by, created_at, products(name)")
+    .eq("branch_id", branchId)
+    .eq("status", "pendiente")
+    .order("created_at");
+  fail(error);
+  const people = await recorders(sb, (data ?? []).map((d) => d.sent_by));
+  return (data ?? []).map(
+    (d): StockDelivery => ({
+      id: d.id,
+      product: d.products?.name ?? "Producto quitado",
+      qty: d.qty,
+      reason: d.reason,
+      by: (d.sent_by && people.get(d.sent_by)?.firstName) || "—",
+      at: d.created_at,
     }),
   );
 }

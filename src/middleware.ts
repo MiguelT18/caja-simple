@@ -15,6 +15,7 @@ const LIVE_ACTIONS = new Set([
   "savePromotion",
   "requestStockEntry",
   "answerStockRequest",
+  "receiveStock",
   "togglePromotion",
   "deletePromotion",
   "requestJoin",

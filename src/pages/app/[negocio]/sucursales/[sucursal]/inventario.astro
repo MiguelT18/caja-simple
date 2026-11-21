@@ -7,7 +7,7 @@ import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
 import { plural } from "@/lib/format";
 import { stamp } from "@/lib/dates";
-import { branchContext, shiftBarData, businessHref, isLowStock, stockMoves, stockRequests } from "@/data/queries";
+import { branchContext, shiftBarData, businessHref, isLowStock, stockDeliveries, stockMoves, stockRequests } from "@/data/queries";
 import { planLimits } from "@/data/plans";
 
 const { negocio, sucursal } = Astro.params;
@@ -30,10 +30,13 @@ const limits = planLimits[business.plan];
 const planHref = `${businessHref(business)}/plan`;
 const tracked = limits.stock ? products.filter((p) => p.stock !== null) : [];
 const frozen = !limits.stock && products.some((p) => p.stock !== null);
-const [moves, requests] = await Promise.all([
+const [moves, requests, deliveries] = await Promise.all([
   stockMoves(Astro.locals.supabase, branch.id),
   limits.stock ? stockRequests(Astro.locals.supabase, branch.id, Astro.locals.userId!) : [],
+  limits.stock ? stockDeliveries(Astro.locals.supabase, branch.id) : [],
 ]);
+// Lo que la dueña envía lo confirma quien trabaja en la sucursal (la dueña, solo si se agregó como empleada aquí).
+const canReceive = ctx.works;
 const kinds = [
   { value: "entrada", label: "Entrada de mercadería (suma)" },
   ...(isOwner
@@ -142,6 +145,76 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
     }
   </div>
 
+  <!-- Stock que la dueña envió: entra cuando alguien de la sucursal confirma cuánto llegó. -->
+  <div data-region="stock-deliveries">
+    {
+      deliveries.length > 0 && (
+        <section class="moves" aria-labelledby="deliveries-title">
+          <h2 class="section-title" id="deliveries-title">Por recibir</h2>
+          <p class="muted deliveries-help">
+            {canReceive ? "Cuenta lo que llegó y confírmalo: recién ahí entra al stock." : "Entra al stock cuando alguien de la sucursal confirme cuánto le llegó."}
+          </p>
+          <ul class="requests card" role="list">
+            {deliveries.map((d) => (
+              <li>
+                <span class="request-what">
+                  <strong>
+                    {d.by} envió <span class="num amount-income">+{d.qty}</span> de {d.product}
+                  </strong>
+                  <span class="muted">{[stamp(d.at), d.reason && `«${d.reason}»`].filter(Boolean).join(" · ")}</span>
+                </span>
+                {canReceive ? (
+                  <span class="request-actions">
+                    <form id={`receive-${d.id}`} class="receive" data-action="receiveStock" data-success={`Listo: el stock de ${d.product} subió lo que llegó.`} novalidate>
+                      <input type="hidden" name="deliveryId" value={d.id} />
+                      <label class="receive-field">
+                        <span>Llegaron</span>
+                        <input
+                          class="input num"
+                          name="qty"
+                          type="number"
+                          inputmode="numeric"
+                          min="0"
+                          max={d.qty}
+                          step="1"
+                          value={d.qty}
+                          required
+                          aria-describedby={`receive-${d.id}-qty-error`}
+                        />
+                      </label>
+                      <button type="submit" class="btn btn-primary" aria-label={`Confirmar lo que llegó de ${d.product}`}>
+                        Confirmar
+                      </button>
+                      <p class="field-error" id={`receive-${d.id}-qty-error`} aria-live="polite"></p>
+                    </form>
+                    <form
+                      data-action="receiveStock"
+                      data-success="Avisamos que no llegó."
+                      data-confirm={`¿No llegó nada de ${d.product}? El stock no cambia y ${d.by} recibe el aviso.`}
+                      data-confirm-label="No llegó"
+                      data-danger
+                    >
+                      <input type="hidden" name="deliveryId" value={d.id} />
+                      <input type="hidden" name="qty" value="0" />
+                      <button type="submit" class="btn btn-secondary" aria-label={`No llegó ${d.product}`}>
+                        No llegó
+                      </button>
+                    </form>
+                  </span>
+                ) : (
+                  <span class="chip chip-warning">
+                    <Clock size={14} stroke-width={2} />
+                    Esperando a la sucursal
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+  </div>
+
   <section class="moves" aria-labelledby="moves-title" data-region="moves">
     <h2 class="section-title" id="moves-title">Movimientos de stock</h2>
     {
@@ -187,7 +260,7 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
       <Modal
         id="stock-move"
         title={isOwner ? "Registrar movimiento de stock" : "Pedir entrada de mercadería"}
-        description={isOwner ? "Cambia el stock de la sucursal y queda en el registro con tu nombre." : "Quien administra el negocio recibe tu pedido. El stock sube cuando lo acepte."}
+        description={isOwner ? "Cambia el stock de la sucursal y queda en el registro con tu nombre. Si alguien más trabaja aquí, una entrada sube cuando confirma que le llegó." : "Quien administra el negocio recibe tu pedido. El stock sube cuando lo acepte."}
         action={isOwner ? "recordStockMove" : "requestStockEntry"}
         draft
         submitLabel={isOwner ? "Guardar" : "Enviar pedido"}
@@ -259,7 +332,41 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
 
   .request-actions {
     display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 0.5rem;
+  }
+
+  .deliveries-help {
+    margin: -0.5rem 0 0.75rem;
+    font-size: var(--text-sm);
+  }
+
+  .receive {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .receive-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--text-sm);
+  }
+
+  .receive-field .input {
+    width: 6rem;
+  }
+
+  .receive .field-error {
+    flex-basis: 100%;
+    margin: 0;
+  }
+
+  .receive .field-error:empty {
+    display: none;
   }
 
   .moves-table {

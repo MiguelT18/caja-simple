@@ -368,7 +368,10 @@ export const products = {
     },
   }),
 
-  /** Entrada de mercadería (cualquiera de la sucursal), merma o ajuste (la dueña). Cambia el stock y queda registrado. */
+  /**
+   * Entrada de mercadería, merma o ajuste (la dueña). Cambia el stock y queda registrado. Una entrada a una sucursal donde
+   * trabaja otra persona queda por recibir (send_stock): sube cuando alguien de ahí confirma cuánto llegó (receiveStock).
+   */
   recordStockMove: defineAction({
     accept: "form",
     input: z
@@ -383,6 +386,11 @@ export const products = {
       .refine((v) => v.kind === "ajuste" || v.qty > 0, { message: "Usa un número mayor que 0", path: ["qty"] })
       .refine((v) => v.kind === "entrada" || v.reason, { message: "Escribe el motivo", path: ["reason"] }),
     handler: async ({ branchId, productId, kind, qty, reason }, context) => {
+      if (kind === "entrada") {
+        const { data: held, error } = await db(context).rpc("send_stock", { p_branch: branchId, p_product: productId, p_qty: qty, p_reason: reason });
+        check(error);
+        return held ? { toast: { message: "Quedó por recibir: sube cuando la sucursal confirme cuánto le llegó.", tone: "success" as const } } : { ok: true };
+      }
       const { error } = await db(context).rpc("record_stock_move", {
         p_branch: branchId,
         p_product: productId,
@@ -417,6 +425,19 @@ export const products = {
     input: z.object({ requestId: uuid, accept: z.enum(["true", "false"]).transform((v) => v === "true") }),
     handler: async ({ requestId, accept }, context) => {
       check((await db(context).rpc("answer_stock_request", { p_request: requestId, p_accept: accept })).error);
+      return { ok: true };
+    },
+  }),
+
+  /** Quien trabaja en la sucursal confirma cuánto llegó de un envío de la dueña (0: no llegó). */
+  receiveStock: defineAction({
+    accept: "form",
+    input: z.object({
+      deliveryId: uuid,
+      qty: z.coerce.number({ error: "Ingresa un número" }).int("Usa un número entero").min(0, "Usa 0 o más").max(100_000),
+    }),
+    handler: async ({ deliveryId, qty }, context) => {
+      check((await db(context).rpc("receive_stock", { p_delivery: deliveryId, p_qty: qty })).error);
       return { ok: true };
     },
   }),

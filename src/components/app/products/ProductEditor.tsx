@@ -13,7 +13,8 @@ import { ProductCard } from "./ProductCard";
 import { ComboFields } from "./ComboFields";
 import { ScanBarcode } from "./ScanBarcode";
 import { MODES, ProductFormSettings } from "./ProductFormSettings";
-import { confirmDialog, flashToast } from "@/scripts/dialogs";
+import { navigate } from "astro:transitions/client";
+import { confirmDialog, toast } from "@/scripts/dialogs";
 import { clearDraft, confirmDiscard, draftKey, hasDraft, keepDraft } from "@/scripts/drafts";
 import { shrinkInput } from "@/scripts/shrink-image";
 
@@ -173,8 +174,8 @@ export default function ProductEditor({
   const another = useRef(false);
   const [lastAdded, setLastAdded] = useState("");
   const leave = (message?: string) => {
-    if (message) flashToast(message);
-    location.assign(catalogHref);
+    // Sin recargar: el menú lateral queda y el aviso sale ya en el catálogo.
+    void navigate(catalogHref).then(() => message && toast(message, "success"));
   };
   const save = useActionForm(
     (form) => actions.saveProduct(form) as never,
@@ -189,7 +190,7 @@ export default function ProductEditor({
         : `«${name}» se agregó al catálogo.`,
       );
     },
-    // El aviso lo muestra el catálogo al volver (flashToast); con «Guardar y agregar otro», el aviso en línea.
+    // El aviso lo muestra el catálogo al volver; con «Guardar y agregar otro», el aviso en línea.
     () => undefined,
   );
 
@@ -415,7 +416,8 @@ export default function ProductEditor({
               id="where"
               title={placing ? "Dónde se vende" : "Precio en cada sucursal"}
               hint={
-                !priced ? "Quien vende escribe el precio en cada venta." : placing ? "Sin precio, quien vende lo escribe en cada venta." : "Déjalo vacío para que quien vende escriba el precio."
+                (!priced ? "Quien vende escribe el precio en cada venta." : placing ? "Sin precio, quien vende lo escribe en cada venta." : "Déjalo vacío para que quien vende escriba el precio.") +
+                (placing && stocked && withStock ? " Si alguien más trabaja en la sucursal, el stock entra cuando confirma que le llegó." : "")
               }
               aside={
                 priced && (placing ? branches.length : soldIn.length) > 1 ? (

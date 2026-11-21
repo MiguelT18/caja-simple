@@ -41,6 +41,8 @@ export function notificationHref(n: Notification, memberships: Membership[]): st
       return inBranch("turnos");
     case "stock_request":
     case "stock_answer":
+    case "stock_delivery":
+    case "stock_received":
       return inBranch("inventario");
     case "low_stock":
       return branch ? branchHref(m.business, branch, "inventario") : owner ? `${businessHref(m.business)}/catalogo` : entryHref(m);
