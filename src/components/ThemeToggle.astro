@@ -24,11 +24,13 @@ const { class: className, iconSize = 18, ...rest } = Astro.props;
 </button>
 
 <script>
+  import { onPage } from "../scripts/refresh";
+
   // Tema: la preferencia guardada manda; si no hay, se sigue la del sistema.
   // BaseHead aplica la guardada antes de pintar; aquí solo se cambia y se refleja en aria-pressed.
   const THEME_KEY = "caja-simple-theme";
   const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-  const toggles = document.querySelectorAll<HTMLButtonElement>(".theme-toggle");
+  const bound = new WeakSet<Element>();
 
   function isDark() {
     const theme = document.documentElement.dataset.theme;
@@ -36,22 +38,27 @@ const { class: className, iconSize = 18, ...rest } = Astro.props;
   }
 
   function sync() {
-    toggles.forEach((toggle) => toggle.setAttribute("aria-pressed", String(isDark())));
+    document.querySelectorAll(".theme-toggle").forEach((toggle) => toggle.setAttribute("aria-pressed", String(isDark())));
   }
 
-  toggles.forEach((toggle) => {
-    toggle.addEventListener("click", () => {
-      const theme = isDark() ? "light" : "dark";
-      document.documentElement.dataset.theme = theme;
-      try {
-        localStorage.setItem(THEME_KEY, theme);
-      } catch {}
-      sync();
+  // En cada página: el botón del menú lateral se conserva al navegar y se ata una sola vez.
+  onPage(() => {
+    document.querySelectorAll<HTMLButtonElement>(".theme-toggle").forEach((toggle) => {
+      if (bound.has(toggle)) return;
+      bound.add(toggle);
+      toggle.addEventListener("click", () => {
+        const theme = isDark() ? "light" : "dark";
+        document.documentElement.dataset.theme = theme;
+        try {
+          localStorage.setItem(THEME_KEY, theme);
+        } catch {}
+        sync();
+      });
     });
+    sync();
   });
 
   darkQuery.addEventListener("change", sync);
-  sync();
 </script>
 
 <style>

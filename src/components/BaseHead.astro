@@ -31,9 +31,16 @@ const { title } = Astro.props;
 <meta name="twitter:card" content="summary_large_image" />
 <script is:inline>
   // Aplica el tema guardado antes de pintar para evitar un parpadeo.
-  try {
-    const theme = localStorage.getItem("caja-simple-theme");
-    if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
-  } catch {}
+  // También al navegar con el ClientRouter: la página nueva trae su <html> sin el tema.
+  {
+  const applyTheme = (doc) => {
+    try {
+      const theme = localStorage.getItem("caja-simple-theme");
+      if (theme === "light" || theme === "dark") doc.documentElement.dataset.theme = theme;
+    } catch {}
+  };
+  applyTheme(document);
+  document.addEventListener("astro:before-swap", (e) => applyTheme(e.newDocument));
+  }
 </script>
 <title>{title} · Caja Simple</title>

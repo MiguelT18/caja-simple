@@ -40,63 +40,66 @@ const labels = JSON.stringify(Object.fromEntries(brandColors.map((c) => [c.key, 
 
 <script>
   import { dominantColor, nearestBrand } from "@/lib/logo-color";
+  import { onPage } from "@/scripts/refresh";
 
-  for (const field of document.querySelectorAll<HTMLElement>("[data-brand-field]")) {
-    const styles: Record<string, string> = JSON.parse(field.dataset.styles!);
-    const labels: Record<string, string> = JSON.parse(field.dataset.labels!);
-    const radios = [...field.querySelectorAll<HTMLInputElement>('input[name="color"]')];
+  onPage(() => {
+    for (const field of document.querySelectorAll<HTMLElement>("[data-brand-field]")) {
+      const styles: Record<string, string> = JSON.parse(field.dataset.styles!);
+      const labels: Record<string, string> = JSON.parse(field.dataset.labels!);
+      const radios = [...field.querySelectorAll<HTMLInputElement>('input[name="color"]')];
 
-    // Vista previa: el acento de toda la página. Si no se guarda, al recargar vuelve el de antes.
-    const apply = (key: string) => {
-      for (const decl of styles[key].split("; ")) {
-        const at = decl.indexOf(":");
-        document.body.style.setProperty(decl.slice(0, at).trim(), decl.slice(at + 1).trim());
-      }
-    };
-    field.addEventListener("change", (event) => {
-      const radio = event.target as HTMLInputElement;
-      if (radio.name === "color") apply(radio.value);
-      hideIfChosen();
-    });
-
-    // Sugerencia desde el logo: solo con una foto elegida ahora (blob:), que se puede leer en un canvas.
-    const suggestion = field.querySelector<HTMLElement>("[data-suggestion]")!;
-    const nameEl = field.querySelector<HTMLElement>("[data-suggestion-name]")!;
-    let suggested = "";
-    const hideIfChosen = () => {
-      suggestion.hidden = !suggested || radios.find((r) => r.checked)?.value === suggested;
-    };
-    field.querySelector("[data-suggestion-use]")!.addEventListener("click", () => {
-      const radio = radios.find((r) => r.value === suggested);
-      if (!radio) return;
-      radio.checked = true;
-      radio.dispatchEvent(new Event("change", { bubbles: true }));
-      radio.focus();
-    });
-
-    const form = document.getElementById(field.dataset.form!);
-    const logo = form?.querySelector<HTMLImageElement>('[data-photo-field]:has([name="image"]) [data-photo-preview]');
-    if (logo) {
-      const read = async () => {
-        suggested = "";
-        if (!logo.hidden && logo.src.startsWith("blob:")) {
-          try {
-            await logo.decode();
-            const canvas = Object.assign(document.createElement("canvas"), { width: 32, height: 32 });
-            const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-            ctx.drawImage(logo, 0, 0, 32, 32);
-            const rgb = dominantColor(ctx.getImageData(0, 0, 32, 32).data);
-            if (rgb) suggested = nearestBrand(rgb);
-          } catch {
-            // Sin poder leerla, no hay sugerencia.
-          }
+      // Vista previa: el acento de toda la página. Si no se guarda, al recargar vuelve el de antes.
+      const apply = (key: string) => {
+        for (const decl of styles[key].split("; ")) {
+          const at = decl.indexOf(":");
+          document.body.style.setProperty(decl.slice(0, at).trim(), decl.slice(at + 1).trim());
         }
-        nameEl.textContent = suggested ? labels[suggested].toLowerCase() : "";
-        hideIfChosen();
       };
-      new MutationObserver(read).observe(logo, { attributes: true, attributeFilter: ["src", "hidden"] });
+      field.addEventListener("change", (event) => {
+        const radio = event.target as HTMLInputElement;
+        if (radio.name === "color") apply(radio.value);
+        hideIfChosen();
+      });
+
+      // Sugerencia desde el logo: solo con una foto elegida ahora (blob:), que se puede leer en un canvas.
+      const suggestion = field.querySelector<HTMLElement>("[data-suggestion]")!;
+      const nameEl = field.querySelector<HTMLElement>("[data-suggestion-name]")!;
+      let suggested = "";
+      const hideIfChosen = () => {
+        suggestion.hidden = !suggested || radios.find((r) => r.checked)?.value === suggested;
+      };
+      field.querySelector("[data-suggestion-use]")!.addEventListener("click", () => {
+        const radio = radios.find((r) => r.value === suggested);
+        if (!radio) return;
+        radio.checked = true;
+        radio.dispatchEvent(new Event("change", { bubbles: true }));
+        radio.focus();
+      });
+
+      const form = document.getElementById(field.dataset.form!);
+      const logo = form?.querySelector<HTMLImageElement>('[data-photo-field]:has([name="image"]) [data-photo-preview]');
+      if (logo) {
+        const read = async () => {
+          suggested = "";
+          if (!logo.hidden && logo.src.startsWith("blob:")) {
+            try {
+              await logo.decode();
+              const canvas = Object.assign(document.createElement("canvas"), { width: 32, height: 32 });
+              const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+              ctx.drawImage(logo, 0, 0, 32, 32);
+              const rgb = dominantColor(ctx.getImageData(0, 0, 32, 32).data);
+              if (rgb) suggested = nearestBrand(rgb);
+            } catch {
+              // Sin poder leerla, no hay sugerencia.
+            }
+          }
+          nameEl.textContent = suggested ? labels[suggested].toLowerCase() : "";
+          hideIfChosen();
+        };
+        new MutationObserver(read).observe(logo, { attributes: true, attributeFilter: ["src", "hidden"] });
+      }
     }
-  }
+  });
 </script>
 
 <style>

@@ -63,7 +63,13 @@ const current = options.find((o) => o.current) ?? options[0];
 </div>
 
 <script>
-  document.querySelectorAll<HTMLElement>("[data-switcher]").forEach((root) => {
+  import { onPage } from "../scripts/refresh";
+
+  // Vive en el menú lateral, que se conserva al navegar: cada selector se ata una sola vez.
+  const bound = new WeakSet<Element>();
+  onPage(() => document.querySelectorAll<HTMLElement>("[data-switcher]").forEach((root) => {
+    if (bound.has(root)) return;
+    bound.add(root);
     const trigger = root.querySelector<HTMLButtonElement>(".switch-trigger")!;
     const menu = root.querySelector<HTMLElement>(".switch-menu")!;
     // Las flechas recorren también el enlace del pie («Ver todas…»). Se buscan cada vez: la lista se reemplaza al aceptar una invitación.
@@ -105,9 +111,9 @@ const current = options.find((o) => o.current) ?? options[0];
 
     // En el celular, la barra del navegador que se esconde dispara resize: se reubica en vez de cerrarse.
     window.addEventListener("resize", () => {
-      if (menu.matches(":popover-open")) position();
+      if (menu.isConnected && menu.matches(":popover-open")) position();
     });
-  });
+  }));
 </script>
 
 <style>

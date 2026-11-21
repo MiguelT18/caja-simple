@@ -111,120 +111,123 @@ const rateText = quote
 
 <script>
   import { bsTotal, discounted, planUsd, usdFor, usdLabel, type Period, type Quote } from "../data/plans";
+  import { onPage } from "../scripts/refresh";
 
-  for (const calc of document.querySelectorAll<HTMLElement>(".calc")) {
-    const max = Number(calc.dataset.max);
-    const min = Number(calc.dataset.min ?? 1);
-    const discount = Number(calc.dataset.discount ?? 0);
-    const discountAmount = calc.querySelector("[data-discount-amount]");
-    const discountLabel = calc.querySelector("[data-discount-label]");
-    const founderMonths = Number(calc.dataset.founderMonths ?? 12);
-    const discountName = calc.dataset.discountName ?? "Precio fundador";
-    let period = calc.dataset.period as Period;
-    const quote: Quote | null = calc.dataset.quote ? JSON.parse(calc.dataset.quote) : null;
-    const current = calc.dataset.current ? Number(calc.dataset.current) : undefined;
-    const input = calc.querySelector<HTMLInputElement>("input")!;
-    const price = calc.querySelector<HTMLElement>(".calc-price")!;
-    const bs = calc.querySelector<HTMLElement>(".calc-bs")!;
-    const usdText = price.querySelector("[data-usd]")!;
-    const detail = calc.querySelector(".calc-detail")!;
-    const base = calc.querySelector("[data-base]")!;
-    const extraRow = calc.querySelector<HTMLElement>("[data-extra-row]")!;
-    const extraLabel = calc.querySelector("[data-extra-label]")!;
-    const extraAmount = calc.querySelector("[data-extra]")!;
-    const currentNote = calc.querySelector<HTMLElement>("[data-current-note]");
-    const [less, more] = calc.querySelectorAll<HTMLButtonElement>("[data-step]");
-    const clamp = (n: number) => Math.min(max, Math.max(min, Math.round(n)));
-    let branches = Number(calc.dataset.branches);
+  onPage((signal) => {
+    for (const calc of document.querySelectorAll<HTMLElement>(".calc")) {
+      const max = Number(calc.dataset.max);
+      const min = Number(calc.dataset.min ?? 1);
+      const discount = Number(calc.dataset.discount ?? 0);
+      const discountAmount = calc.querySelector("[data-discount-amount]");
+      const discountLabel = calc.querySelector("[data-discount-label]");
+      const founderMonths = Number(calc.dataset.founderMonths ?? 12);
+      const discountName = calc.dataset.discountName ?? "Precio fundador";
+      let period = calc.dataset.period as Period;
+      const quote: Quote | null = calc.dataset.quote ? JSON.parse(calc.dataset.quote) : null;
+      const current = calc.dataset.current ? Number(calc.dataset.current) : undefined;
+      const input = calc.querySelector<HTMLInputElement>("input")!;
+      const price = calc.querySelector<HTMLElement>(".calc-price")!;
+      const bs = calc.querySelector<HTMLElement>(".calc-bs")!;
+      const usdText = price.querySelector("[data-usd]")!;
+      const detail = calc.querySelector(".calc-detail")!;
+      const base = calc.querySelector("[data-base]")!;
+      const extraRow = calc.querySelector<HTMLElement>("[data-extra-row]")!;
+      const extraLabel = calc.querySelector("[data-extra-label]")!;
+      const extraAmount = calc.querySelector("[data-extra]")!;
+      const currentNote = calc.querySelector<HTMLElement>("[data-current-note]");
+      const [less, more] = calc.querySelectorAll<HTMLButtonElement>("[data-step]");
+      const clamp = (n: number) => Math.min(max, Math.max(min, Math.round(n)));
+      let branches = Number(calc.dataset.branches);
 
-    const render = () => {
-      input.value = String(branches);
-      // aria-disabled y no disabled: en el tope el botón conserva el foco (el clic ya no cambia nada).
-      less.setAttribute("aria-disabled", String(branches === min));
-      more.setAttribute("aria-disabled", String(branches === max));
-      // Un local: Negocio (o Gratis). Más: Sucursales, con cada local extra aparte.
-      const extra = branches - 1;
-      const full = usdFor(extra === 0 ? "Negocio" : "Sucursales", period, extra);
-      // Anual: el precio fundador cubre solo los meses que le quedan.
-      const months = period === "anual" ? founderMonths : 12;
-      const usd = discounted(full, discount, months);
-      if (discountLabel)
-        discountLabel.textContent = `${discountName} · −${Math.round(discount * 100)}%${months < 12 ? ` en ${months} de 12 meses` : ""}`;
-      if (discountAmount) discountAmount.textContent = `− ${usdLabel(Math.round((full - usd) * 100) / 100)}`;
-      base.textContent = usdLabel(planUsd.base[period]);
-      extraRow.hidden = extra === 0;
-      extraLabel.textContent = `${extra} ${extra === 1 ? "sucursal extra" : "sucursales extra"} × ${usdLabel(planUsd.extraBranch[period])}`;
-      extraAmount.textContent = usdLabel(Math.round(extra * planUsd.extraBranch[period] * 100) / 100);
-      // Dólares y bolivianos al tipo de cambio de hoy (la misma cuenta del cobro); «con impuestos» solo si los hay.
-      usdText.textContent = usdLabel(usd);
-      bs.hidden = !quote;
-      bs.textContent = quote ? `Bs ${bsTotal(usd, quote.rate, quote.tax).toLocaleString("es-BO")}${quote.tax ? " con impuestos" : ""}` : "";
-      detail.textContent =
-        (extra === 0 ? "Plan Negocio (o Gratis, sin pagar)." : `Plan Sucursales: ${branches} locales en total.`) +
-        (discount > 0 ? ` Sin el descuento serían ${usdLabel(full)}.` : "");
-      if (currentNote) currentNote.hidden = current === undefined || branches === current;
-    };
-
-    const set = (next: number) => {
-      const value = clamp(next);
-      if (value === branches) return render();
-      branches = value;
-      render();
-      // Reinicia la animación del precio en cada cambio.
-      price.classList.remove("tick");
-      void price.offsetWidth;
-      price.classList.add("tick");
-    };
-
-    // Mantener presionado − o + repite: tras una pausa, un paso cada 90 ms.
-    for (const button of [less, more]) {
-      const step = Number(button.dataset.step);
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const stop = () => clearTimeout(timer);
-      const repeat = (delay: number) => {
-        timer = setTimeout(() => {
-          set(branches + step);
-          repeat(90);
-        }, delay);
+      const render = () => {
+        input.value = String(branches);
+        // aria-disabled y no disabled: en el tope el botón conserva el foco (el clic ya no cambia nada).
+        less.setAttribute("aria-disabled", String(branches === min));
+        more.setAttribute("aria-disabled", String(branches === max));
+        // Un local: Negocio (o Gratis). Más: Sucursales, con cada local extra aparte.
+        const extra = branches - 1;
+        const full = usdFor(extra === 0 ? "Negocio" : "Sucursales", period, extra);
+        // Anual: el precio fundador cubre solo los meses que le quedan.
+        const months = period === "anual" ? founderMonths : 12;
+        const usd = discounted(full, discount, months);
+        if (discountLabel)
+          discountLabel.textContent = `${discountName} · −${Math.round(discount * 100)}%${months < 12 ? ` en ${months} de 12 meses` : ""}`;
+        if (discountAmount) discountAmount.textContent = `− ${usdLabel(Math.round((full - usd) * 100) / 100)}`;
+        base.textContent = usdLabel(planUsd.base[period]);
+        extraRow.hidden = extra === 0;
+        extraLabel.textContent = `${extra} ${extra === 1 ? "sucursal extra" : "sucursales extra"} × ${usdLabel(planUsd.extraBranch[period])}`;
+        extraAmount.textContent = usdLabel(Math.round(extra * planUsd.extraBranch[period] * 100) / 100);
+        // Dólares y bolivianos al tipo de cambio de hoy (la misma cuenta del cobro); «con impuestos» solo si los hay.
+        usdText.textContent = usdLabel(usd);
+        bs.hidden = !quote;
+        bs.textContent = quote ? `Bs ${bsTotal(usd, quote.rate, quote.tax).toLocaleString("es-BO")}${quote.tax ? " con impuestos" : ""}` : "";
+        detail.textContent =
+          (extra === 0 ? "Plan Negocio (o Gratis, sin pagar)." : `Plan Sucursales: ${branches} locales en total.`) +
+          (discount > 0 ? ` Sin el descuento serían ${usdLabel(full)}.` : "");
+        if (currentNote) currentNote.hidden = current === undefined || branches === current;
       };
-      button.addEventListener("pointerdown", (event) => {
-        if (event.button !== 0) return;
-        set(branches + step);
-        repeat(400);
-      });
-      for (const type of ["pointerup", "pointerleave", "pointercancel"]) button.addEventListener(type, stop);
-      // Teclado (Enter o Espacio): un paso por pulsación. Los clics del puntero ya se contaron en pointerdown.
-      button.addEventListener("click", (event) => {
-        if (event.detail === 0) set(branches + step);
-      });
-    }
 
-    // Escribir el número: se acota a min–20 al salir del campo; lo que no es número vuelve al valor de antes.
-    input.addEventListener("input", () => {
-      const typed = Number(input.value);
-      if (input.value !== "" && Number.isFinite(typed) && typed >= min && typed <= max) set(typed);
-    });
-    input.addEventListener("change", () => set(input.value === "" || !Number.isFinite(Number(input.value)) ? branches : Number(input.value)));
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "PageUp" || event.key === "PageDown") {
-        event.preventDefault();
-        set(branches + (event.key === "PageUp" ? 5 : -5));
+      const set = (next: number) => {
+        const value = clamp(next);
+        if (value === branches) return render();
+        branches = value;
+        render();
+        // Reinicia la animación del precio en cada cambio.
+        price.classList.remove("tick");
+        void price.offsetWidth;
+        price.classList.add("tick");
+      };
+
+      // Mantener presionado − o + repite: tras una pausa, un paso cada 90 ms.
+      for (const button of [less, more]) {
+        const step = Number(button.dataset.step);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const stop = () => clearTimeout(timer);
+        const repeat = (delay: number) => {
+          timer = setTimeout(() => {
+            set(branches + step);
+            repeat(90);
+          }, delay);
+        };
+        button.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0) return;
+          set(branches + step);
+          repeat(400);
+        });
+        for (const type of ["pointerup", "pointerleave", "pointercancel"]) button.addEventListener(type, stop);
+        // Teclado (Enter o Espacio): un paso por pulsación. Los clics del puntero ya se contaron en pointerdown.
+        button.addEventListener("click", (event) => {
+          if (event.detail === 0) set(branches + step);
+        });
       }
-    });
 
-    // Mensual/anual sin recargar (PeriodSwitch): mismos locales, precios del período nuevo.
-    document.addEventListener("period:change", (event) => {
-      period = (event as CustomEvent<Period>).detail;
-      calc.querySelector("[data-per]")!.textContent = `Total ${period === "mensual" ? "al mes" : "al año"}`;
+      // Escribir el número: se acota a min–20 al salir del campo; lo que no es número vuelve al valor de antes.
+      input.addEventListener("input", () => {
+        const typed = Number(input.value);
+        if (input.value !== "" && Number.isFinite(typed) && typed >= min && typed <= max) set(typed);
+      });
+      input.addEventListener("change", () => set(input.value === "" || !Number.isFinite(Number(input.value)) ? branches : Number(input.value)));
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "PageUp" || event.key === "PageDown") {
+          event.preventDefault();
+          set(branches + (event.key === "PageUp" ? 5 : -5));
+        }
+      });
+
+      // Mensual/anual sin recargar (PeriodSwitch): mismos locales, precios del período nuevo.
+      document.addEventListener("period:change", (event) => {
+        period = (event as CustomEvent<Period>).detail;
+        calc.querySelector("[data-per]")!.textContent = `Total ${period === "mensual" ? "al mes" : "al año"}`;
+        render();
+      }, { signal });
+
+      calc.querySelector("[data-reset]")?.addEventListener("click", () => {
+        if (current !== undefined) set(current);
+        input.focus();
+      });
       render();
-    });
-
-    calc.querySelector("[data-reset]")?.addEventListener("click", () => {
-      if (current !== undefined) set(current);
-      input.focus();
-    });
-    render();
-  }
+    }
+  });
 </script>
 
 <style>

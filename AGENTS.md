@@ -109,6 +109,7 @@ Fuera de `src/`: `supabase/migrations/` (esquema), `supabase/functions/` (`send-
 - **Foco:** el anillo de foco es global (`:where(a, button):focus-visible` en `global.css`). No lo copies en cada componente.
 - **Íconos:** usa `@lucide/astro`, con `size` y `stroke-width={1.75}`. Nada de SVG a mano, salvo el logo y la «G» de Google.
 - **Scripts de cliente:** van en `<script>` dentro del componente, o en `src/scripts/` si los comparten varias páginas. Lee los mensajes de error y la configuración de atributos `data-*`.
+- **Navegación en /app:** `Layout.astro` usa el `ClientRouter` de Astro: al navegar solo cambia el contenido y el Sidebar se conserva (`transition:persist`, con una clave por negocio y sucursal). Un `<script>` corre una sola vez por sesión, así que lo que busca elementos de la página va dentro de `onPage((signal) => …)` (o `onRegions`) de `src/scripts/refresh.ts`. Usa `signal` en los listeners de `window` o `document`, los intervalos y las conexiones. Lo que vive en el Sidebar se ata una vez por elemento (con un `WeakSet`). Para navegar desde código usa `navigate()` de `astro:transitions/client`, no `location.assign`. Vender (`registrar-venta`) entra y sale con la página entera.
 - **Accesibilidad (no negociable):**
   - Texto con contraste WCAG AA en los dos temas.
   - Inputs de al menos 16px.

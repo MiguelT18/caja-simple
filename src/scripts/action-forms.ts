@@ -19,11 +19,12 @@ import { actions, isInputError } from "astro:actions";
 import { isBusy, setBusy } from "./busy";
 import { confirmDialog, flashToast, toast } from "./dialogs";
 import { clearDraft, confirmDiscard, draftKey, hasDraft, keepDraft } from "./drafts";
-import { showPageSkeleton } from "./nav-skeleton";
+import { navigate } from "astro:transitions/client";
 import { onRegions, refreshRegions } from "./refresh";
 
 type ActionFn = (input: FormData) => Promise<{ data?: Record<string, unknown>; error?: Error & { code?: string } }>;
 
+// En captura: antes que el ClientRouter, que si no enviaría el formulario como una navegación.
 document.addEventListener("submit", async (event) => {
   const form = event.target;
   if (!(form instanceof HTMLFormElement) || !form.dataset.action) return;
@@ -52,12 +53,15 @@ document.addEventListener("submit", async (event) => {
     unsaved.delete(form);
     if ("draft" in form.dataset) clearDraft(formDraftKey(form));
     const target = form.dataset.redirect?.replace(/\{(\w+)\}/g, (_, key) => String(data?.[key] ?? ""));
-    if (target || "reload" in form.dataset) {
+    // data-reload recarga entera (cambió el menú lateral o la sesión); data-redirect navega sin tocar el menú.
+    if ("reload" in form.dataset) {
       if (form.dataset.success) flashToast(form.dataset.success);
-      if (!target) return window.location.reload();
-      const url = new URL(target, location.href);
-      if (url.pathname.startsWith("/app")) showPageSkeleton(url);
-      return window.location.assign(url);
+      return target ? window.location.assign(new URL(target, location.href)) : window.location.reload();
+    }
+    if (target) {
+      await navigate(new URL(target, location.href).href);
+      if (form.dataset.success) toast(form.dataset.success, "success");
+      return;
     }
     // Sin recargar: se cierra el diálogo y se cambian solo las regiones con datos nuevos.
     form.closest("dialog")?.close();
@@ -94,7 +98,7 @@ document.addEventListener("submit", async (event) => {
     form.closest("dialog")?.close();
     toast(error.message || "No se pudo guardar. Intenta de nuevo.", "error");
   }
-});
+}, true);
 
 // Cambios sin guardar: se compara lo que hay en el formulario con lo que tenía al cargar.
 const unsaved = new Set<HTMLFormElement>();
@@ -116,7 +120,10 @@ onRegions((root) => {
   for (const form of root.querySelectorAll<HTMLFormElement>("form[data-track-changes]")) trackChanges(form);
 });
 
+const tracked = new WeakSet<HTMLFormElement>();
 function trackChanges(form: HTMLFormElement) {
+  if (tracked.has(form)) return;
+  tracked.add(form);
   const initial = snapshot(form);
   const submit = form.querySelector<HTMLButtonElement>("button[type=submit]");
   const status = form.querySelector<HTMLElement>("[data-change-status]");
@@ -138,13 +145,17 @@ function trackChanges(form: HTMLFormElement) {
 
 const hasUnsaved = () => [...unsaved].some((form) => form.isConnected && !form.closest("dialog:not([open])"));
 
-// Recargar, cerrar la pestaña o «Atrás» del navegador: solo el aviso nativo puede frenarlos.
+// Recargar o cerrar la pestaña: solo el aviso nativo puede frenarlos.
 window.addEventListener("beforeunload", (event) => {
   if (hasUnsaved()) event.preventDefault();
 });
+// «Atrás» o «Adelante» con cambios sin guardar: se deja al navegador cargar la página entera, así sale el aviso nativo.
+document.addEventListener("astro:before-preparation", (event) => {
+  if (event.navigationType === "traverse" && hasUnsaved()) event.preventDefault();
+});
 
-// Un enlace de la app con cambios sin guardar: se pregunta con nuestro diálogo antes del esqueleto (nav-skeleton.ts,
-// que no actúa si el clic ya se canceló; por eso va en captura). Al confirmar, se sale sin el aviso nativo.
+// Un enlace de la app con cambios sin guardar: se pregunta con nuestro diálogo antes de navegar (el ClientRouter no actúa
+// si el clic ya se canceló; por eso va en captura). Al confirmar, se sale sin el aviso nativo.
 document.addEventListener(
   "click",
   async (event) => {
@@ -161,8 +172,7 @@ document.addEventListener(
     });
     if (!leave) return;
     unsaved.clear();
-    if (url.pathname.startsWith("/app")) showPageSkeleton(url);
-    location.assign(url);
+    navigate(url.href);
   },
   { capture: true },
 );

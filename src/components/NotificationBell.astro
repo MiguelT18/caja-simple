@@ -1,5 +1,5 @@
 ---
-import { AlarmClock, ArrowLeftRight, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Crown, Hourglass, PackageMinus, PackagePlus, RotateCcw, TriangleAlert, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
+import { AlarmClock, ArrowLeftRight, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Crown, Hourglass, PackageCheck, PackageMinus, PackagePlus, PackageX, RotateCcw, TriangleAlert, Truck, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
 import type { HTMLAttributes } from "astro/types";
 import { branchColor, branchImages, inbox, myBusinesses, notificationHref } from "@/data/queries";
 import type { Notification } from "@/data/types";
@@ -11,7 +11,7 @@ type Props = HTMLAttributes<"div">;
 const { class: className, ...rest } = Astro.props;
 const { notifications, unread } = inbox(Astro.locals);
 // Una invitación o un pedido sin responder no se borra: es donde se acepta o se rechaza.
-const removable = (n: Notification) => !((n.kind === "invitation" || n.kind === "reopen_request" || n.kind === "join_request" || n.kind === "stock_request") && n.pending);
+const removable = (n: Notification) => !((n.kind === "invitation" || n.kind === "reopen_request" || n.kind === "join_request" || n.kind === "stock_request" || n.kind === "stock_delivery") && n.pending);
 // «de hoy», «de ayer» o la fecha del turno.
 const dayOf = (date: string) => (date === today() ? "de hoy" : `del ${shortDate(date)}`);
 const canClear = notifications.some(removable);
@@ -122,6 +122,22 @@ function describe(n: Notification) {
         detail: [n.data.branch, n.data.reason && `«${n.data.reason}»`].filter(Boolean).join(" · "),
         tone: n.pending ? "warning" : undefined,
       };
+    case "stock_delivery":
+      return {
+        icon: Truck,
+        title: `${n.data.person} te envió ${n.data.qty} de ${n.data.product}`,
+        detail: [n.data.branch, n.data.reason && `«${n.data.reason}»`, n.pending && "Confirma cuánto llegó"].filter(Boolean).join(" · "),
+        tone: n.pending ? "warning" : undefined,
+      };
+    case "stock_received":
+      return n.data.received === n.data.qty
+        ? { icon: PackageCheck, title: `${n.data.person} recibió ${n.data.qty} de ${n.data.product}`, detail: `${n.data.branch}: el stock ya subió` }
+        : {
+            icon: PackageX,
+            title: n.data.received === 0 ? `A ${n.data.branch} no le llegó ${n.data.product}` : `${n.data.person} recibió ${n.data.received} de ${n.data.qty} ${n.data.product}`,
+            detail: n.data.received === 0 ? `${n.data.person} avisó que no llegó nada: el stock no cambió` : `${n.data.branch}: faltaron ${n.data.qty - n.data.received}; el stock subió ${n.data.received}`,
+            tone: "warning",
+          };
     case "stock_answer":
       return n.data.accepted
         ? { icon: PackagePlus, title: `${n.data.person} aceptó tu entrada de ${n.data.qty} ${n.data.product}`, detail: `${n.data.branch}: el stock ya subió` }
@@ -265,6 +281,38 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
                     ) : (
                       <p class="bell-detail">Ya respondiste este pedido.</p>
                     ))}
+                  {n.kind === "stock_delivery" &&
+                    (n.pending ? (
+                      <div class="bell-actions">
+                        <form id={`bell-receive-${n.id}`} class="bell-receive" data-action="receiveStock" data-reload data-success={`Listo: el stock de ${n.data.product} subió lo que llegó.`} novalidate>
+                          <input type="hidden" name="deliveryId" value={n.requestId} />
+                          <label>
+                            <span>Llegaron</span>
+                            <input class="input num" name="qty" type="number" inputmode="numeric" min="0" max={n.data.qty} step="1" value={n.data.qty} required aria-describedby={`bell-receive-${n.id}-qty-error`} />
+                          </label>
+                          <button type="submit" class="btn btn-primary" aria-label={`Confirmar lo que llegó de ${n.data.product}`}>
+                            Confirmar
+                          </button>
+                          <p class="field-error" id={`bell-receive-${n.id}-qty-error`} aria-live="polite"></p>
+                        </form>
+                        <form
+                          data-action="receiveStock"
+                          data-reload
+                          data-success="Avisamos que no llegó."
+                          data-confirm={`¿No llegó nada de ${n.data.product}? El stock no cambia y ${n.data.person} recibe el aviso.`}
+                          data-confirm-label="No llegó"
+                          data-danger
+                        >
+                          <input type="hidden" name="deliveryId" value={n.requestId} />
+                          <input type="hidden" name="qty" value="0" />
+                          <button type="submit" class="btn btn-secondary" aria-label={`No llegó ${n.data.product}`}>
+                            No llegó
+                          </button>
+                        </form>
+                      </div>
+                    ) : (
+                      <p class="bell-detail">Ya se confirmó este envío.</p>
+                    ))}
                   {n.kind === "stock_request" &&
                     (n.pending ? (
                       <div class="bell-actions">
@@ -346,8 +394,13 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
   import { actions } from "astro:actions";
   import { announce, confirmDialog, toast } from "@/scripts/dialogs";
   import { isBusy, setBusy } from "@/scripts/busy";
+  import { onPage } from "@/scripts/refresh";
 
-  document.querySelectorAll<HTMLElement>("[data-bell]").forEach((root) => {
+  // Vive en el menú lateral, que se conserva al navegar: cada campana se ata una sola vez.
+  const bound = new WeakSet<Element>();
+  onPage(() => document.querySelectorAll<HTMLElement>("[data-bell]").forEach((root) => {
+    if (bound.has(root)) return;
+    bound.add(root);
     const trigger = root.querySelector<HTMLButtonElement>(".bell-trigger")!;
     const panel = root.querySelector<HTMLElement>(".bell-panel")!;
 
@@ -591,9 +644,9 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
 
     // En el celular, la barra del navegador que se esconde dispara resize: se reubica en vez de cerrarse.
     window.addEventListener("resize", () => {
-      if (panel.matches(":popover-open")) position();
+      if (panel.isConnected && panel.matches(":popover-open")) position();
     });
-  });
+  }));
 </script>
 
 <style>
@@ -914,8 +967,38 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
 
   .bell-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     margin-top: 0.5rem;
+  }
+
+  /* Confirmar un envío: cuánto llegó, en la misma fila que los botones. */
+  .bell-receive {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .bell-receive label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: var(--text-sm);
+  }
+
+  .bell-receive .input {
+    width: 5rem;
+    min-height: 2.25rem;
+  }
+
+  .bell-receive .field-error {
+    flex-basis: 100%;
+    margin: 0;
+  }
+
+  .bell-receive .field-error:empty {
+    display: none;
   }
 
   .bell-actions .btn {

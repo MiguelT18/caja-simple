@@ -305,7 +305,7 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
               </div>
               <p className="field-hint m-0">
                 {chosen.length
-                  ? "Entran al inventario con el precio y el stock de cada fila. Sin precio se cobra al vender; sin stock, no se controla. Lo que ya está en una sucursal no se toca."
+                  ? "Entran al inventario con el precio y el stock de cada fila. Sin precio se cobra al vender; sin stock, no se controla. Lo que ya está en una sucursal no se toca. Si alguien más trabaja en la sucursal, el stock entra cuando confirma que le llegó."
                   : "Sin sucursal, solo se crea el catálogo: el precio y el stock se ponen después en cada sucursal."}
               </p>
               {chosen.length > 1 && (

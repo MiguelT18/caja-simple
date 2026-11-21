@@ -68,7 +68,7 @@ export function AddToBranch({
       title="Agregar a la sucursal"
       description={
         withStock
-          ? "Marca los productos del catálogo y ponles precio y stock aquí. Sin precio se cobra al vender; sin stock, no se controla."
+          ? "Marca los productos del catálogo y ponles precio y stock aquí. Sin precio se cobra al vender; sin stock, no se controla. Si alguien más trabaja en la sucursal, el stock entra cuando confirma que le llegó."
           : "Marca los productos del catálogo y ponles precio aquí. Sin precio se cobra al vender. El control de stock es del plan Negocio."
       }
       size="xl"

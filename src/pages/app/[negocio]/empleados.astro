@@ -178,10 +178,13 @@ const rows = employees.map((e) => {
 
 <script>
   import { peopleSearch } from "@/scripts/people-search";
+  import { onPage } from "@/scripts/refresh";
 
-  const input = document.querySelector<HTMLInputElement>("[data-people-search]");
-  const personId = document.querySelector<HTMLInputElement>("[data-person-id]");
-  if (input && personId) peopleSearch(input, personId, input.dataset.peopleSearch);
+  onPage(() => {
+    const input = document.querySelector<HTMLInputElement>("[data-people-search]");
+    const personId = document.querySelector<HTMLInputElement>("[data-person-id]");
+    if (input && personId) peopleSearch(input, personId, input.dataset.peopleSearch);
+  });
 </script>
 
 <style>

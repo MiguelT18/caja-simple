@@ -274,6 +274,8 @@ export function StockFields({
             <Field id="inv-min" label="Stock mínimo" hint="Avisa cuando baje de aquí." error={errors.minStock}>
               <input id="inv-min" name="minStock" type="number" inputMode="numeric" step="1" min="0" className="input" defaultValue={product?.minStock ?? 0} required />
             </Field>
+            {/* Activar el control con stock lo trata la base como un envío (inventory_hold_stock); cambiarlo después, como un ajuste. */}
+            {product?.stock == null && <p className="field-hint col-span-2 m-0">Si alguien más trabaja en la sucursal, el stock entra cuando confirma que le llegó.</p>}
           </div>
         ) : (
           <p className="field-hint m-0">Se vende sin tope y sin avisos de stock bajo.</p>

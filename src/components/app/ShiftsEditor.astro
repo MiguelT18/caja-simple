@@ -307,108 +307,111 @@ const toneLabels = { morning: "Mañana", afternoon: "Tarde", night: "Noche" };
   import { toneOf } from "@/lib/dates";
   import { confirmDialog } from "@/scripts/dialogs";
   import { sortable } from "@/scripts/sortable";
+  import { onPage } from "@/scripts/refresh";
 
   const toneLabels = { morning: "Mañana", afternoon: "Tarde", night: "Noche" };
 
   type Draft = { name: string; start: string; end: string; tone: string };
 
-  for (const editor of document.querySelectorAll<HTMLElement>("[data-shifts-editor]")) {
-    const rows = editor.querySelector<HTMLOListElement>("[data-rows]")!;
-    const template = editor.querySelector<HTMLTemplateElement>("[data-row-template]")!;
-    const presets: Draft[][] = JSON.parse(editor.dataset.presets ?? "[]");
-    let counter = rows.children.length;
-    let edited = false;
+  onPage(() => {
+    for (const editor of document.querySelectorAll<HTMLElement>("[data-shifts-editor]")) {
+      const rows = editor.querySelector<HTMLOListElement>("[data-rows]")!;
+      const template = editor.querySelector<HTMLTemplateElement>("[data-row-template]")!;
+      const presets: Draft[][] = JSON.parse(editor.dataset.presets ?? "[]");
+      let counter = rows.children.length;
+      let edited = false;
 
-    /** «del turno N» (solo para lectores de pantalla): cada fila repite las mismas etiquetas. */
-    const renumber = () => {
-      [...rows.children].forEach((row, i) => {
-        for (const n of row.querySelectorAll<HTMLElement>("[data-n]")) n.textContent = ` del turno ${i + 1}`;
-        row.querySelector<HTMLElement>("[data-row-title]")!.textContent = `Turno ${i + 1}`;
+      /** «del turno N» (solo para lectores de pantalla): cada fila repite las mismas etiquetas. */
+      const renumber = () => {
+        [...rows.children].forEach((row, i) => {
+          for (const n of row.querySelectorAll<HTMLElement>("[data-n]")) n.textContent = ` del turno ${i + 1}`;
+          row.querySelector<HTMLElement>("[data-row-title]")!.textContent = `Turno ${i + 1}`;
+        });
+      };
+
+      const syncRow = (row: HTMLElement) => {
+        const start = row.querySelector<HTMLInputElement>("[name=shiftStart]")!.value;
+        const end = row.querySelector<HTMLInputElement>("[name=shiftEnd]")!.value;
+        const name = row.querySelector<HTMLInputElement>("[name=shiftName]")!.value;
+        row.querySelector<HTMLElement>("[data-overnight]")!.hidden = !(start && end && end < start);
+        row.querySelector<HTMLElement>("[data-remove]")!.setAttribute("aria-label", name ? `Quitar turno ${name}` : "Quitar turno");
+        row.querySelector<HTMLElement>("[data-drag]")!.setAttribute("aria-label", name ? `Mover turno ${name}` : "Mover turno");
+        // Sin hora todavía no tiene momento: la franja queda neutra y el chip oculto.
+        const chip = row.querySelector<HTMLElement>("[data-tone-label]")!;
+        if (start) row.dataset.tone = toneOf(start);
+        else delete row.dataset.tone;
+        chip.hidden = !start;
+        chip.textContent = start ? toneLabels[toneOf(start)] : "";
+      };
+
+      const addRow = (draft?: Draft) => {
+        const fragment = template.content.cloneNode(true) as DocumentFragment;
+        const index = String(counter++);
+        for (const el of fragment.querySelectorAll<HTMLElement>("[id], [for]")) {
+          if (el.id) el.id = el.id.replace("__i__", index);
+          const target = el.getAttribute("for");
+          if (target) el.setAttribute("for", target.replace("__i__", index));
+        }
+        const row = fragment.querySelector<HTMLElement>("[data-row]")!;
+        row.querySelector<HTMLInputElement>("[name=shiftName]")!.value = draft?.name ?? "";
+        row.querySelector<HTMLInputElement>("[name=shiftStart]")!.value = draft?.start ?? "";
+        row.querySelector<HTMLInputElement>("[name=shiftEnd]")!.value = draft?.end ?? "";
+        rows.append(row);
+        syncRow(row);
+        renumber();
+        return row;
+      };
+
+      editor.querySelector("[data-add]")!.addEventListener("click", () => {
+        addRow().querySelector<HTMLInputElement>("[name=shiftName]")!.focus();
       });
-    };
 
-    const syncRow = (row: HTMLElement) => {
-      const start = row.querySelector<HTMLInputElement>("[name=shiftStart]")!.value;
-      const end = row.querySelector<HTMLInputElement>("[name=shiftEnd]")!.value;
-      const name = row.querySelector<HTMLInputElement>("[name=shiftName]")!.value;
-      row.querySelector<HTMLElement>("[data-overnight]")!.hidden = !(start && end && end < start);
-      row.querySelector<HTMLElement>("[data-remove]")!.setAttribute("aria-label", name ? `Quitar turno ${name}` : "Quitar turno");
-      row.querySelector<HTMLElement>("[data-drag]")!.setAttribute("aria-label", name ? `Mover turno ${name}` : "Mover turno");
-      // Sin hora todavía no tiene momento: la franja queda neutra y el chip oculto.
-      const chip = row.querySelector<HTMLElement>("[data-tone-label]")!;
-      if (start) row.dataset.tone = toneOf(start);
-      else delete row.dataset.tone;
-      chip.hidden = !start;
-      chip.textContent = start ? toneLabels[toneOf(start)] : "";
-    };
-
-    const addRow = (draft?: Draft) => {
-      const fragment = template.content.cloneNode(true) as DocumentFragment;
-      const index = String(counter++);
-      for (const el of fragment.querySelectorAll<HTMLElement>("[id], [for]")) {
-        if (el.id) el.id = el.id.replace("__i__", index);
-        const target = el.getAttribute("for");
-        if (target) el.setAttribute("for", target.replace("__i__", index));
-      }
-      const row = fragment.querySelector<HTMLElement>("[data-row]")!;
-      row.querySelector<HTMLInputElement>("[name=shiftName]")!.value = draft?.name ?? "";
-      row.querySelector<HTMLInputElement>("[name=shiftStart]")!.value = draft?.start ?? "";
-      row.querySelector<HTMLInputElement>("[name=shiftEnd]")!.value = draft?.end ?? "";
-      rows.append(row);
-      syncRow(row);
-      renumber();
-      return row;
-    };
-
-    editor.querySelector("[data-add]")!.addEventListener("click", () => {
-      addRow().querySelector<HTMLInputElement>("[name=shiftName]")!.focus();
-    });
-
-    editor.addEventListener("click", (event) => {
-      const button = (event.target as Element).closest("[data-remove]");
-      if (!button) return;
-      const row = button.closest<HTMLElement>("[data-row]")!;
-      const next = row.nextElementSibling ?? row.previousElementSibling;
-      row.remove();
-      renumber();
-      edited = true;
-      // El foco no se pierde: pasa a la fila vecina o al botón de agregar.
-      (next?.querySelector<HTMLElement>("[data-remove]") ?? editor.querySelector<HTMLElement>("[data-add]"))!.focus();
-    });
-
-    // Ordenar: arrastrando el asa (mouse o dedo) o con las flechas sobre ella. El orden de las filas es el que se guarda.
-    const status = editor.querySelector<HTMLElement>("[data-move-status]")!;
-    const announce = (row: Element) => {
-      const name = row.querySelector<HTMLInputElement>("[name=shiftName]")!.value || "Turno";
-      status.textContent = `${name}: posición ${[...rows.children].indexOf(row) + 1} de ${rows.children.length}.`;
-    };
-    sortable(rows, {
-      item: "[data-row]",
-      onChange: () => {
+      editor.addEventListener("click", (event) => {
+        const button = (event.target as Element).closest("[data-remove]");
+        if (!button) return;
+        const row = button.closest<HTMLElement>("[data-row]")!;
+        const next = row.nextElementSibling ?? row.previousElementSibling;
+        row.remove();
         renumber();
         edited = true;
-      },
-      onDrop: (row) => announce(row),
-    });
+        // El foco no se pierde: pasa a la fila vecina o al botón de agregar.
+        (next?.querySelector<HTMLElement>("[data-remove]") ?? editor.querySelector<HTMLElement>("[data-add]"))!.focus();
+      });
 
-    editor.addEventListener("input", (event) => {
-      const row = (event.target as Element).closest<HTMLElement>("[data-row]");
-      if (row) syncRow(row);
-      if (row) edited = true;
-    });
+      // Ordenar: arrastrando el asa (mouse o dedo) o con las flechas sobre ella. El orden de las filas es el que se guarda.
+      const status = editor.querySelector<HTMLElement>("[data-move-status]")!;
+      const announce = (row: Element) => {
+        const name = row.querySelector<HTMLInputElement>("[name=shiftName]")!.value || "Turno";
+        status.textContent = `${name}: posición ${[...rows.children].indexOf(row) + 1} de ${rows.children.length}.`;
+      };
+      sortable(rows, {
+        item: "[data-row]",
+        onChange: () => {
+          renumber();
+          edited = true;
+        },
+        onDrop: (row) => announce(row),
+      });
 
-    // Cambiar el punto de partida reemplaza las filas: si ya se editaron, primero se pregunta.
-    const preset = editor.querySelector<HTMLSelectElement>("[data-preset]");
-    let presetValue = preset?.value;
-    preset?.addEventListener("change", async () => {
-      if (edited && !(await confirmDialog("Se reemplazan los turnos que editaste.", { title: "¿Cambiar los turnos?", confirmLabel: "Cambiar" }))) {
-        preset.value = presetValue!;
-        return;
-      }
-      presetValue = preset.value;
-      edited = false;
-      rows.replaceChildren();
-      for (const draft of presets[Number(preset.value)] ?? []) addRow(draft);
-    });
-  }
+      editor.addEventListener("input", (event) => {
+        const row = (event.target as Element).closest<HTMLElement>("[data-row]");
+        if (row) syncRow(row);
+        if (row) edited = true;
+      });
+
+      // Cambiar el punto de partida reemplaza las filas: si ya se editaron, primero se pregunta.
+      const preset = editor.querySelector<HTMLSelectElement>("[data-preset]");
+      let presetValue = preset?.value;
+      preset?.addEventListener("change", async () => {
+        if (edited && !(await confirmDialog("Se reemplazan los turnos que editaste.", { title: "¿Cambiar los turnos?", confirmLabel: "Cambiar" }))) {
+          preset.value = presetValue!;
+          return;
+        }
+        presetValue = preset.value;
+        edited = false;
+        rows.replaceChildren();
+        for (const draft of presets[Number(preset.value)] ?? []) addRow(draft);
+      });
+    }
+  });
 </script>

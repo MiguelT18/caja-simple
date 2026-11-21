@@ -54,9 +54,12 @@ const branchLinks = m
       current: other.id === branch?.id,
     }))
   : [];
+// Al navegar, el menú se conserva mientras siga siendo el mismo negocio, sucursal y aviso de precio (Layout › ClientRouter);
+// si cambia alguno, llega el de la página nueva. Lo que guarda una Action y cambia el menú recarga entera (data-reload).
+const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "promo" : ""].join(":");
 ---
 
-<div class="sidebar" style="view-transition-name: sidebar">
+<div class="sidebar" style="view-transition-name: sidebar" transition:persist={persistKey}>
   <header class="sidebar-header">
     <a href={m ? entryHref(m) : "/app"} class="brand">
       <Logo class="logo" />
@@ -171,83 +174,92 @@ const branchLinks = m
 
 <script>
   import Sortable from "sortablejs";
+  import { onPage } from "../scripts/refresh";
 
-  // Orden del menú elegido por la persona: se guarda en una cookie para que el servidor ya lo pinte ordenado.
-  const lists = document.querySelectorAll<HTMLUListElement>(".nav-sortable");
-  const announce = document.querySelector<HTMLElement>("[data-nav-announce]")!;
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Una vez por menú: el que se conserva al navegar ya está atado.
+  const bound = new WeakSet<Element>();
+  onPage(() => {
+    const root = document.querySelector<HTMLElement>(".sidebar");
+    if (!root || bound.has(root)) return;
+    bound.add(root);
 
-  function saveOrder() {
-    let order: Record<string, string[]> = {};
-    try {
-      order = JSON.parse(decodeURIComponent(document.cookie.match(/(?:^|; )nav-order=([^;]*)/)?.[1] ?? "{}"));
-    } catch {}
-    for (const list of lists) order[list.dataset.navSection!] = [...list.children].map((li) => (li as HTMLElement).dataset.navId!);
-    document.cookie = `nav-order=${encodeURIComponent(JSON.stringify(order))}; path=/; max-age=31536000; samesite=lax`;
-  }
+    // Orden del menú elegido por la persona: se guarda en una cookie para que el servidor ya lo pinte ordenado.
+    const lists = root.querySelectorAll<HTMLUListElement>(".nav-sortable");
+    const announce = root.querySelector<HTMLElement>("[data-nav-announce]")!;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  for (const list of lists) {
-    Sortable.create(list, {
-      animation: reducedMotion ? 0 : 150,
-      // En pantallas táctiles hay que mantener presionado: así tocar y desplazar siguen funcionando.
-      delay: 250,
-      delayOnTouchOnly: true,
-      ghostClass: "nav-ghost",
-      chosenClass: "nav-chosen",
-      onEnd: (event) => {
-        if (event.oldIndex !== event.newIndex) saveOrder();
-      },
+    function saveOrder() {
+      let order: Record<string, string[]> = {};
+      try {
+        order = JSON.parse(decodeURIComponent(document.cookie.match(/(?:^|; )nav-order=([^;]*)/)?.[1] ?? "{}"));
+      } catch {}
+      for (const list of lists) order[list.dataset.navSection!] = [...list.children].map((li) => (li as HTMLElement).dataset.navId!);
+      document.cookie = `nav-order=${encodeURIComponent(JSON.stringify(order))}; path=/; max-age=31536000; samesite=lax`;
+    }
+
+    for (const list of lists) {
+      Sortable.create(list, {
+        animation: reducedMotion ? 0 : 150,
+        // En pantallas táctiles hay que mantener presionado: así tocar y desplazar siguen funcionando.
+        delay: 250,
+        delayOnTouchOnly: true,
+        ghostClass: "nav-ghost",
+        chosenClass: "nav-chosen",
+        onEnd: (event) => {
+          if (event.oldIndex !== event.newIndex) saveOrder();
+        },
+      });
+
+      // Teclado: Alt + ↑/↓ mueve el enlace con foco dentro de su sección.
+      list.addEventListener("keydown", (event) => {
+        if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+        const li = (event.target as HTMLElement).closest("li");
+        if (!li) return;
+        event.preventDefault();
+        const sibling = event.key === "ArrowUp" ? li.previousElementSibling : li.nextElementSibling;
+        if (!sibling) return;
+        if (event.key === "ArrowUp") sibling.before(li);
+        else sibling.after(li);
+        li.querySelector("a")!.focus();
+        saveOrder();
+        announce.textContent = `${li.textContent!.trim()}: posición ${[...list.children].indexOf(li) + 1} de ${list.children.length}`;
+      });
+    }
+
+    const sidebar = root;
+    const toggle = sidebar.querySelector<HTMLButtonElement>(".menu-toggle")!;
+    const panel = sidebar.querySelector<HTMLElement>(".sidebar-panel")!;
+    const mobileQuery = window.matchMedia("(max-width: 768px)");
+
+    function setOpen(open: boolean) {
+      sidebar.dataset.open = String(open);
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
+      document.documentElement.classList.toggle("menu-open", open);
+      // Mientras el menú está abierto, el contenido de fondo no recibe foco ni clics.
+      for (const el of document.querySelectorAll("main, .shift-bar")) el.toggleAttribute("inert", open);
+    }
+
+    toggle.addEventListener("click", () => {
+      const open = sidebar.dataset.open !== "true";
+      setOpen(open);
+      if (open) panel.querySelector<HTMLElement>("button, a")?.focus();
     });
 
-    // Teclado: Alt + ↑/↓ mueve el enlace con foco dentro de su sección.
-    list.addEventListener("keydown", (event) => {
-      if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
-      const li = (event.target as HTMLElement).closest("li");
-      if (!li) return;
-      event.preventDefault();
-      const sibling = event.key === "ArrowUp" ? li.previousElementSibling : li.nextElementSibling;
-      if (!sibling) return;
-      if (event.key === "ArrowUp") sibling.before(li);
-      else sibling.after(li);
-      li.querySelector("a")!.focus();
-      saveOrder();
-      announce.textContent = `${li.textContent!.trim()}: posición ${[...list.children].indexOf(li) + 1} de ${list.children.length}`;
+    panel.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => setOpen(false));
     });
-  }
 
-  const sidebar = document.querySelector<HTMLElement>(".sidebar")!;
-  const toggle = sidebar.querySelector<HTMLButtonElement>(".menu-toggle")!;
-  const panel = sidebar.querySelector<HTMLElement>(".sidebar-panel")!;
-  const mobileQuery = window.matchMedia("(max-width: 768px)");
+    document.addEventListener("keydown", (event) => {
+      // Si hay un popover abierto (p. ej. el selector de sucursal), Esc solo cierra ese popover.
+      if (event.key !== "Escape" || !sidebar.isConnected || sidebar.dataset.open !== "true") return;
+      if (sidebar.querySelector(":popover-open")) return;
+      setOpen(false);
+      toggle.focus();
+    });
 
-  function setOpen(open: boolean) {
-    sidebar.dataset.open = String(open);
-    toggle.setAttribute("aria-expanded", String(open));
-    toggle.setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
-    document.documentElement.classList.toggle("menu-open", open);
-    // Mientras el menú está abierto, el contenido de fondo no recibe foco ni clics.
-    for (const el of document.querySelectorAll("main, .shift-bar")) el.toggleAttribute("inert", open);
-  }
-
-  toggle.addEventListener("click", () => {
-    const open = sidebar.dataset.open !== "true";
-    setOpen(open);
-    if (open) panel.querySelector<HTMLElement>("button, a")?.focus();
+    mobileQuery.addEventListener("change", () => sidebar.isConnected && setOpen(false));
   });
-
-  panel.querySelectorAll("a").forEach((link) => {
-    link.addEventListener("click", () => setOpen(false));
-  });
-
-  document.addEventListener("keydown", (event) => {
-    // Si hay un popover abierto (p. ej. el selector de sucursal), Esc solo cierra ese popover.
-    if (event.key !== "Escape" || sidebar.dataset.open !== "true") return;
-    if (sidebar.querySelector(":popover-open")) return;
-    setOpen(false);
-    toggle.focus();
-  });
-
-  mobileQuery.addEventListener("change", () => setOpen(false));
 </script>
 
 <style>

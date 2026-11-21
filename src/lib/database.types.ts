@@ -678,6 +678,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["notification_kind"];
           read_at: string | null;
           reopen_request_id: string | null;
+          stock_delivery_id: string | null;
           stock_request_id: string | null;
           user_id: string;
         };
@@ -692,6 +693,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["notification_kind"];
           read_at?: string | null;
           reopen_request_id?: string | null;
+          stock_delivery_id?: string | null;
           stock_request_id?: string | null;
           user_id: string;
         };
@@ -705,6 +707,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["notification_kind"];
           read_at?: string | null;
           reopen_request_id?: string | null;
+          stock_delivery_id?: string | null;
           stock_request_id?: string | null;
           user_id?: string;
         };
@@ -735,6 +738,13 @@ export type Database = {
             columns: ["reopen_request_id"];
             isOneToOne: false;
             referencedRelation: "reopen_requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_stock_delivery_id_fkey";
+            columns: ["stock_delivery_id"];
+            isOneToOne: false;
+            referencedRelation: "stock_deliveries";
             referencedColumns: ["id"];
           },
           {
@@ -1717,6 +1727,88 @@ export type Database = {
           },
         ];
       };
+      stock_deliveries: {
+        Row: {
+          branch_id: string;
+          business_id: string;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          id: string;
+          product_id: string;
+          qty: number;
+          reason: string | null;
+          received_qty: number | null;
+          sent_by: string | null;
+          status: Database["public"]["Enums"]["reopen_status"];
+        };
+        ComputedFields: never;
+        Insert: {
+          branch_id: string;
+          business_id: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          product_id: string;
+          qty: number;
+          reason?: string | null;
+          received_qty?: number | null;
+          sent_by?: string | null;
+          status?: Database["public"]["Enums"]["reopen_status"];
+        };
+        Update: {
+          branch_id?: string;
+          business_id?: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          product_id?: string;
+          qty?: number;
+          reason?: string | null;
+          received_qty?: number | null;
+          sent_by?: string | null;
+          status?: Database["public"]["Enums"]["reopen_status"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_deliveries_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_deliveries_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_deliveries_decided_by_fkey";
+            columns: ["decided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_deliveries_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_deliveries_sent_by_fkey";
+            columns: ["sent_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       stock_movements: {
         Row: {
           approved_by: string | null;
@@ -2043,6 +2135,7 @@ export type Database = {
         Args: { p_amount: number; p_payment: string; p_pending: string; p_shift?: string };
         Returns: undefined;
       };
+      receive_stock: { Args: { p_delivery: string; p_qty: number }; Returns: undefined };
       record_stock_move: {
         Args: {
           p_branch: string;
@@ -2114,6 +2207,7 @@ export type Database = {
           total: number;
         }[];
       };
+      send_stock: { Args: { p_branch: string; p_product: string; p_qty: number; p_reason?: string }; Returns: boolean };
       set_close_note: { Args: { p_close: string; p_note: string }; Returns: undefined };
       transfer_ownership: { Args: { p_employee: string }; Returns: undefined };
       void_sale: { Args: { p_sale: string }; Returns: undefined };
@@ -2144,7 +2238,9 @@ export type Database = {
         | "join_answer"
         | "shift_overdue"
         | "stock_request"
-        | "stock_answer";
+        | "stock_answer"
+        | "stock_delivery"
+        | "stock_received";
       payment_method: "efectivo" | "qr" | "transferencia";
       plan: "Gratis" | "Negocio" | "Sucursales";
       plan_period: "mensual" | "anual";
@@ -2285,6 +2381,8 @@ export const Constants = {
         "shift_overdue",
         "stock_request",
         "stock_answer",
+        "stock_delivery",
+        "stock_received",
       ],
       payment_method: ["efectivo", "qr", "transferencia"],
       plan: ["Gratis", "Negocio", "Sucursales"],
