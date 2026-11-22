@@ -7,6 +7,7 @@ describe("gastos fijos", () => {
     expect(occurrence("2026-01-31", "mensual", 1)).toBe("2026-02-28");
     expect(occurrence("2026-10-20", "quincenal", 2)).toBe("2026-11-17");
     expect(occurrence("2026-11-02", "semanal", 1)).toBe("2026-11-09");
+    expect(occurrence("2026-11-30", "diario", 2)).toBe("2026-12-02");
   });
 
   it("da el próximo pago después de hoy", () => {
@@ -14,6 +15,7 @@ describe("gastos fijos", () => {
     expect(nextOccurrence("2026-08-31", "mensual", "2026-10-31")).toBe("2026-11-30");
     expect(nextOccurrence("2026-10-20", "quincenal", "2026-11-17")).toBe("2026-12-01");
     expect(nextOccurrence("2026-12-05", "semanal", "2026-11-21")).toBe("2026-12-05");
+    expect(nextOccurrence("2026-11-01", "diario", "2026-11-21")).toBe("2026-11-22");
   });
 });
 

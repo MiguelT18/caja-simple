@@ -5,7 +5,7 @@ import type { Supabase } from "@/lib/supabase";
 import { fail } from "./mappers";
 import type { Membership } from "./session";
 import { cents, shiftCash } from "./cash";
-import type { Branch, Business, ClosedShift, Expense, Order, Recorder, Sale, SaleLine, StockDelivery, StockMove, StockRequest } from "./types";
+import type { Branch, Business, ClosedShift, Expense, Order, Withdrawal, Recorder, Sale, SaleLine, StockDelivery, StockMove, StockRequest } from "./types";
 
 /** Nombres de quienes registraron movimientos. RLS solo deja ver a quien comparte negocio. */
 export async function recorders(sb: Supabase, ids: (string | null)[]) {
@@ -71,17 +71,19 @@ export async function branchImages(locals: App.Locals, m: Pick<Membership, "bran
 // Una hora: son comprobantes de pago.
 export const receiptUrls = (sb: Supabase, sales: Sale[]) => imageUrls(sb, sales.map((s) => s.receiptPath), "sale-receipts", 1);
 
-/** Ventas y gastos desde `from` (y hasta `to`, si viene) en esas sucursales. */
+/** Ventas, gastos y retiros de la dueña desde `from` (y hasta `to`, si viene) en esas sucursales. */
 export async function movements(sb: Supabase, branchIds: string[], from: string, to?: string) {
   // Sin `to`, hasta hoy: ningún movimiento tiene un día del negocio futuro.
   const until = to ?? "9999-12-31";
-  const [sales, expenses] = await Promise.all([
+  const [sales, expenses, withdrawals] = await Promise.all([
     sb.from("sale_totals").select("*").in("branch_id", branchIds).gte("business_date", from).lte("business_date", until).order("occurred_at", { ascending: false }),
     sb.from("expenses").select("*").in("branch_id", branchIds).gte("business_date", from).lte("business_date", until).order("occurred_at", { ascending: false }),
+    sb.from("cash_withdrawals").select("*").in("branch_id", branchIds).gte("business_date", from).lte("business_date", until).order("occurred_at", { ascending: false }),
   ]);
   fail(sales.error);
   fail(expenses.error);
-  const people = await recorders(sb, [...(sales.data ?? []), ...(expenses.data ?? [])].map((m) => m.recorded_by));
+  fail(withdrawals.error);
+  const people = await recorders(sb, [...(sales.data ?? []), ...(expenses.data ?? []), ...(withdrawals.data ?? [])].map((m) => m.recorded_by));
   const recordedBy = (id: string | null) => (id && people.get(id)) || unknownRecorder;
 
   const saleList: Sale[] = (sales.data ?? []).map((s) => ({
@@ -114,7 +116,19 @@ export async function movements(sb: Supabase, branchIds: string[], from: string,
     voided: g.voided_at ? Number(g.amount) : null,
     owedOn: g.owed_on,
   }));
-  return { sales: saleList, expenses: expenseList };
+  const withdrawalList: Withdrawal[] = (withdrawals.data ?? []).map((w) => ({
+    id: w.id,
+    branchId: w.branch_id,
+    date: w.business_date,
+    time: clock(w.occurred_at),
+    shiftId: w.shift_id,
+    recordedBy: recordedBy(w.recorded_by),
+    recordedById: w.recorded_by,
+    note: w.note,
+    amount: w.voided_at ? 0 : Number(w.amount),
+    voided: w.voided_at ? Number(w.amount) : null,
+  }));
+  return { sales: saleList, expenses: expenseList, withdrawals: withdrawalList };
 }
 
 /** Cierres de hoy y los que siguen abiertos de otro día (un turno nocturno abierto ayer). */

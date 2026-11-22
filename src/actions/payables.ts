@@ -8,16 +8,18 @@ import { check, db, optional, uuid } from "./shared";
 const dueOn = optional.pipe(z.iso.date({ error: "Usa una fecha válida" }).optional());
 const fixedFields = {
   ...expenseFields,
-  frequency: z.enum(["semanal", "quincenal", "mensual"], { error: "Elige cada cuánto se paga" }),
+  frequency: z.enum(["diario", "semanal", "quincenal", "mensual"], { error: "Elige cada cuánto se paga" }),
   startsOn: z.iso.date({ error: "Elige el día del primer pago" }),
   // Vacío: sin vencimiento.
   graceDays: optional.pipe(z.coerce.number<string | undefined>().int("Usa un número entero").min(0, "No puede ser negativo").max(365).optional()),
+  // Vacío: no es el sueldo de nadie.
+  employeeId: optional.pipe(uuid.optional()),
 };
-const fixedRow = ({ frequency, startsOn, graceDays, ...rest }: { frequency: "semanal" | "quincenal" | "mensual"; startsOn: string; graceDays?: number; concept: string; category: string; amount: number }) => ({
+const fixedRow = ({ startsOn, graceDays, employeeId, ...rest }: z.infer<z.ZodObject<typeof fixedFields>>) => ({
   ...rest,
-  frequency,
   starts_on: startsOn,
   grace_days: graceDays ?? null,
+  employee_id: employeeId ?? null,
 });
 
 export const payables = {
@@ -97,6 +99,28 @@ export const payables = {
         p_shift: from === "caja" ? shiftId : undefined,
       });
       check(error);
+      return { ok: true };
+    },
+  }),
+
+  /** Efectivo que se lleva la dueña de la caja del turno abierto. No es un gasto: solo baja el esperado. */
+  createWithdrawal: defineAction({
+    accept: "form",
+    input: z.object({ withdrawalId: uuid, branchId: uuid, shiftId: uuid, amount, note: optional.pipe(z.string().max(120, "Máximo 120 caracteres").optional()) }),
+    handler: async ({ withdrawalId, branchId, shiftId, amount, note }, context) => {
+      const { error } = await db(context)
+        .from("cash_withdrawals")
+        .insert({ id: withdrawalId, branch_id: branchId, shift_id: shiftId, amount, note: note ?? null });
+      if (error?.code === "23505" && error.message.includes("cash_withdrawals_pkey")) return { ok: true };
+      check(error);
+      return { ok: true };
+    },
+  }),
+
+  voidWithdrawal: defineAction({
+    input: z.object({ withdrawalId: uuid }),
+    handler: async ({ withdrawalId }, context) => {
+      check((await db(context).from("cash_withdrawals").update({ voided_at: new Date().toISOString() }).eq("id", withdrawalId).select("id").single()).error);
       return { ok: true };
     },
   }),

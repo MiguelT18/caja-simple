@@ -246,6 +246,21 @@ export interface Expense {
   owedOn: string | null;
 }
 
+/** Efectivo que se lleva la dueña de la caja de un turno: baja el esperado, pero no es un gasto. */
+export interface Withdrawal {
+  id: string;
+  branchId: string;
+  date: string;
+  time: string;
+  shiftId: string;
+  recordedBy: Recorder;
+  recordedById: string | null;
+  note: string | null;
+  /** 0 si se anuló. */
+  amount: number;
+  voided: number | null;
+}
+
 export interface DaySummary {
   date: string;
   sales: number;
@@ -276,6 +291,8 @@ export type Notification = {
   | { kind: "shift_late"; data: { branch: string; shift: string; start: string } }
   | { kind: "shift_overdue"; data: { branch: string; shift: string; end: string; person?: string | null } }
   | { kind: "low_stock"; data: { product: string; branch: string; stock: number; minStock: number } }
+  /** Alguien del equipo registró un gasto (concept) o un retiro (concept = la nota, si tiene). */
+  | { kind: "expense_added" | "cash_withdrawal"; data: { branch: string; person: string | null; concept: string | null; amount: number } }
   | { kind: "shift_change"; data: { person: string; business: string; branch: string; from: string | null; to: string } }
   | { kind: "plan_expiring"; data: { business: string; plan: string; until: string; days: number; trial?: boolean } }
   | { kind: "plan_expired"; data: { business: string; plan: string; trial?: boolean } }

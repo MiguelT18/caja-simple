@@ -120,6 +120,7 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
       sales: cash.sales,
       cash: cash.cash,
       expenses: cash.expenses,
+      withdrawals: cash.withdrawals,
       expected: cash.expected,
     };
   };
@@ -181,6 +182,7 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
     expenses,
     salesHistory: (history ?? moves).sales,
     expenseHistory: (history ?? moves).expenses,
+    withdrawalHistory: (history ?? moves).withdrawals,
     /** Lo contado en el último cierre de la sucursal: la apertura sugerida del siguiente turno. */
     lastCount: previous && { counted: previous.counted, shiftName: shiftById(previous.shiftId)?.name },
     salesTotal: sum(sales.map((s) => s.total)),
@@ -245,6 +247,7 @@ export function shiftBarData(ctx: NonNullable<Awaited<ReturnType<typeof branchCo
     sales: totals.sales,
     cash: totals.cash,
     expenses: totals.expenses,
+    withdrawals: totals.withdrawals,
     expected: totals.expected,
   };
 }

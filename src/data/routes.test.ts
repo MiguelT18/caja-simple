@@ -24,6 +24,10 @@ describe("notificationHref", () => {
     expect(notificationHref(note("plan_expiring"), [owner])).toBe("/app/tienda/plan");
     expect(notificationHref(note("ownership"), [employee])).toBe("/app/tienda/sucursales/centro/registrar-venta");
   });
+  it("un gasto o un retiro del equipo lleva a Gastos de la sucursal", () => {
+    expect(notificationHref(note("expense_added"), [owner])).toBe("/app/tienda/sucursales/centro/gastos");
+    expect(notificationHref(note("cash_withdrawal"), [owner])).toBe("/app/tienda/sucursales/centro/gastos");
+  });
   it("sin un negocio donde estés (invitación sin aceptar), no lleva a ningún lado", () => {
     expect(notificationHref(note("invitation", { businessId: "otro" }), [owner])).toBeUndefined();
   });

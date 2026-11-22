@@ -1,9 +1,9 @@
 ---
-import { Plus } from "@lucide/astro";
+import { HandCoins, Plus } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import DonutChart from "@/components/app/charts/DonutChart";
-import ExpensesTable from "@/components/app/ExpensesTable";
+import ExpensesTable, { type ExpenseRow } from "@/components/app/ExpensesTable";
 import PayablesCard from "@/components/app/PayablesCard";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
@@ -18,11 +18,16 @@ const range = parseRange(Astro.url.searchParams, todayOf());
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!, range);
 if (!ctx) return Astro.rewrite("/404");
 const rangeText = range.days === 7 && range.to === ctx.today ? "los últimos 7 días" : `del ${shortDate(range.from)} al ${shortDate(range.to)}`;
-const { branch, business, canCorrect, currentShift, expenseHistory, expenses, shiftById, shifts, today } = ctx;
+const { branch, business, canCorrect, currentShift, expenseHistory, expenses, shiftById, shifts, today, withdrawalHistory } = ctx;
 const isOwner = ctx.membership.role === "dueño";
 const owed = await payables(Astro.locals.supabase, [branch.id], today, range);
-// Nuevo en cada carga (la página recarga al guardar): un doble envío del mismo formulario no duplica el gasto.
+// Nuevos en cada carga: un doble envío del mismo formulario no duplica el gasto ni el retiro.
 const expenseId = crypto.randomUUID();
+const withdrawalId = crypto.randomUUID();
+// La dueña retira aunque no tenga ficha aquí; quien trabaja aquí, también (la dueña recibe un aviso).
+const canWithdraw = !!currentShift && (isOwner || ctx.works);
+const myEmployeeId = ctx.membership.employee?.branchId === branch.id ? ctx.membership.employee.id : null;
+const staff = ctx.employees.filter((e) => e.status === "activo").map((e) => ({ id: e.id, name: fullName(e) }));
 // Categorías ya usadas, como sugerencias del campo.
 const usedCategories = [...new Set(expenseHistory.map((g) => g.category))].sort();
 
@@ -32,8 +37,12 @@ const byShift = shifts.map((shift) => ({
   shift,
   total: sum(expenseHistory.filter((g) => g.shiftId === shift.id).map((g) => g.amount)),
 }));
+// Para la dueña: lo ya pagado (de la caja y fuera de ella) y cuánto sería con lo que falta pagar.
+const spent = weekTotal + sum(owed.outside.map((x) => x.amount));
+const withPending = spent + sum(owed.pending.map((p) => p.balance));
+const withdrawn = sum(withdrawalHistory.map((w) => w.amount));
 
-const rows = [
+const rows: ExpenseRow[] = [
   ...expenseHistory.map((g) => {
   const shift = shiftById(g.shiftId);
   return {
@@ -64,11 +73,36 @@ const rows = [
     outside: true,
     canEdit: isOwner || x.paidById === Astro.locals.userId,
   })),
-].sort((a, b) => (b.paidOn ?? b.date).localeCompare(a.paidOn ?? a.date) || b.time.localeCompare(a.time));
+  // Retiros de la dueña: salen de la caja del turno, pero no son gastos.
+  ...withdrawalHistory.map((w) => {
+    const shift = shiftById(w.shiftId);
+    return {
+      id: w.id,
+      date: w.date,
+      time: w.time,
+      concept: w.note ? `Retiro: ${w.note}` : "Retiro de la dueña",
+      category: "Retiro",
+      shift: { name: shift.name, tone: shift.tone },
+      by: fullName(w.recordedBy),
+      amount: w.voided ?? w.amount,
+      voided: w.voided !== null,
+      withdrawal: true,
+      canEdit: w.voided === null && canCorrect(w),
+    };
+  }),
+].sort((a: ExpenseRow, b: ExpenseRow) => (b.paidOn ?? b.date).localeCompare(a.paidOn ?? a.date) || b.time.localeCompare(a.time));
 ---
 
 <Layout title={`Gastos · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
   <PageHeader {...ctx.backdrop} eyebrow={longDate(today)} title="Gastos" description={`Lo que salió de la caja ${rangeText} en ${branch.name}.`}>
+    {
+      canWithdraw && (
+        <button type="button" class="btn btn-secondary" data-open-dialog="withdrawal">
+          <HandCoins size={18} stroke-width={1.75} />
+          Registrar retiro
+        </button>
+      )
+    }
     {
       // Registra quien trabaja en la sucursal; la dueña sin ficha aquí solo mira.
       !ctx.works ? null : currentShift ? (
@@ -91,7 +125,7 @@ const rows = [
       <Modal
         id="expense"
         title="Registrar gasto"
-        description={`Sale de la caja del turno ${currentShift.name.toLowerCase()}.`}
+        description={`Sale de la caja del turno ${currentShift.name.toLowerCase()}.${isOwner ? "" : " La dueña recibe un aviso."}`}
         action="createExpense"
         draft
         submitLabel="Guardar gasto"
@@ -110,12 +144,37 @@ const rows = [
       </Modal>
     )
   }
+  {
+    canWithdraw && (
+      <Modal
+        id="withdrawal"
+        title="Registrar retiro"
+        description={`Efectivo que se lleva la dueña de la caja del turno ${currentShift!.name.toLowerCase()}. Baja lo esperado en caja, pero no es un gasto.${isOwner ? "" : " La dueña recibe un aviso."}`}
+        action="createWithdrawal"
+        submitLabel="Guardar retiro"
+        hidden={{ withdrawalId, branchId: branch.id, shiftId: currentShift!.id }}
+      >
+        <FormInput form="withdrawal-form" name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" label="Monto (Bs)" required />
+        <FormInput form="withdrawal-form" name="note" label="Nota (opcional)" placeholder="Ej.: Ganancias de la semana" maxlength={120} />
+      </Modal>
+    )
+  }
   </div>
 
+  {/* Quien trabaja aquí ve los pendientes y el historial, no los totales. */}
+  {isOwner && (
   <div class="top" data-region="totals">
     <dl class="card totals">
-      <div class="totals-main">
-        <dt>{rangeText[0].toUpperCase() + rangeText.slice(1)}</dt>
+      <div>
+        <dt>Gastado {rangeText}</dt>
+        <dd class="num amount-expense totals-big">{formatBs(spent, "−")}</dd>
+      </div>
+      <div>
+        <dt>Con lo pendiente</dt>
+        <dd class="num amount-expense totals-big">{formatBs(withPending, "−")}</dd>
+      </div>
+      <div>
+        <dt>De la caja</dt>
         <dd class="num amount-expense">{formatBs(weekTotal, "−")}</dd>
       </div>
       <div>
@@ -132,6 +191,10 @@ const rows = [
           </div>
         ))
       }
+      <div>
+        <dt>Retiros (no son gastos)</dt>
+        <dd class="num">{formatBs(withdrawn)}</dd>
+      </div>
     </dl>
 
     <section class="card chart-card" aria-labelledby="by-category">
@@ -139,6 +202,7 @@ const rows = [
       <DonutChart client:visible items={expensesByCategory(expenseHistory)} totalLabel={range.days === 7 && range.to === today ? "en 7 días" : `en ${range.days} días`} />
     </section>
   </div>
+  )}
 
   <div class="payables" data-region="payables">
     <PayablesCard
@@ -149,9 +213,12 @@ const rows = [
       today={today}
       userId={Astro.locals.userId!}
       isOwner={isOwner}
-      canAdd={isOwner || ctx.works}
+      canAdd={isOwner}
       cashShift={ctx.works && currentShift ? { id: currentShift.id, name: currentShift.name } : null}
       categories={usedCategories}
+      settled={owed.settled}
+      staff={staff}
+      myEmployeeId={myEmployeeId}
     />
   </div>
 
@@ -194,11 +261,7 @@ const rows = [
     font-weight: var(--font-semibold);
   }
 
-  .totals-main {
-    grid-column: 1 / -1;
-  }
-
-  .totals-main dd {
+  .totals-big {
     font-size: var(--text-3xl);
     line-height: var(--text-3xl-lh);
     font-weight: var(--font-bold);

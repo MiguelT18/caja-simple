@@ -32,6 +32,8 @@ export interface ExpenseRow {
   paidOn?: string;
   /** Pago de un pendiente hecho fuera de la caja: solo se puede anular. */
   outside?: boolean;
+  /** Retiro de la dueña: sale de la caja pero no es un gasto. Solo se puede anular. */
+  withdrawal?: boolean;
 }
 
 const dayLabel = new Intl.DateTimeFormat("es-BO", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
@@ -63,16 +65,24 @@ export default function ExpensesTable({
     const ok = await confirmDialog(
       g.outside
         ? `El pago de ${formatBs(g.amount)} a «${g.concept}» queda anulado y ese monto vuelve a Por pagar.`
-        : `«${g.concept}» por ${formatBs(g.amount)} queda registrado como anulado y deja de contar en la caja.`,
+        : g.withdrawal
+          ? `El retiro de ${formatBs(g.amount)} queda anulado y ese efectivo vuelve a contar en la caja.`
+          : `«${g.concept}» por ${formatBs(g.amount)} queda registrado como anulado y deja de contar en la caja.`,
       {
       title: "¿Eliminar el gasto?",
       confirmLabel: "Eliminar gasto",
       danger: true,
     });
     if (!ok) return;
-    const { error } = await safeAction(() => (g.outside ? actions.voidPendingPayment({ paymentId: g.id }) : actions.voidExpense({ expenseId: g.id })));
+    const { error } = await safeAction(() =>
+      g.outside
+        ? actions.voidPendingPayment({ paymentId: g.id })
+        : g.withdrawal
+          ? actions.voidWithdrawal({ withdrawalId: g.id })
+          : actions.voidExpense({ expenseId: g.id }),
+    );
     if (error) return toast(error.message, "error");
-    toast("Gasto eliminado.", "success");
+    toast(g.withdrawal ? "Retiro anulado." : g.outside ? "Pago anulado." : "Gasto eliminado.", "success");
     await refreshRegions();
   }
 
@@ -86,7 +96,7 @@ export default function ExpensesTable({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {!g.outside && (
+          {!g.outside && !g.withdrawal && (
             <DropdownMenuItem onSelect={() => setEditing(g)}>
               <Pencil />
               Editar
@@ -108,7 +118,10 @@ export default function ExpensesTable({
   );
   const voidedChip = (g: ExpenseRow) => g.voided && <span className="chip chip-warning">Anulado</span>;
   const shiftCell = (g: ExpenseRow) => (g.shift ? <ShiftBadge shift={g.shift} /> : <span className="chip chip-info">Fuera de la caja</span>);
-  const amountOf = (g: ExpenseRow) => (g.outside ? <span className="tabular-nums">{formatBs(g.amount)}</span> : amount(g));
+  // Fuera de la caja o retiro: no es un gasto de la caja, sin el signo ni el color de gasto.
+  const plain = (g: ExpenseRow) => g.outside || g.withdrawal;
+  const amountOf = (g: ExpenseRow) =>
+    plain(g) ? <span className={`tabular-nums ${g.voided ? "text-muted-foreground line-through" : ""}`}>{formatBs(g.amount)}</span> : amount(g);
   return (
     <div className="@container">
       {/* Lista: concepto y monto arriba; cuándo y quién debajo; categoría y turno al pie. */}
@@ -118,7 +131,7 @@ export default function ExpensesTable({
             <div className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{g.concept}</span>
               <span className="inline-flex shrink-0 items-center gap-1">
-                <span className={`${g.outside ? "" : amountClass(g)} font-bold tabular-nums`}>{amountOf(g)}</span>
+                <span className={`${plain(g) ? "" : amountClass(g)} font-bold tabular-nums`}>{amountOf(g)}</span>
                 {menu(g)}
               </span>
             </div>
@@ -170,7 +183,7 @@ export default function ExpensesTable({
                 </TableCell>
                 <TableCell>{shiftCell(g)}</TableCell>
                 <TableCell className="text-muted-foreground">{g.by}</TableCell>
-                <TableCell className={`${g.outside ? "" : amountClass(g)} text-right tabular-nums`}>{amountOf(g)}</TableCell>
+                <TableCell className={`${plain(g) ? "" : amountClass(g)} text-right tabular-nums`}>{amountOf(g)}</TableCell>
                 {withActions && <TableCell className="text-right">{menu(g)}</TableCell>}
               </TableRow>
             ))}

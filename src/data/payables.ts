@@ -20,6 +20,8 @@ export interface Payable {
   /** Viene de un gasto fijo (lo generó la base). */
   fixed: boolean;
   createdById: string | null;
+  /** Es el sueldo de esta ficha: esa persona confirma que se lo pagaron. */
+  employeeId: string | null;
 }
 
 export interface FixedExpense {
@@ -31,6 +33,7 @@ export interface FixedExpense {
   frequency: Frequency;
   startsOn: string;
   graceDays: number | null;
+  employeeId: string | null;
   next: string;
 }
 
@@ -54,7 +57,7 @@ export interface OutsidePayment {
  * los pagos fuera de la caja hechos en esos días.
  */
 export async function payables(sb: Supabase, branchIds: string[], today: string, range?: { from: string; to: string }) {
-  const [open, fixed, outside] = await Promise.all([
+  const [open, fixed, outside, settled] = await Promise.all([
     sb.from("pending_balances").select("*").in("branch_id", branchIds).is("canceled_at", null).gt("balance", 0),
     sb.from("fixed_expenses").select("*").in("branch_id", branchIds).is("archived_at", null).order("concept"),
     range
@@ -69,13 +72,25 @@ export async function payables(sb: Supabase, branchIds: string[], today: string,
           .lte("paid_at", `${range.to}T23:59:59.999-04:00`)
           .order("paid_at", { ascending: false })
       : undefined,
+    // Saldados en el rango (por el día que tocaba): los «completados» de Por pagar.
+    range
+      ? sb
+          .from("pending_balances")
+          .select("*")
+          .in("branch_id", branchIds)
+          .is("canceled_at", null)
+          .lte("balance", 0)
+          .gte("owed_on", range.from)
+          .lte("owed_on", range.to)
+          .order("owed_on", { ascending: false })
+      : undefined,
   ]);
+  fail(settled?.error ?? null);
   fail(open.error);
   fail(fixed.error);
   fail(outside?.error ?? null);
 
-  const pending: Payable[] = (open.data ?? [])
-    .map((p) => ({
+  const toPayable = (p: NonNullable<typeof open.data>[number]): Payable => ({
       id: p.id!,
       branchId: p.branch_id!,
       concept: p.concept!,
@@ -87,8 +102,9 @@ export async function payables(sb: Supabase, branchIds: string[], today: string,
       balance: Number(p.balance ?? p.amount),
       fixed: p.fixed_expense_id !== null,
       createdById: p.created_by,
-    }))
-    .sort(payableOrder);
+      employeeId: p.employee_id,
+    });
+  const pending = (open.data ?? []).map(toPayable).sort(payableOrder);
 
   const fixedList: FixedExpense[] = (fixed.data ?? []).map((f) => ({
     id: f.id,
@@ -99,6 +115,7 @@ export async function payables(sb: Supabase, branchIds: string[], today: string,
     frequency: f.frequency,
     startsOn: f.starts_on,
     graceDays: f.grace_days,
+    employeeId: f.employee_id,
     next: nextOccurrence(f.starts_on, f.frequency, today),
   }));
 
@@ -122,7 +139,7 @@ export async function payables(sb: Supabase, branchIds: string[], today: string,
       : [],
   );
 
-  return { pending, fixed: fixedList, outside: outsideList };
+  return { pending, fixed: fixedList, outside: outsideList, settled: (settled?.data ?? []).map(toPayable) };
 }
 
 /** Lo pagado de los pendientes desde `from` (día de Bolivia), de la caja o fuera, sin lo anulado. */

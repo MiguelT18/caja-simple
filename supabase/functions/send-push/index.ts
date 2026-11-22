@@ -41,6 +41,10 @@ function describe({ kind, data }: Notice) {
       return data.accepted
         ? { title: `${data.person} aceptó tu entrada de ${data.qty} ${data.product}`, body: `${data.branch}: el stock ya subió` }
         : { title: `${data.person} rechazó tu entrada de ${data.qty} ${data.product}`, body: `${data.branch}: el stock no cambió` };
+    case "expense_added":
+      return { title: `${data.person ?? "Alguien"} registró un gasto en ${data.branch}`, body: `${data.concept ?? "Gasto"} · ${money(Number(data.amount))}` };
+    case "cash_withdrawal":
+      return { title: `${data.person ?? "Alguien"} registró un retiro en ${data.branch}`, body: `${money(Number(data.amount))}${data.concept ? ` · ${data.concept}` : ""}` };
     case "low_stock":
       return { title: `Stock bajo: ${data.product}`, body: `Quedan ${data.stock} en ${data.branch} (mínimo ${data.minStock})` };
     case "shift_change":

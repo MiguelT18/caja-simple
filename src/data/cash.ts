@@ -1,6 +1,6 @@
 // Cuentas de la caja: funciones puras sobre movimientos y cierres ya cargados (sin consultas).
 import type { Row } from "./mappers";
-import type { Expense, Sale } from "./types";
+import type { Expense, Sale, Withdrawal } from "./types";
 import { periodStart, type Period } from "@/lib/dates";
 
 export const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
@@ -40,7 +40,7 @@ type CloseRow = Row<"shift_closes">;
  * con los movimientos de su día, lo vendido (todo y en efectivo), lo gastado y lo esperado en caja.
  * Mismo cálculo que private.on_shift_closed_notify() en la base.
  */
-export function shiftCash(closes: CloseRow[], moves: { sales: Sale[]; expenses: Expense[] }, shiftId: string, day: string) {
+export function shiftCash(closes: CloseRow[], moves: { sales: Sale[]; expenses: Expense[]; withdrawals: Withdrawal[] }, shiftId: string, day: string) {
   const row =
     closes.find((c) => c.shift_id === shiftId && c.status === "en-curso") ?? closes.find((c) => c.shift_id === shiftId && c.business_date === day);
   const date = row?.business_date ?? day;
@@ -49,8 +49,10 @@ export function shiftCash(closes: CloseRow[], moves: { sales: Sale[]; expenses: 
   // Al cajón solo entra el efectivo: QR y transferencia no se cuentan en el arqueo.
   const cash = sum(shiftSales.filter((s) => s.payment === "efectivo").map((s) => s.total));
   const expenses = sum(moves.expenses.filter((g) => g.shiftId === shiftId && g.date === date).map((g) => g.amount));
+  // Los retiros de la dueña salen del cajón, pero no son gastos.
+  const withdrawals = sum(moves.withdrawals.filter((w) => w.shiftId === shiftId && w.date === date).map((w) => w.amount));
   const opening = Number(row?.opening ?? 0);
-  return { row, date, opening, sales, cash, expenses, expected: cents(opening + cash - expenses) };
+  return { row, date, opening, sales, cash, expenses, withdrawals, expected: cents(opening + cash - expenses - withdrawals) };
 }
 
 /** Estado de la caja de una sucursal hoy, a partir de sus cierres. */

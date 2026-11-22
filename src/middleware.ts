@@ -39,6 +39,8 @@ const LIVE_ACTIONS = new Set([
   "cancelPendingExpense",
   "payPendingExpense",
   "voidPendingPayment",
+  "createWithdrawal",
+  "voidWithdrawal",
   "openShift",
   "closeShift",
   "saveCloseNote",

@@ -21,6 +21,7 @@ describe("shiftCash", () => {
   const moves = {
     sales: [sale({ total: 50.1 }), sale({ total: 0.2 }), sale({ total: 30, payment: "qr" }), sale({ total: 99, shiftId: "s2" }), sale({ total: 7, date: "2026-11-02" })],
     expenses: [expense({ amount: 20 })],
+    withdrawals: [],
   };
   it("esperado = apertura + ventas en efectivo − gastos del día del turno", () => {
     const cash = shiftCash([close({})], moves, "s1", "2026-11-03");
@@ -30,6 +31,10 @@ describe("shiftCash", () => {
   it("un turno abierto ayer usa los movimientos de ayer", () => {
     const cash = shiftCash([close({ business_date: "2026-11-02" })], moves, "s1", "2026-11-03");
     expect(cash).toMatchObject({ date: "2026-11-02", sales: 7, expected: 107 });
+  });
+  it("los retiros de la dueña bajan el esperado, pero no son gastos", () => {
+    const withRetiro = { ...moves, withdrawals: [{ id: "w", branchId: "b", date: "2026-11-03", time: "12:00", shiftId: "s1", amount: 30, voided: null } as never] };
+    expect(shiftCash([close({})], withRetiro, "s1", "2026-11-03")).toMatchObject({ expenses: 20, withdrawals: 30, expected: 100.3 });
   });
   it("sin cierre, todo en 0", () => {
     expect(shiftCash([], moves, "s3", "2026-11-03").expected).toBe(0);

@@ -1,5 +1,5 @@
 import { actions } from "astro:actions";
-import { Archive, CalendarDays, CircleAlert, Clock, Ellipsis, Pencil, Plus, Repeat, X } from "lucide-react";
+import { Archive, CalendarDays, CircleAlert, CircleCheck, Clock, Ellipsis, Pencil, Plus, Repeat, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import type { FixedExpense, Payable } from "@/data/payables";
 import { shortDate } from "@/lib/dates";
@@ -16,6 +16,8 @@ import { Field, MoneyInput, safeAction, useActionForm } from "./products/form";
 const ICON = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
 const DUE_ICON = { late: CircleAlert, soon: Clock, later: CalendarDays, none: null };
 const DUE_CLASS = { late: "text-[var(--color-expense)] font-semibold", soon: "text-[var(--color-warning)] font-semibold", later: "text-muted-foreground", none: "text-muted-foreground" };
+
+type Staff = { id: string; name: string };
 
 type Dialog =
   | { kind: "pay"; item: Payable }
@@ -39,6 +41,9 @@ export default function PayablesCard({
   canAdd,
   cashShift,
   categories = [],
+  settled = [],
+  staff = [],
+  myEmployeeId = null,
 }: {
   branchId: string;
   title?: string;
@@ -53,7 +58,14 @@ export default function PayablesCard({
   /** El turno abierto de quien trabaja aquí: habilita «De la caja». */
   cashShift: { id: string; name: string } | null;
   categories?: string[];
+  /** Saldados en el rango: la lista «Saldados», plegada. */
+  settled?: Payable[];
+  /** Fichas de la sucursal: «Sueldo de» en los gastos fijos y el nombre en cada sueldo. */
+  staff?: Staff[];
+  /** La ficha de quien mira, si trabaja aquí: su sueldo lo confirma ella («Me pagaron»). */
+  myEmployeeId?: string | null;
 }) {
+  const staffName = (id: string | null) => staff.find((e) => e.id === id)?.name;
   const [dialog, setDialog] = useState<Dialog>(null);
   const close = () => setDialog(null);
   const total = pending.reduce((s, p) => s + p.balance, 0);
@@ -129,6 +141,12 @@ export default function PayablesCard({
                           Fijo
                         </span>
                       )}
+                      {p.employeeId && staffName(p.employeeId) && (
+                        <span className="chip chip-info">
+                          <UserRound size={12} strokeWidth={1.75} aria-hidden="true" />
+                          {p.employeeId === myEmployeeId ? "Tu sueldo" : staffName(p.employeeId)}
+                        </span>
+                      )}
                     </span>
                     <span className="flex flex-wrap items-center gap-x-2 text-sm">
                       <span className={`inline-flex items-center gap-1 ${DUE_CLASS[due.tone]}`}>
@@ -143,9 +161,11 @@ export default function PayablesCard({
                       <span className="num font-bold">{formatBs(p.balance)}</span>
                       {p.paid > 0 && <span className="num text-xs text-muted-foreground">pagado {formatBs(p.paid)} de {formatBs(p.amount)}</span>}
                     </span>
-                    <Button type="button" size="sm" onClick={() => setDialog({ kind: "pay", item: p })}>
-                      Pagar
-                    </Button>
+                    {(isOwner || cashShift || p.employeeId === myEmployeeId) && (
+                      <Button type="button" size="sm" onClick={() => setDialog({ kind: "pay", item: p })}>
+                        {p.employeeId && p.employeeId === myEmployeeId ? "Me pagaron" : isOwner ? "Pagar" : "Saldar"}
+                      </Button>
+                    )}
                     {(isOwner || canCancel) && (
                       // modal={false}: el menú abre un diálogo; así Radix no deja la página bloqueada al cerrarlo.
                       <DropdownMenu modal={false}>
@@ -176,6 +196,26 @@ export default function PayablesCard({
             })}
           </ul>
         )}
+
+        {settled.length > 0 && (
+          <details className="group border-t border-[var(--color-border)] pt-3">
+            <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold">
+              <CircleCheck {...ICON} />
+              Saldados ({settled.length}) · {formatBs(settled.reduce((s, p) => s + p.amount, 0))}
+            </summary>
+            <ul className="m-0 grid list-none divide-y divide-[var(--color-border)] p-0">
+              {settled.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2.5 text-sm">
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    <span className="font-semibold">{p.concept}</span>
+                    <span className="text-muted-foreground"> · tocaba el {shortDate(p.owedOn)}</span>
+                  </span>
+                  <span className="num">{formatBs(p.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
 
       {isOwner && (
@@ -200,6 +240,7 @@ export default function PayablesCard({
                     <span className="font-semibold [overflow-wrap:anywhere]">{f.concept}</span>
                     <span className="text-sm text-muted-foreground">
                       {frequencyLabel[f.frequency]} · próximo el {shortDate(f.next)}
+                      {f.employeeId && staffName(f.employeeId) && ` · sueldo de ${staffName(f.employeeId)}`}
                     </span>
                   </div>
                   <span className="ml-auto num font-semibold">{formatBs(f.amount)}</span>
@@ -232,10 +273,12 @@ export default function PayablesCard({
           <option key={c} value={c} />
         ))}
       </datalist>
-      {dialog?.kind === "pay" && <PayDialog key={dialog.item.id} item={dialog.item} cashShift={cashShift} onClose={close} />}
+      {dialog?.kind === "pay" && (
+        <PayDialog key={dialog.item.id} item={dialog.item} cashShift={cashShift} isOwner={isOwner} ownSalary={!!dialog.item.employeeId && dialog.item.employeeId === myEmployeeId} onClose={close} />
+      )}
       {dialog?.kind === "edit" && <EditDialog key={dialog.item.id} item={dialog.item} onClose={close} />}
       {dialog?.kind === "new" && <NewDialog branchId={branchId} onClose={close} />}
-      {dialog?.kind === "fixed" && <FixedDialog branchId={branchId} item={dialog.item} today={today} onClose={close} />}
+      {dialog?.kind === "fixed" && <FixedDialog branchId={branchId} item={dialog.item} today={today} staff={staff} onClose={close} />}
     </div>
   );
 }
@@ -261,9 +304,25 @@ function Footer({ onClose, busy, submitProps, label }: { onClose: () => void; bu
   );
 }
 
-/** Pagar todo o una parte. El id del pago nace al abrir: un doble envío no lo repite. */
-function PayDialog({ item, cashShift, onClose }: { item: Payable; cashShift: { id: string; name: string } | null; onClose: () => void }) {
+/**
+ * Pagar todo o una parte (la dueña). Quien trabaja aquí salda completo y de la caja; su propio sueldo
+ * también lo confirma si se lo pagó la dueña. La base exige lo mismo. El id del pago nace al abrir.
+ */
+function PayDialog({
+  item,
+  cashShift,
+  isOwner,
+  ownSalary,
+  onClose,
+}: {
+  item: Payable;
+  cashShift: { id: string; name: string } | null;
+  isOwner: boolean;
+  ownSalary: boolean;
+  onClose: () => void;
+}) {
   const [paymentId] = useState(() => crypto.randomUUID());
+  const outsideAllowed = isOwner || ownSalary;
   const [from, setFrom] = useState<"caja" | "fuera">(cashShift ? "caja" : "fuera");
   const save = useActionForm(
     (form) => actions.payPendingExpense(form) as never,
@@ -272,17 +331,34 @@ function PayDialog({ item, cashShift, onClose }: { item: Payable; cashShift: { i
   );
   const sources = [
     ...(cashShift ? [{ value: "caja" as const, label: `De la caja del turno ${cashShift.name.toLowerCase()}`, hint: "Resta del efectivo esperado de hoy." }] : []),
-    { value: "fuera" as const, label: "Fuera de la caja", hint: "Plata de la dueña o del banco: no toca ningún turno." },
+    ...(outsideAllowed
+      ? [
+          ownSalary && !isOwner
+            ? { value: "fuera" as const, label: "Me pagó la dueña", hint: "No sale de la caja: no toca ningún turno." }
+            : { value: "fuera" as const, label: "Fuera de la caja", hint: "Plata de la dueña o del banco: no toca ningún turno." },
+        ]
+      : []),
   ];
   return (
-    <AppDialog title={`Pagar ${item.concept}`} description={`Queda registrado con el día que tocaba: ${shortDate(item.owedOn)}.`} onClose={onClose}>
+    <AppDialog title={ownSalary ? `Confirmar ${item.concept}` : `${isOwner ? "Pagar" : "Saldar"} ${item.concept}`} description={`Queda registrado con el día que tocaba: ${shortDate(item.owedOn)}.`} onClose={onClose}>
       <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
         <input type="hidden" name="paymentId" value={paymentId} />
         <input type="hidden" name="pendingId" value={item.id} />
         {from === "caja" && cashShift && <input type="hidden" name="shiftId" value={cashShift.id} />}
-        <Field id="pay-amount" label="Monto" error={save.errors.amount} hint={`Falta ${formatBs(item.balance)}. Puedes pagar una parte.`}>
-          <MoneyInput id="pay-amount" name="amount" min="0.01" max={item.balance} defaultValue={item.balance} required />
-        </Field>
+        {isOwner ? (
+          <Field id="pay-amount" label="Monto" error={save.errors.amount} hint={`Falta ${formatBs(item.balance)}. Puedes pagar una parte.`}>
+            <MoneyInput id="pay-amount" name="amount" min="0.01" max={item.balance} defaultValue={item.balance} required />
+          </Field>
+        ) : (
+          <>
+            {/* Se salda completo: el monto no se edita. */}
+            <input type="hidden" name="amount" value={item.balance} />
+            <p className="m-0 grid gap-0.5">
+              <span className="text-sm text-muted-foreground">Monto</span>
+              <span className="num text-xl font-bold">{formatBs(item.balance)}</span>
+            </p>
+          </>
+        )}
         <fieldset className="grid gap-1">
           <legend className="mb-1 text-sm font-semibold">De dónde sale la plata</legend>
           {sources.map((s) => (
@@ -295,10 +371,11 @@ function PayDialog({ item, cashShift, onClose }: { item: Payable; cashShift: { i
             </label>
           ))}
           {!cashShift && <p className="field-hint">Para pagar de la caja, hazlo desde Gastos de la sucursal con tu turno abierto.</p>}
+          {sources.length === 0 && <p className="field-error">Abre tu turno para saldarlo de la caja.</p>}
           {save.errors.from && <p className="field-error">{save.errors.from}</p>}
         </fieldset>
         <ErrorNotice message={save.message} />
-        <Footer onClose={onClose} busy={save.busy} submitProps={save.submitProps} label="Registrar pago" />
+        <Footer onClose={onClose} busy={save.busy} submitProps={save.submitProps} label={ownSalary ? "Confirmar pago" : isOwner ? "Registrar pago" : "Saldar"} />
       </form>
     </AppDialog>
   );
@@ -352,7 +429,7 @@ function NewDialog({ branchId, onClose }: { branchId: string; onClose: () => voi
   );
 }
 
-function FixedDialog({ branchId, item, today, onClose }: { branchId: string; item?: FixedExpense; today: string; onClose: () => void }) {
+function FixedDialog({ branchId, item, today, staff, onClose }: { branchId: string; item?: FixedExpense; today: string; staff: Staff[]; onClose: () => void }) {
   const [fixedId] = useState(() => item?.id ?? crypto.randomUUID());
   const save = useActionForm(
     (form) => (item ? actions.updateFixedExpense(form) : actions.createFixedExpense(form)) as never,
@@ -393,6 +470,18 @@ function FixedDialog({ branchId, item, today, onClose }: { branchId: string; ite
             <input id="fixed-starts" name="startsOn" type="date" className="input" defaultValue={item?.startsOn ?? today} required />
           </Field>
         </div>
+        {staff.length > 0 && (
+          <Field id="fixed-employee" label="Sueldo de (opcional)" error={save.errors.employeeId} hint="Esa persona confirma cuando se lo pagaron.">
+            <select id="fixed-employee" name="employeeId" className="input" defaultValue={item?.employeeId ?? ""}>
+              <option value="">Nadie: no es un sueldo</option>
+              {staff.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field id="fixed-grace" label="Días para pagar (opcional)" error={save.errors.graceDays} hint="Ej.: 10 si la luz vence 10 días después. Vacío: sin vencimiento.">
           <input id="fixed-grace" name="graceDays" type="number" inputMode="numeric" min="0" max="365" step="1" className="input num" defaultValue={item?.graceDays ?? ""} />
         </Field>
