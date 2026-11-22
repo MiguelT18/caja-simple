@@ -9,14 +9,23 @@ import Modal from "@/components/app/Modal.astro";
 import Layout from "@/layouts/Layout.astro";
 import { brandColor } from "@/data/brand";
 import { kindOptions } from "@/data/kinds";
-import { businessImages, currentUser, entryHref, myBusinesses } from "@/data/queries";
+import {
+  businessImages,
+  currentUser,
+  entryHref,
+  myBusinesses,
+} from "@/data/queries";
 import { boliviaNow } from "@/lib/dates";
 import { plural } from "@/lib/format";
 
 const memberships = myBusinesses(Astro.locals);
-const logos = await businessImages(Astro.locals, memberships.map((m) => m.business));
+const logos = await businessImages(
+  Astro.locals,
+  memberships.map((m) => m.business),
+);
 const hour = boliviaNow().minutes / 60;
-const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
+const greeting =
+  hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
 const firstName = currentUser(Astro.locals).firstName;
 const monogram = (name: string) =>
   name
@@ -28,61 +37,109 @@ const monogram = (name: string) =>
 ---
 
 <Layout title="Tus negocios">
-  {
-    memberships.length === 0 ? (
-      <FirstBusiness firstName={firstName} />
-    ) : (
-      <PageHeader title={firstName ? `${greeting}, ${firstName}` : greeting} description="Los negocios que tienes y en los que trabajas. Elige uno para entrar.">
-        <button
-          type="button"
-          class="btn btn-secondary"
-          data-open-dialog="new-business"
-        >
-          <Plus size={18} stroke-width={2} />
-          Crear negocio
-        </button>
-      </PageHeader>
-    )
-  }
+  {memberships.length === 0 ? (
+    <FirstBusiness firstName={firstName} />
+  ) : (
+    <PageHeader
+      title={firstName ? `${greeting}, ${firstName}` : greeting}
+      description="Los negocios que tienes y en los que trabajas. Elige uno para entrar."
+    >
+      <button
+        type="button"
+        class="btn btn-secondary"
+        data-open-dialog="new-business"
+      >
+        <Plus size={18} stroke-width={2} />
+        Crear negocio
+      </button>
+    </PageHeader>
+  )}
 
-  <Modal id="new-business" title="Crear negocio" description="Con su primera sucursal, que arranca con los turnos de mañana, tarde y noche." action="createBusiness" draft submitLabel="Crear negocio" redirect="/app/{slug}">
-    <FormInput form="new-business-form" name="name" label="Nombre del negocio" required maxlength={80} />
-    <FormInput form="new-business-form" name="kind" label="Rubro" options={kindOptions()} />
+  <Modal
+    id="new-business"
+    title="Crear negocio"
+    description="Con su primera sucursal, que arranca con los turnos de mañana, tarde y noche."
+    action="createBusiness"
+    draft
+    submitLabel="Crear negocio"
+    redirect="/app/{slug}"
+  >
+    <FormInput
+      form="new-business-form"
+      name="name"
+      label="Nombre del negocio"
+      required
+      maxlength={80}
+    />
+    <FormInput
+      form="new-business-form"
+      name="kind"
+      label="Rubro"
+      options={kindOptions()}
+    />
     <BusinessProfileFields form="new-business-form" />
-    <FormInput form="new-business-form" name="branchName" label="Primera sucursal" value="Principal" hint="La zona o la calle; por ejemplo: Centro o Mercado Rodríguez." required maxlength={80} />
-    <FormInput form="new-business-form" name="branchAddress" label="Dirección" hint="Opcional" maxlength={160} />
+    <FormInput
+      form="new-business-form"
+      name="branchName"
+      label="Primera sucursal"
+      value="Principal"
+      hint="La zona o la calle; por ejemplo: Centro o Mercado Rodríguez."
+      required
+      maxlength={80}
+    />
+    <FormInput
+      form="new-business-form"
+      name="branchAddress"
+      label="Dirección"
+      hint="Opcional"
+      maxlength={160}
+    />
   </Modal>
 
-  {
-    memberships.length > 0 && (
-      <section aria-labelledby="businesses-title">
-        <h2 id="businesses-title" class="section-title">Tus negocios</h2>
-        <ul class="media-grid business-grid" role="list">
-          {memberships.map((m) => {
-            const owner = m.role === "dueño" || !m.branches[0];
-            return (
-              <li>
-                <MediaCard
-                  href={entryHref(m)}
-                  title={m.business.name}
-                  monogram={monogram(m.business.name)}
-                  color={brandColor(m.business.color)}
-                  image={logos.get(m.business.id)}
-                  subtitle={
-                    m.role === "dueño"
-                      ? `Tu negocio · plan ${m.business.plan} · ${plural(m.branches.length, "sucursal", "sucursales")}`
-                      : ["Trabajas aquí", m.employee?.jobTitle, ...m.branches.map((b) => b.name)].filter(Boolean).join(" · ")
-                  }
-                  transition={owner && logos.has(m.business.id) ? `biz-${m.business.id}` : undefined}
-                  label={owner ? `Entrar a ${m.business.name}` : `Ir a la caja de ${m.branches[0].name}, en ${m.business.name}`}
-                />
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-    )
-  }
+  {memberships.length > 0 && (
+    <section aria-labelledby="businesses-title">
+      <h2 id="businesses-title" class="section-title">
+        Tus negocios
+      </h2>
+      <ul class="media-grid business-grid" role="list">
+        {memberships.map((m) => {
+          const owner = m.role === "dueño" || !m.branches[0];
+          return (
+            <li>
+              <MediaCard
+                href={entryHref(m)}
+                title={m.business.name}
+                monogram={monogram(m.business.name)}
+                color={brandColor(m.business.color)}
+                image={logos.get(m.business.id)}
+                subtitle={
+                  m.role === "dueño"
+                    ? `Tu negocio · plan ${m.business.plan} · ${plural(m.branches.length, "sucursal", "sucursales")}`
+                    : [
+                        "Trabajas aquí",
+                        m.employee?.jobTitle,
+                        ...m.branches.map((b) => b.name),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                }
+                transition={
+                  owner && logos.has(m.business.id)
+                    ? `biz-${m.business.id}`
+                    : undefined
+                }
+                label={
+                  owner
+                    ? `Entrar a ${m.business.name}`
+                    : `Ir a la caja de ${m.branches[0].name}, en ${m.business.name}`
+                }
+              />
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  )}
 </Layout>
 
 <style>

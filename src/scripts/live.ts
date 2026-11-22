@@ -13,6 +13,10 @@ interface Options {
   topic: string;
   /** Regiones (data-region) que se actualizan. */
   regions: string[];
+  /** Además de `regions`, las que tocan según lo que llegó (p. ej., la bandeja: según el tipo de aviso). */
+  regionsFor?: (events: LiveEvent[]) => string[];
+  /** Actualiza aunque la pestaña esté oculta (la bandeja: el título de la pestaña avisa). */
+  whileHidden?: boolean;
   /** id de sucursal → nombre, para el anuncio. */
   names: Record<string, string>;
   /** Solo los avisos de esta sucursal (el canal es del negocio entero). */
@@ -49,16 +53,20 @@ export function watchLive(o: Options) {
   // Un aviso que llega mientras se actualiza no se pierde: al terminar se actualiza otra vez (la página que se pidió
   // pudo armarse antes de ese cambio).
   let again = "";
-  const refresh = async (text = ""): Promise<void> => {
+  const extra = new Set<string>();
+  const refresh = async (text = "", more: string[] = []): Promise<void> => {
     if (o.signal.aborted) return;
+    more.forEach((r) => extra.add(r));
     if (busy) {
       again = text || again || " ";
       return;
     }
     busy = true;
+    const regions = [...new Set([...o.regions, ...extra])];
+    extra.clear();
     try {
       o.beforeRefresh?.();
-      await refreshRegions(o.regions, location.href, { keepFocus: true });
+      await refreshRegions(regions, location.href, { keepFocus: true });
       o.afterRefresh?.();
       updatedAt = Date.now();
       if (text) o.onAnnounce(text);
@@ -74,8 +82,11 @@ export function watchLive(o: Options) {
   };
 
   const batch = createBatcher<LiveEvent>(WAIT, (events) => {
-    if (document.hidden) pending = true;
-    else void refresh(announcement(events, o.names));
+    const more = o.regionsFor?.(events) ?? [];
+    if (document.hidden && !o.whileHidden) {
+      pending = true;
+      more.forEach((r) => extra.add(r));
+    } else void refresh(announcement(events, o.names), more);
   });
 
   // Respaldo: cada minuto, solo mientras Realtime no está y la pestaña se ve.
@@ -84,7 +95,7 @@ export function watchLive(o: Options) {
     if (o.signal.aborted || (value === live && (live || poll))) return;
     live = value;
     clearInterval(poll);
-    poll = live ? undefined : setInterval(() => !document.hidden && refresh(), POLL);
+    poll = live ? undefined : setInterval(() => (o.whileHidden || !document.hidden) && refresh(), POLL);
     status();
   };
 
@@ -127,7 +138,8 @@ export function watchLive(o: Options) {
     const channel = client.channel(o.topic, { config: { private: true } });
     channel.on("broadcast", { event: "*" }, ({ event, payload }) => {
       if (o.branch && payload?.branch !== o.branch) return;
-      batch.push({ table: event, op: String(payload?.op ?? ""), branch: String(payload?.branch ?? "") });
+      // Un aviso de la bandeja trae su tipo («kind»); uno del negocio, la tabla como evento.
+      batch.push({ table: String(payload?.kind ?? event), op: String(payload?.op ?? "insert"), branch: String(payload?.branch ?? "") });
     });
     const timeout = setTimeout(() => setLive(false), CONNECT_TIMEOUT);
     channel.subscribe((state) => {

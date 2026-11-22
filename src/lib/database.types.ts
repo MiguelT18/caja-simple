@@ -272,6 +272,75 @@ export type Database = {
           },
         ];
       };
+      cash_withdrawals: {
+        Row: {
+          amount: number;
+          branch_id: string;
+          business_date: string;
+          id: string;
+          note: string | null;
+          occurred_at: string;
+          recorded_by: string | null;
+          shift_id: string;
+          voided_at: string | null;
+          voided_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          branch_id: string;
+          business_date?: string;
+          id: string;
+          note?: string | null;
+          occurred_at?: string;
+          recorded_by?: string | null;
+          shift_id: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Update: {
+          amount?: number;
+          branch_id?: string;
+          business_date?: string;
+          id?: string;
+          note?: string | null;
+          occurred_at?: string;
+          recorded_by?: string | null;
+          shift_id?: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cash_withdrawals_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cash_withdrawals_recorded_by_fkey";
+            columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cash_withdrawals_shift_id_branch_id_fkey";
+            columns: ["shift_id", "branch_id"];
+            isOneToOne: false;
+            referencedRelation: "shifts";
+            referencedColumns: ["id", "branch_id"];
+          },
+          {
+            foreignKeyName: "cash_withdrawals_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       categories: {
         Row: {
           business_id: string;
@@ -512,6 +581,7 @@ export type Database = {
           category: string;
           concept: string;
           created_at: string;
+          employee_id: string | null;
           frequency: Database["public"]["Enums"]["expense_frequency"];
           grace_days: number | null;
           id: string;
@@ -525,6 +595,7 @@ export type Database = {
           category: string;
           concept: string;
           created_at?: string;
+          employee_id?: string | null;
           frequency: Database["public"]["Enums"]["expense_frequency"];
           grace_days?: number | null;
           id?: string;
@@ -537,6 +608,7 @@ export type Database = {
           category?: string;
           concept?: string;
           created_at?: string;
+          employee_id?: string | null;
           frequency?: Database["public"]["Enums"]["expense_frequency"];
           grace_days?: number | null;
           id?: string;
@@ -548,6 +620,13 @@ export type Database = {
             columns: ["branch_id"];
             isOneToOne: false;
             referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fixed_expenses_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
             referencedColumns: ["id"];
           },
         ];
@@ -834,6 +913,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           due_on: string | null;
+          employee_id: string | null;
           fixed_expense_id: string | null;
           id: string;
           owed_on: string;
@@ -849,6 +929,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           due_on?: string | null;
+          employee_id?: string | null;
           fixed_expense_id?: string | null;
           id?: string;
           owed_on?: string;
@@ -863,6 +944,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           due_on?: string | null;
+          employee_id?: string | null;
           fixed_expense_id?: string | null;
           id?: string;
           owed_on?: string;
@@ -887,6 +969,13 @@ export type Database = {
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_expenses_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
             referencedColumns: ["id"];
           },
           {
@@ -1978,6 +2067,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           due_on: string | null;
+          employee_id: string | null;
           fixed_expense_id: string | null;
           id: string;
           owed_on: string;
@@ -2004,6 +2094,13 @@ export type Database = {
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_expenses_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
             referencedColumns: ["id"];
           },
           {
@@ -2217,7 +2314,7 @@ export type Database = {
       charge_method: "qr" | "transferencia" | "tarjeta";
       close_status: "en-curso" | "cerrado";
       employee_status: "activo" | "invitado";
-      expense_frequency: "semanal" | "quincenal" | "mensual";
+      expense_frequency: "semanal" | "quincenal" | "mensual" | "diario";
       join_status: "pendiente" | "aceptada" | "rechazada";
       notification_kind:
         | "invitation"
@@ -2240,7 +2337,9 @@ export type Database = {
         | "stock_request"
         | "stock_answer"
         | "stock_delivery"
-        | "stock_received";
+        | "stock_received"
+        | "expense_added"
+        | "cash_withdrawal";
       payment_method: "efectivo" | "qr" | "transferencia";
       plan: "Gratis" | "Negocio" | "Sucursales";
       plan_period: "mensual" | "anual";
@@ -2359,7 +2458,7 @@ export const Constants = {
       charge_method: ["qr", "transferencia", "tarjeta"],
       close_status: ["en-curso", "cerrado"],
       employee_status: ["activo", "invitado"],
-      expense_frequency: ["semanal", "quincenal", "mensual"],
+      expense_frequency: ["semanal", "quincenal", "mensual", "diario"],
       join_status: ["pendiente", "aceptada", "rechazada"],
       notification_kind: [
         "invitation",
@@ -2383,6 +2482,8 @@ export const Constants = {
         "stock_answer",
         "stock_delivery",
         "stock_received",
+        "expense_added",
+        "cash_withdrawal",
       ],
       payment_method: ["efectivo", "qr", "transferencia"],
       plan: ["Gratis", "Negocio", "Sucursales"],

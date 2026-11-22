@@ -1,15 +1,17 @@
 // Cuentas puras de los gastos fijos y los pendientes (ver supabase/migrations/*_fixed_expenses_payables.sql).
 import { addDays, shortDate } from "./dates";
 
-export type Frequency = "semanal" | "quincenal" | "mensual";
+export type Frequency = "diario" | "semanal" | "quincenal" | "mensual";
 
-export const frequencyLabel: Record<Frequency, string> = { semanal: "Cada semana", quincenal: "Cada 15 días", mensual: "Cada mes" };
+export const frequencyLabel: Record<Frequency, string> = { diario: "Cada día", semanal: "Cada semana", quincenal: "Cada 15 días", mensual: "Cada mes" };
+
+const STEP_DAYS: Record<Exclude<Frequency, "mensual">, number> = { diario: 1, semanal: 7, quincenal: 14 };
 
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
 
 /** El período `n` de un gasto fijo. Como en la base: siempre desde el primero, así el 31 cae el 30 o el 28 y vuelve al 31. */
 export function occurrence(startsOn: string, frequency: Frequency, n: number) {
-  if (frequency !== "mensual") return addDays(startsOn, n * (frequency === "semanal" ? 7 : 14));
+  if (frequency !== "mensual") return addDays(startsOn, n * STEP_DAYS[frequency]);
   const [y, m, d] = startsOn.split("-").map(Number);
   const month = m - 1 + n;
   const lastDay = new Date(Date.UTC(y, month + 1, 0)).getUTCDate();
@@ -19,7 +21,7 @@ export function occurrence(startsOn: string, frequency: Frequency, n: number) {
 /** El próximo pago después de hoy (el de hoy ya es un pendiente). */
 export function nextOccurrence(startsOn: string, frequency: Frequency, today: string) {
   if (startsOn > today) return startsOn;
-  let n = Math.floor(daysBetween(startsOn, today) / (frequency === "mensual" ? 31 : frequency === "semanal" ? 7 : 14));
+  let n = Math.floor(daysBetween(startsOn, today) / (frequency === "mensual" ? 31 : STEP_DAYS[frequency]));
   while (occurrence(startsOn, frequency, n) <= today) n++;
   return occurrence(startsOn, frequency, n);
 }

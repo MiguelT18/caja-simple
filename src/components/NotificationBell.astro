@@ -1,5 +1,5 @@
 ---
-import { AlarmClock, ArrowLeftRight, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Crown, Hourglass, PackageCheck, PackageMinus, PackagePlus, PackageX, RotateCcw, TriangleAlert, Truck, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
+import { AlarmClock, ArrowLeftRight, HandCoins, Wallet, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Crown, Hourglass, PackageCheck, PackageMinus, PackagePlus, PackageX, RotateCcw, TriangleAlert, Truck, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
 import type { HTMLAttributes } from "astro/types";
 import { branchColor, branchImages, inbox, myBusinesses, notificationHref } from "@/data/queries";
 import type { Notification } from "@/data/types";
@@ -60,6 +60,10 @@ function describe(n: Notification) {
       return { icon: TriangleAlert, title: `Turno ${n.data.shift.toLowerCase()} sin abrir en ${n.data.branch}`, detail: `Debía abrir a las ${n.data.start}`, tone: "warning" };
     case "shift_overdue":
       return { icon: TriangleAlert, title: `Turno ${n.data.shift.toLowerCase()} sin cerrar en ${n.data.branch}`, detail: `Debía cerrar a las ${n.data.end}${n.data.person ? ` · lo abrió ${n.data.person}` : ""}`, tone: "warning" };
+    case "expense_added":
+      return { icon: Wallet, title: `${n.data.person ?? "Alguien"} registró un gasto en ${n.data.branch}`, detail: `${n.data.concept ?? "Gasto"} · ${formatBs(Number(n.data.amount))}` };
+    case "cash_withdrawal":
+      return { icon: HandCoins, title: `${n.data.person ?? "Alguien"} registró un retiro en ${n.data.branch}`, detail: `${formatBs(Number(n.data.amount))}${n.data.concept ? ` · ${n.data.concept}` : ""}` };
     case "low_stock":
       return {
         icon: PackageMinus,
@@ -152,7 +156,8 @@ function describe(n: Notification) {
 const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin leer`;
 ---
 
-<div class:list={["bell", className]} data-bell data-unread={unread} {...rest}>
+<!-- data-region: los avisos en vivo la vuelven a pedir sin recargar (scripts/live.ts, canal «persona:<id>»). -->
+<div class:list={["bell", className]} data-bell data-region="bell" data-user={Astro.locals.userId} data-unread={unread} {...rest}>
   <button type="button" class="icon-btn bell-trigger" popovertarget="notifications" aria-controls="notifications" aria-expanded="false" aria-label={label} title={label}>
     <Bell size={18} stroke-width={1.75} />
     {unread > 0 && <span class="bell-count" aria-hidden="true">{unread > 9 ? "9+" : unread}</span>}
@@ -199,7 +204,7 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
             const at = branchesOf(n);
             const photo = at && photos.get(at.branch.id);
             return (
-              <li class:list={["bell-item", { unread: !n.read, linked: href }]} data-id={n.read ? undefined : n.id}>
+              <li class:list={["bell-item", { unread: !n.read, linked: href }]} data-id={n.read ? undefined : n.id} data-key={n.id}>
                 {at ? (
                   // La sucursal a simple vista: su foto (o su color) y, en la esquina, el ícono del tipo de aviso.
                   <span class="bell-icon bell-art" style={`--tone: ${branchColor(at.m, at.branch.id)}`} aria-hidden="true">
@@ -394,11 +399,82 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
   import { actions } from "astro:actions";
   import { announce, confirmDialog, toast } from "@/scripts/dialogs";
   import { isBusy, setBusy } from "@/scripts/busy";
-  import { onPage } from "@/scripts/refresh";
+  import { onPage, onRegions, refreshRegions } from "@/scripts/refresh";
+  import { watchLive } from "@/scripts/live";
 
-  // Vive en el menú lateral, que se conserva al navegar: cada campana se ata una sola vez.
+  // Avisos en vivo: la base anuncia cada aviso nuevo en el canal de su destinataria (migración inbox_live). La campana
+  // y lo que la página muestra de ese tema se vuelven a pedir; el contenido lo arma el servidor, como siempre.
+  // Qué regiones de la página cambian según el tipo de aviso (las que no están en la página se ignoran).
+  const REGIONS_BY_KIND: [RegExp, string[]][] = [
+    [/^stock_/, ["stock-requests", "stock-deliveries", "moves"]],
+    [/^(reopen_|shift_)/, ["shifts", "calendar", "shift-bar"]],
+    [/^(invitation|join_)/, ["join-requests", "team"]],
+  ];
+  const keys = () => new Set([...document.querySelectorAll<HTMLElement>("[data-bell] .bell-item[data-key]")].map((li) => li.dataset.key!));
+  let watching = false;
+  // Llegó algo con la bandeja abierta: no se cambia mientras se lee, se actualiza al cerrarla.
+  let stale = false;
+
+  /** «(3) Turnos · Caja Simple»: con la pestaña de fondo, el título dice que hay avisos sin leer. */
+  function syncTitle() {
+    const unread = Number(document.querySelector<HTMLElement>("[data-bell]")?.dataset.unread ?? 0);
+    const base = document.title.replace(/^\(\d+\+?\) /, "");
+    document.title = unread > 0 ? `(${unread > 9 ? "9+" : unread}) ${base}` : base;
+  }
+
+  function watchInbox(user: string) {
+    if (watching) return;
+    watching = true;
+    let before = keys();
+    watchLive({
+      // Vive toda la sesión: el menú lateral (y la campana) se conservan al navegar.
+      signal: new AbortController().signal,
+      topic: `persona:${user}`,
+      regions: ["bell"],
+      regionsFor: (events) => events.flatMap((e) => REGIONS_BY_KIND.find(([kind]) => kind.test(e.table))?.[1] ?? []),
+      whileHidden: true,
+      names: {},
+      onStatus: () => {},
+      // El anuncio lo da el toast (que también va a los lectores de pantalla).
+      onAnnounce: () => {},
+      beforeRefresh: () => (before = keys()),
+      afterRefresh: () => {
+        stale ||= !!document.querySelector("[data-bell] .bell-panel:popover-open");
+        syncTitle();
+        announceNew(before);
+      },
+    });
+  }
+
+  /** Un toast por lo que llegó desde `before` (varios: uno solo con la cuenta). También lo leen los lectores de pantalla. */
+  function announceNew(before: Set<string>) {
+    const fresh = [...document.querySelectorAll<HTMLElement>("[data-bell] .bell-item[data-key]")].filter((li) => !before.has(li.dataset.key!));
+    if (fresh.length === 0) return;
+    if (fresh.length > 1) return toast(`Tienes ${fresh.length} avisos nuevos.`, "info");
+    const title = fresh[0].querySelector(".bell-title")?.cloneNode(true) as HTMLElement | undefined;
+    title?.querySelector(".sr-only")?.remove();
+    const href = fresh[0].querySelector<HTMLAnchorElement>(".bell-go")?.getAttribute("href");
+    toast(title?.textContent?.trim() || "Tienes un aviso nuevo.", "info", href ? { href, label: "Ver" } : undefined);
+  }
+
+  /** Lo que llegó mientras la bandeja estaba abierta, una vez cerrada. */
+  async function catchUp() {
+    stale = false;
+    const before = keys();
+    await refreshRegions(["bell"], location.href, { keepFocus: true });
+    syncTitle();
+    announceNew(before);
+  }
+
+  onPage(() => {
+    syncTitle();
+    const user = document.querySelector<HTMLElement>("[data-bell]")?.dataset.user;
+    if (user) watchInbox(user);
+  });
+
+  // Se conserva al navegar y también llega nueva con cada aviso: cada campana se ata una sola vez.
   const bound = new WeakSet<Element>();
-  onPage(() => document.querySelectorAll<HTMLElement>("[data-bell]").forEach((root) => {
+  onRegions((scope) => [...(scope instanceof HTMLElement && scope.matches("[data-bell]") ? [scope] : scope.querySelectorAll<HTMLElement>("[data-bell]"))].forEach((root) => {
     if (bound.has(root)) return;
     bound.add(root);
     const trigger = root.querySelector<HTMLButtonElement>(".bell-trigger")!;
@@ -450,6 +526,8 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
       else {
         observer.disconnect();
         showSeenAsRead();
+        // Lo que llegó mientras estaba abierta: después de cerrarse (en beforetoggle todavía cuenta como abierta).
+        if (stale) setTimeout(() => void catchUp());
       }
     });
 
@@ -635,6 +713,7 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
         count.textContent = unread > 9 ? "9+" : String(unread);
         count.hidden = unread === 0;
       }
+      syncTitle();
       const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin leer`;
       trigger.setAttribute("aria-label", label);
       trigger.title = label;

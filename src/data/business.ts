@@ -58,7 +58,11 @@ export async function businessContext(locals: App.Locals, businessSlug: string) 
   const lowStock = (i: (typeof stock)[number]) => isLowStock({ stock: i.stock, minStock: i.min_stock });
 
   const branchSummary = m.branches.map((branch) => {
-    const branchMoves = { sales: moves.sales.filter((s) => s.branchId === branch.id), expenses: moves.expenses.filter((g) => g.branchId === branch.id) };
+    const branchMoves = {
+      sales: moves.sales.filter((s) => s.branchId === branch.id),
+      expenses: moves.expenses.filter((g) => g.branchId === branch.id),
+      withdrawals: moves.withdrawals.filter((w) => w.branchId === branch.id),
+    };
     const sales = branchMoves.sales.filter((s) => s.date === day);
     const expenses = branchMoves.expenses.filter((g) => g.date === day);
     return {
