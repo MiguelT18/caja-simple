@@ -18,6 +18,7 @@ if (typeof document !== "undefined") {
  * Sin regiones o sin red, recarga: nunca queda peor que antes.
  * Con `keepFocus` (avisos en vivo, que nadie pidió con un clic): el foco vuelve al mismo control de la región nueva
  * y, si no estaba en una región, no se toca. Esos avisos nunca navegan: si algo falla, la página queda como estaba.
+ * Tampoco cambian una región en uso (busy): se actualiza en el próximo aviso.
  */
 export async function refreshRegions(names?: string[], url = location.href, { keepFocus = false } = {}) {
   if (navigating) return;
@@ -42,6 +43,7 @@ export async function refreshRegions(names?: string[], url = location.href, { ke
   const swapped: HTMLElement[] = [];
   let refocus: HTMLElement | undefined;
   for (const now of current) {
+    if (keepFocus && busy(now)) continue;
     const next = fresh.querySelector<HTMLElement>(selector(now.dataset.region!));
     if (!next) {
       now.remove(); // ya no corresponde (p. ej., la barra del turno al cerrarlo)
@@ -78,6 +80,13 @@ export async function refreshRegions(names?: string[], url = location.href, { ke
 }
 
 const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]";
+
+/** En uso: un menú o la bandeja abiertos, un diálogo abierto, un formulario con cambios o un campo donde se escribe. */
+function busy(region: HTMLElement) {
+  if (region.querySelector(":popover-open, dialog[open], form[data-dirty]")) return true;
+  const active = document.activeElement;
+  return !!active && region.contains(active) && active.matches("input:not([type=checkbox], [type=radio], [type=hidden]), textarea, select");
+}
 
 /** Pone en `next` las islas ya hidratadas de `now` (misma posición y componente), con los props nuevos. */
 function keepIslands(now: HTMLElement, next: HTMLElement) {
