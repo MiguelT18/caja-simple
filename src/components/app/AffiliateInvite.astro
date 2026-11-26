@@ -1,8 +1,10 @@
 ---
 // Anuncio del programa de afiliados al final de /app/[negocio]/plan: solo para quien tiene perfil de afiliado
-// (`affiliate` de la sesión, public.affiliates). Su enlace `/r/<código>` guarda la cookie `ref` y lleva a /planes;
+// (`affiliate` de la sesión, public.affiliates). Su enlace `/r/<código>` abre una invitación con su nombre y guarda la cookie `ref`;
 // las comisiones y las condiciones están en /app/cuenta/afiliado.
 import { ArrowRight, Check, Copy, HandCoins, MessageCircle, Share2, Store, Wallet } from "@lucide/astro";
+import { founderPromo, referralPerks } from "@/data/queries";
+import { referralOffer } from "@/data/plans";
 
 interface Props {
   affiliate: { code: string; rate: number };
@@ -11,7 +13,10 @@ interface Props {
 const { affiliate } = Astro.props;
 const link = `${Astro.url.origin}/r/${affiliate.code}`;
 const pct = `${Math.round(affiliate.rate * 100)}%`;
-const share = `https://wa.me/?text=${encodeURIComponent(`Yo llevo la caja de mi negocio con Caja Simple: ventas, gastos y cuadre de caja, desde el celular. Con este enlace tienes 20% de descuento en tu primer pago: ${link}`)}`;
+const sb = Astro.locals.supabase;
+const [founder, perks] = await Promise.all([founderPromo(sb, undefined, true).catch(() => null), referralPerks(sb)]);
+const offer = referralOffer(founder, perks);
+const share = `https://wa.me/?text=${encodeURIComponent(`Yo llevo la caja de mi negocio con Caja Simple: ventas, gastos y cuadre de caja, desde el celular. Con este enlace tienes ${offer}: te ayudo a cargar tus productos, armar los turnos e invitar a tu equipo. ${link}`)}`;
 ---
 
 <section class="affiliate" aria-labelledby="affiliate-title">
@@ -22,7 +27,7 @@ const share = `https://wa.me/?text=${encodeURIComponent(`Yo llevo la caja de mi 
       <h2 id="affiliate-title">Gana dinero recomendando Caja Simple</h2>
       <p class="lead">
         Tienes un perfil de afiliado. Gana el <strong class="num">{pct}</strong> de lo que paguen los negocios que lleguen
-        con tu enlace, durante sus primeros 12 meses. Ellos tienen <strong class="num">20%</strong> de descuento en su primer pago.
+        con tu enlace, durante sus primeros 12 meses. Ellos tienen {offer}.
       </p>
     </div>
   </div>

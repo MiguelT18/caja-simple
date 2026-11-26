@@ -6,7 +6,7 @@ import PlanCalculator from "@/components/PlanCalculator.astro";
 import PeriodSwitch from "@/components/plans/PeriodSwitch.astro";
 import PlanPrice from "@/components/plans/PlanPrice.astro";
 import Layout from "@/layouts/Layout.astro";
-import { businessContext, businessHref, currentQuote, founderPromo, myAffiliate, myBusinesses, planCharges, referralDiscount } from "@/data/queries";
+import { businessContext, businessHref, currentQuote, founderPromo, myAffiliate, myBusinesses, planCharges, referralPerks } from "@/data/queries";
 import { founderMonthsLeft, plans, untilLabel, upgradeUrl, usdLabel, type Period } from "@/data/plans";
 import { longDate, shortDate, stamp, today } from "@/lib/dates";
 import { plural } from "@/lib/format";
@@ -16,19 +16,19 @@ if (!ctx) return Astro.rewrite("/404");
 const { business } = ctx;
 const sb = Astro.locals.supabase;
 const period: Period = Astro.url.searchParams.get("periodo") === "anual" ? "anual" : "mensual";
-const [quote, charges, promo, referral] = await Promise.all([
+const [quote, charges, promo, perks] = await Promise.all([
   currentQuote(sb),
   planCharges(sb, business.id),
   founderPromo(sb, business.id).catch(() => null),
-  business.referred ? referralDiscount(sb) : 0,
+  business.referred ? referralPerks(sb) : null,
 ]);
-// Llegó con el link de un afiliado y todavía no pagó: su primer cobro lleva el descuento de recomendación si es mayor
-// que el de fundador (como create_plan_charge), sobre el cobro entero.
-const referralFirst = referral > (promo?.discount ?? 0) && !charges.some((c) => c.status === "pagado") ? referral : 0;
+// Llegó con el link de un afiliado, no tiene precio fundador y todavía no pagó: su primer pago suma meses gratis
+// (activate_plan_charge).
+const freeMonths = perks && !promo && !charges.some((c) => c.status === "pagado") ? perks.freeMonths : 0;
 // Lo que pagaría hoy: con su precio fundador vigente o, si aún no lo es, mientras queden cupos.
-const discount = referralFirst || (promo ? promo.discount : 0);
+const discount = promo ? promo.discount : 0;
 // En el anual, el descuento cubre solo los meses de fundador que le quedan (un fundador nuevo, el año entero).
-const founderMonths = !referralFirst && promo?.until ? founderMonthsLeft(promo.until, today()) : 12;
+const founderMonths = promo?.until ? founderMonthsLeft(promo.until, today()) : 12;
 const affiliate = myAffiliate(Astro.locals);
 const pct = (d: number) => `${Math.round(d * 100)}%`;
 const branches = ctx.membership.branches.length;
@@ -131,24 +131,25 @@ const rateText = (c: (typeof charges)[number]) =>
               </details>
             )}
           </div>
-          {referralFirst > 0 && (
+          {freeMonths > 0 && (
             <p class="founder">
               <Sparkles size={16} stroke-width={1.75} aria-hidden="true" />
-              <span><strong>Descuento por recomendación: −{pct(referralFirst)}</strong> en tu primer pago, por llegar con el enlace de un socio de Caja Simple.</span>
+              <span><strong>{freeMonths === 1 ? "Un mes gratis" : `${freeMonths} meses gratis`}:</strong> tu primer pago suma {freeMonths === 1 ? "un mes más" : `${freeMonths} meses más`}, por llegar con el enlace de un socio de Caja Simple.</span>
             </p>
           )}
-          {promo && !referralFirst && (
+          {promo && (
             <p class="founder">
               <Sparkles size={16} stroke-width={1.75} aria-hidden="true" />
               <span>
-                <strong>Precio fundador: −{pct(promo.discount)}</strong>{" "}
+                <strong>Precio fundador{promo.referred && !promo.until ? " asegurado" : ""}: −{pct(promo.discount)}</strong>{" "}
+                {promo.referred && !promo.until && "por llegar con el enlace de un socio de Caja Simple, "}
                 {promo.until
                   ? `en tus cobros hasta el ${longDate(promo.until).replace(/^\S+ /, "")}. En el plan anual, solo por los meses que te quedan.`
                   : `${promo.months === 12 ? "el primer año" : `por ${promo.months} meses`} desde tu primer pago. ${promo.left === 1 ? "Queda 1 cupo" : `Quedan ${promo.left} cupos`}: el tuyo se reserva al confirmar el pago.`}
               </span>
             </p>
           )}
-          <PlanCalculator branches={pending ? pending.extraBranches + 1 : branches} current={branches} min={Math.max(branches, 1)} name="branches" form="pay" discount={discount} founderMonths={founderMonths} discountName={referralFirst ? "Descuento por recomendación" : undefined} period={period} quote={quote} />
+          <PlanCalculator branches={pending ? pending.extraBranches + 1 : branches} current={branches} min={Math.max(branches, 1)} name="branches" form="pay" discount={discount} founderMonths={founderMonths} period={period} quote={quote} />
 
           {pending && (
             <div class="pending" role="group" aria-labelledby="pending-title">

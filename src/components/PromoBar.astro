@@ -28,7 +28,11 @@ const left = promo.left === 1 ? "Queda 1 cupo" : `Quedan ${promo.left} cupos`;
         <Sparkles size={16} stroke-width={1.75} aria-hidden="true" />
         <p>
           <strong>Precio fundador:</strong>{" "}
-          <span class="promo-long">{pct} de descuento {year} para los primeros {promo.slots} negocios que paguen.</span>
+          <span class="promo-long">
+            {promo.referred
+              ? `llegaste con el enlace de un socio de Caja Simple: tienes ${pct} de descuento ${year}.`
+              : `${pct} de descuento ${year} para los primeros ${promo.slots} negocios que paguen.`}
+          </span>
           <span class="promo-short">−{pct} {year}.</span>{" "}
           <strong class="num">{left}.</strong>
         </p>
@@ -42,7 +46,7 @@ const left = promo.left === 1 ? "Queda 1 cupo" : `Quedan ${promo.left} cupos`;
         <strong id="promo-card-title">Precio fundador −{pct}</strong>
       </p>
       <p class="promo-card-text">
-        {year[0].toUpperCase() + year.slice(1)}, para los primeros {promo.slots} negocios. <strong class="num">{left}.</strong>
+        {year[0].toUpperCase() + year.slice(1)}, {promo.referred ? "asegurado por el enlace de un socio" : `para los primeros ${promo.slots} negocios`}. <strong class="num">{left}.</strong>
       </p>
       <a href={href} class="promo-link">{label}</a>
       <button type="button" class="promo-close" aria-label="Ocultar promoción" data-promo-close>

@@ -95,6 +95,20 @@ export function founderMonthsLeft(until: string, today: string) {
   return Math.min(12, months + (ed !== td ? 1 : 0));
 }
 
+/**
+ * Lo que recibe quien llega con el enlace de un afiliado, para el texto que comparte y sus condiciones: el precio
+ * fundador mientras dure el programa, si no, los meses gratis; siempre la prueba larga y el alta asistida.
+ */
+export function referralOffer(founder: { discount: number; months: number } | null, perks: { freeMonths: number; trialDays: number }) {
+  const trial = `${perks.trialDays} días de prueba`;
+  if (founder) {
+    const span = founder.months === 12 ? "el primer año" : `los primeros ${founder.months} meses`;
+    return `precio fundador (${Math.round(founder.discount * 100)}% de descuento ${span}), ${trial} y la app configurada`;
+  }
+  const free = perks.freeMonths === 1 ? "un mes gratis" : `${perks.freeMonths} meses gratis`;
+  return perks.freeMonths > 0 ? `${trial}, ${free} en tu primer pago y la app configurada` : `${trial} y la app configurada`;
+}
+
 const usdFormat = (n: number) => n.toLocaleString("es-BO", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
 /** «US$ 5,50», «US$ 55». */
 export const usdLabel = (n: number) => `US$ ${usdFormat(n)}`;

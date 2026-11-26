@@ -4,6 +4,14 @@ import AuthDivider from "../../components/auth/AuthDivider.astro";
 import FormField from "../../components/auth/FormField.astro";
 import GoogleButton from "../../components/auth/GoogleButton.astro";
 import PasswordField from "../../components/auth/PasswordField.astro";
+import { referralInvite, referralPerks } from "@/data/queries";
+import { REFERRAL_COOKIE } from "@/lib/auth";
+
+// Llegó con el enlace de un afiliado (/r/<código>): se le recuerda quién lo invitó y qué recibe.
+const code = Astro.cookies.get(REFERRAL_COOKIE)?.value;
+const [invite, perks] = code
+  ? await Promise.all([referralInvite(Astro.locals.supabase, code).catch(() => null), referralPerks(Astro.locals.supabase).catch(() => null)])
+  : [null, null];
 ---
 
 <AuthLayout
@@ -12,6 +20,8 @@ import PasswordField from "../../components/auth/PasswordField.astro";
   description="Empieza a controlar tu negocio"
   pitch="Abre tu caja hoy. Empezar es gratis."
 >
+  {invite && <p class="notice" role="status">Te invitó {invite.name}: tu primer negocio prueba el plan Negocio {perks?.trialDays ?? 60} días gratis.</p>}
+
   <GoogleButton label="Registrarse con Google" action="/api/auth/google" />
 
   <AuthDivider />

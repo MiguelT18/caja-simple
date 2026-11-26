@@ -25,28 +25,45 @@ export interface FounderPromo {
   months: number;
   /** Con negocio: último día con precio fundador de ese negocio (si ya lo es). */
   until: string | null;
+  /** Llegó con el enlace de un afiliado: tiene el precio fundador asegurado, con los cupos de referido. */
+  referred: boolean;
 }
 
 /**
  * La promo de fundadores como la cuenta la base (founder_promo): los cupos reales, sin caché. null si está apagada,
- * o si ya no quedan cupos y este negocio no la tiene. Sirve sin sesión.
+ * o si ya no quedan cupos y este negocio no la tiene. Sirve sin sesión. Con `referred` (o un negocio referido), los
+ * cupos son los de un referido (billing_settings.referral_founder_slots).
  */
-export async function founderPromo(sb: Supabase, businessId?: string): Promise<FounderPromo | null> {
-  const { data, error } = await sb.rpc("founder_promo", businessId ? { p_business: businessId } : {});
+export async function founderPromo(sb: Supabase, businessId?: string, referred = false): Promise<FounderPromo | null> {
+  const { data, error } = await sb.rpc("founder_promo", { ...(businessId && { p_business: businessId }), p_referred: referred });
   fail(error);
   const row = data?.[0];
   if (!row) return null;
   const until = row.founder_until && row.founder_until >= today() ? row.founder_until : null;
   const left = Math.max(0, row.slots - row.taken);
   if (!until && (!row.active || left === 0)) return null;
-  return { slots: row.slots, left, discount: Number(row.discount), months: row.months, until };
+  return { slots: row.slots, left, discount: Number(row.discount), months: row.months, until, referred: row.referred };
 }
 
-/** Descuento del primer cobro de un negocio referido por un afiliado (0,2 = 20%). */
-export async function referralDiscount(sb: Supabase) {
-  const { data, error } = await sb.from("billing_settings").select("referral_discount").maybeSingle();
+/** Lo que gana quien llega con el enlace de un afiliado, sin contar el precio fundador: meses gratis en su primer pago y días de prueba. */
+export async function referralPerks(sb: Supabase) {
+  const { data, error } = await sb.from("billing_settings").select("referral_free_months, referral_trial_days").maybeSingle();
   fail(error);
-  return Number(data?.referral_discount ?? 0);
+  return { freeMonths: data?.referral_free_months ?? 1, trialDays: data?.referral_trial_days ?? 60 };
+}
+
+/** Quién invita con el código de /r/<código>: «Ana T.». null si el código no existe o el afiliado ya no está activo. Sirve sin sesión. */
+export async function referralInvite(sb: Supabase, code: string): Promise<{ name: string } | null> {
+  const { data, error } = await sb.rpc("referral_invite", { p_code: code });
+  fail(error);
+  return data?.[0] ?? null;
+}
+
+/** Si la cuenta de la sesión puede activar la invitación de `code`: «si», «ya» (ya tiene afiliado) o «no». */
+export async function referralClaimable(sb: Supabase, code: string): Promise<"si" | "ya" | "no"> {
+  const { data, error } = await sb.rpc("referral_claimable", { p_code: code });
+  fail(error);
+  return data === "si" || data === "ya" ? data : "no";
 }
 
 /** Negocios que la persona ve, para /planes (ahí el middleware no carga la sesión). Vencido cuenta como Gratis, como en la base. */
