@@ -8,7 +8,8 @@ import DonutChart from "@/components/app/charts/DonutChart";
 import WeekChart from "@/components/app/charts/WeekChart";
 import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { affiliateSummary, commissionsByPeriod, myAffiliate } from "@/data/queries";
+import { affiliateSummary, commissionsByPeriod, founderPromo, myAffiliate, referralPerks } from "@/data/queries";
+import { referralOffer } from "@/data/plans";
 import { addDays, parseRange, shortDate, today as todayOf, type Period } from "@/lib/dates";
 
 const affiliate = myAffiliate(Astro.locals);
@@ -24,7 +25,12 @@ const periods: Record<Period, string> = { dia: "Por día", semana: "Por semana",
 const asked = Astro.url.searchParams.get("periodo");
 const period: Period = asked === "dia" || asked === "semana" || asked === "mes" ? asked : range.days > 92 ? "mes" : range.days > 31 ? "semana" : "dia";
 
-const { inRange, totals, range: summary, referrals } = await affiliateSummary(Astro.locals.supabase, range);
+const [{ inRange, totals, range: summary, referrals }, founder, perks] = await Promise.all([
+  affiliateSummary(Astro.locals.supabase, range),
+  founderPromo(Astro.locals.supabase, undefined, true).catch(() => null),
+  referralPerks(Astro.locals.supabase),
+]);
+const offer = referralOffer(founder, perks);
 const monthFormat = new Intl.DateTimeFormat("es-BO", { month: "short", year: "numeric", timeZone: "UTC" });
 const periodLabel = (date: string) =>
   period === "mes" ? monthFormat.format(new Date(`${date}T12:00:00Z`)).replace(".", "") : period === "semana" ? `Sem. del ${shortDate(date)}` : shortDate(date);
@@ -37,7 +43,7 @@ const statusName = { retenida: "Retenida", "por pagar": "Por cobrar", pagada: "C
 
 const link = `${Astro.url.origin}/r/${affiliate.code}`;
 const pct = `${Math.round(affiliate.rate * 100)}%`;
-const share = `https://wa.me/?text=${encodeURIComponent(`Yo uso Caja Simple para llevar la caja del negocio: ventas, gastos y cuadre, desde el celular. Con este enlace tienes un descuento en tu primer pago: ${link}`)}`;
+const share = `https://wa.me/?text=${encodeURIComponent(`Yo uso Caja Simple para llevar la caja del negocio: ventas, gastos y cuadre, desde el celular. Con este enlace tienes ${offer}: te ayudo a cargar tus productos, armar los turnos e invitar a tu equipo. ${link}`)}`;
 const bs = (n: number) => `Bs ${n.toLocaleString("es-BO")}`;
 const rangeText = `del ${shortDate(range.from)} al ${shortDate(range.to)}`;
 const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", pagada: "chip-income" } as const;
@@ -145,7 +151,8 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
       <h2 class="card-title" id="rules-title"><ScrollText size={20} stroke-width={1.75} aria-hidden="true" />Condiciones</h2>
       <ul class="rules">
         <li>Ganas el {pct} de lo que paga, en bolivianos, cada negocio que llegó con tu enlace, durante los 12 meses que siguen a su primer pago. Un plan anual cuenta solo por los meses que caen dentro de esos 12.</li>
-        <li>El negocio tiene un descuento en su primer pago. Si le toca el precio fundador, se aplica el mayor de los dos.</li>
+        <li>El negocio que llega con tu enlace tiene {offer}.{founder && ` Después del programa fundador, en vez del precio fundador tiene ${perks.freeMonths === 1 ? "un mes gratis" : `${perks.freeMonths} meses gratis`} en su primer pago.`}</li>
+        <li><strong>Alta asistida:</strong> a cada negocio que traes le dejas la app lista. Importas sus productos, armas los turnos e invitas a su equipo. Es lo que el negocio gana por llegar contigo.</li>
         <li>Vale para cuentas nuevas: la persona tiene que crear su cuenta con tu enlace (dura 60 días en su navegador) y no haber pagado antes.</li>
         <li>No cuentan tus propios negocios.</li>
         <li>Cada comisión queda retenida 30 días después del pago del cliente. Te pagamos una vez al mes, cuando lo que tienes por cobrar llega a Bs 100.</li>

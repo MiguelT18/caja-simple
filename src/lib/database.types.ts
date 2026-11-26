@@ -50,9 +50,11 @@ export type Database = {
           founder_slots: number;
           id: boolean;
           qr_image_url: string | null;
-          referral_discount: number;
+          referral_founder_slots: number;
+          referral_free_months: number;
           referral_hold_days: number;
           referral_months: number;
+          referral_trial_days: number;
           tax_rate: number;
         };
         ComputedFields: never;
@@ -66,9 +68,11 @@ export type Database = {
           founder_slots?: number;
           id?: boolean;
           qr_image_url?: string | null;
-          referral_discount?: number;
+          referral_founder_slots?: number;
+          referral_free_months?: number;
           referral_hold_days?: number;
           referral_months?: number;
+          referral_trial_days?: number;
           tax_rate?: number;
         };
         Update: {
@@ -81,9 +85,11 @@ export type Database = {
           founder_slots?: number;
           id?: boolean;
           qr_image_url?: string | null;
-          referral_discount?: number;
+          referral_founder_slots?: number;
+          referral_free_months?: number;
           referral_hold_days?: number;
           referral_months?: number;
+          referral_trial_days?: number;
           tax_rate?: number;
         };
         Relationships: [];
@@ -2218,12 +2224,13 @@ export type Database = {
       };
       delete_my_account: { Args: Record<PropertyKey, never>; Returns: undefined };
       founder_promo: {
-        Args: { p_business?: string };
+        Args: { p_business?: string; p_referred?: boolean };
         Returns: {
           active: boolean;
           discount: number;
           founder_until: string;
           months: number;
+          referred: boolean;
           slots: number;
           taken: number;
         }[];
@@ -2233,6 +2240,8 @@ export type Database = {
         Returns: undefined;
       };
       receive_stock: { Args: { p_delivery: string; p_qty: number }; Returns: undefined };
+      referral_claimable: { Args: { p_code: string }; Returns: string };
+      referral_invite: { Args: { p_code: string }; Returns: { name: string }[] };
       record_stock_move: {
         Args: {
           p_branch: string;

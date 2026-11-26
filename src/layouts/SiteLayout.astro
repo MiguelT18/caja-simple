@@ -19,8 +19,9 @@ interface Props {
 const { title, description, active } = Astro.props;
 const signedIn = Boolean(Astro.locals.userId);
 const plansCurrent = active === "planes" ? "page" : undefined;
-// Precio fundador con los cupos reales; si la base no responde, la página sale sin la barra.
-const promo = await founderPromo(Astro.locals.supabase).catch(() => null);
+// Precio fundador con los cupos reales; si la base no responde, la página sale sin la barra. Quien llegó con el enlace
+// de un afiliado (cookie `ref` de /r/<código>) lo tiene asegurado, con los cupos de referido.
+const promo = await founderPromo(Astro.locals.supabase, undefined, Astro.cookies.has("ref")).catch(() => null);
 ---
 
 <html lang="es">

@@ -20,6 +20,21 @@ export const billing = {
     },
   }),
 
+  /**
+   * «Activar beneficio» en /r/<código>: deja la cuenta referida por el afiliado y, con ella, sus negocios sin pagos
+   * (claim_referral decide si vale: cuenta nueva, sin pagos, no el propio afiliado).
+   */
+  claimReferral: defineAction({
+    accept: "form",
+    input: z.object({ code: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Ese enlace no es válido.").max(30) }),
+    handler: async ({ code }, context) => {
+      const { data, error } = await db(context).rpc("claim_referral", { p_code: code });
+      check(error);
+      if (!data) throw new ActionError({ code: "BAD_REQUEST", message: "Este beneficio es para cuentas nuevas que todavía no pagaron un plan." });
+      return { claimed: true };
+    },
+  }),
+
   /** Solo los que no se pagaron (por pagar o vencidos): RLS deja fuera los pagados. */
   deletePlanCharge: defineAction({
     accept: "form",

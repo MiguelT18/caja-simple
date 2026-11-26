@@ -1,14 +1,244 @@
 ---
-// Link de afiliado: guarda su código hasta que la persona crea su cuenta (claimReferral) y la lleva a los planes.
-// La base valida el código al reclamarlo; aquí solo se descarta lo que no puede ser un código.
+// Link de afiliado: una invitación que dice quién invita y qué recibe quien llega (docs/planes-de-suscripcion.md ›
+// Afiliados). Sin sesión guarda el código en la cookie `ref` hasta que la persona crea su cuenta (claimReferral).
+// Con sesión, «Activar beneficio» (Action claimReferral) deja la cuenta y sus negocios sin pagos referidos, si la base
+// lo permite (referral_claimable: cuenta nueva, sin pagos, sin otro afiliado).
+import { actions } from "astro:actions";
+import { CalendarCheck, Gift, Sparkles, Wrench } from "@lucide/astro";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import { founderPromo, referralClaimable, referralInvite, referralPerks } from "@/data/queries";
 import { REFERRAL_COOKIE } from "@/lib/auth";
+import { plural } from "@/lib/format";
 
 export const prerender = false;
 
-const code = (Astro.params.codigo ?? "").toLowerCase();
-// La primera recomendación gana: un segundo link no pisa la cookie.
-if (/^[a-z0-9]+(-[a-z0-9]+)*$/.test(code) && code.length <= 30 && !Astro.cookies.has(REFERRAL_COOKIE)) {
-  Astro.cookies.set(REFERRAL_COOKIE, code, { path: "/", maxAge: 60 * 60 * 24 * 60, httpOnly: true, sameSite: "lax", secure: import.meta.env.PROD });
+const sb = Astro.locals.supabase;
+const signedIn = Boolean(Astro.locals.userId);
+const raw = (Astro.params.codigo ?? "").toLowerCase();
+// La base valida el código; aquí solo se descarta lo que no puede ser un código.
+const code = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(raw) && raw.length <= 30 ? raw : null;
+const [invite, perks, promo] = await Promise.all([
+  code ? referralInvite(sb, code).catch(() => null) : null,
+  referralPerks(sb).catch(() => null),
+  founderPromo(sb, undefined, true).catch(() => null),
+]);
+
+// Con sesión: lo decide la persona con el botón, no abrir la página.
+const result = Astro.getActionResult(actions.claimReferral);
+const claimed = result?.data?.claimed === true;
+const claimError = result?.error?.message;
+let claimable: "si" | "ya" | "no" = "no";
+if (invite && code) {
+  if (signedIn) {
+    claimable = claimed ? "ya" : await referralClaimable(sb, code).catch(() => "no" as const);
+  } else if (!Astro.cookies.has(REFERRAL_COOKIE)) {
+    // La primera recomendación gana: un segundo link no pisa la cookie.
+    Astro.cookies.set(REFERRAL_COOKIE, code, { path: "/", maxAge: 60 * 60 * 24 * 60, httpOnly: true, sameSite: "lax", secure: import.meta.env.PROD });
+  }
 }
-return Astro.redirect("/planes", 303);
+
+const trialDays = perks?.trialDays ?? 60;
+const freeMonths = perks?.freeMonths ?? 0;
+const pct = promo ? `${Math.round(promo.discount * 100)}%` : "";
+const year = promo && (promo.months === 12 ? "el primer año" : `los primeros ${plural(promo.months, "mes", "meses")}`);
+const benefits = [
+  { icon: CalendarCheck, title: `${trialDays} días gratis del plan Negocio`, text: "Tu primer negocio los prueba completos, sin tarjeta. Después puedes seguir en Gratis, que no vence." },
+  promo && promo.left > 0
+    ? { icon: Sparkles, title: `${pct} de descuento ${year}`, text: `Precio fundador asegurado si pagas mientras queden cupos (${promo.left === 1 ? "queda 1" : `quedan ${promo.left}`}).` }
+    : freeMonths > 0
+      ? { icon: Gift, title: `${plural(freeMonths, "mes gratis", "meses gratis")} en tu primer pago`, text: "Pagas un mes y usas uno más, o pagas un año y usas trece." }
+      : null,
+  invite && { icon: Wrench, title: "La app lista para usar", text: `${invite.name} te ayuda a cargar tus productos, armar los turnos e invitar a tu equipo.` },
+].filter((b) => !!b);
+
+const title = invite ? `${invite.name} te invita a Caja Simple` : "Este enlace ya no está activo";
 ---
+
+<SiteLayout title={title} description="Lleva la caja de tu negocio desde el celular: ventas, gastos y cuadre de caja.">
+  <section class="invite" aria-labelledby="invite-title">
+    <div class="wrap">
+      <div class="card">
+        {
+          !invite ? (
+            <>
+              <h1 id="invite-title">Este enlace ya no está activo</h1>
+              <p class="lead">Igual puedes empezar gratis: tu primer negocio prueba el plan Negocio por 30 días.</p>
+              <div class="actions">
+                <a href={signedIn ? "/app" : "/auth/crear-cuenta"} class="btn btn-primary btn-lg">{signedIn ? "Ir a tus negocios" : "Crear mi cuenta gratis"}</a>
+                <a href="/planes" class="btn btn-secondary btn-lg">Ver planes y precios</a>
+              </div>
+            </>
+          ) : signedIn && claimable !== "si" ? (
+            <>
+              <h1 id="invite-title">
+                {claimed ? `Listo: activaste la invitación de ${invite.name}` : claimable === "ya" ? "Tu cuenta ya tiene una invitación" : "Ya tienes una cuenta"}
+              </h1>
+              <p class="lead">
+                {claimed
+                  ? `Tus negocios que todavía no pagaron ya tienen el beneficio. Si estás en la prueba, ahora dura ${trialDays} días.`
+                  : claimable === "ya"
+                    ? "Sus beneficios ya están en tus negocios."
+                    : "Los beneficios de una invitación son para cuentas nuevas que todavía no pagaron un plan. Tus negocios siguen igual."}
+              </p>
+              <div class="actions">
+                <a href="/app" class="btn btn-primary btn-lg">Ir a tus negocios</a>
+              </div>
+            </>
+          ) : (
+            <>
+              <p class="eyebrow">Invitación</p>
+              <h1 id="invite-title">{invite.name} te invita a Caja Simple</h1>
+              <p class="lead">Lleva la caja de tu negocio desde el celular: ventas, gastos y cuadre de caja. Con esta invitación recibes:</p>
+              <ul role="list" class="benefits">
+                {benefits.map((b) => (
+                  <li>
+                    <span class="benefit-icon" aria-hidden="true"><b.icon size={20} stroke-width={1.75} /></span>
+                    <span>
+                      <strong>{b.title}</strong>
+                      <span class="benefit-text">{b.text}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {signedIn ? (
+                <form method="POST" action={actions.claimReferral} class="claim">
+                  <input type="hidden" name="code" value={code} />
+                  {claimError && <p class="notice notice-error" role="alert">{claimError}</p>}
+                  <p class="claim-note">Se aplica a tu cuenta y a tus negocios que todavía no pagaron un plan.</p>
+                  <div class="actions">
+                    <button type="submit" class="btn btn-primary btn-lg">Activar beneficio</button>
+                    <a href="/app" class="btn btn-secondary btn-lg">Ahora no</a>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div class="actions">
+                    <a href="/auth/crear-cuenta" class="btn btn-primary btn-lg">Crear mi cuenta gratis</a>
+                    <a href="/planes" class="btn btn-secondary btn-lg">Ver planes y precios</a>
+                  </div>
+                  <p class="switch">¿Ya tienes cuenta? <a href="/auth/iniciar-sesion">Inicia sesión</a></p>
+                </>
+              )}
+            </>
+          )
+        }
+      </div>
+    </div>
+  </section>
+</SiteLayout>
+
+<style>
+  .invite {
+    padding-block: var(--section-gap);
+    background: var(--color-surface-muted);
+  }
+
+  .card {
+    max-width: 40rem;
+    margin-inline: auto;
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+  }
+
+  .eyebrow {
+    margin: 0 0 0.5rem;
+    color: var(--color-primary);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.75rem, 1.4rem + 1.6vw, 2.5rem);
+    line-height: 1.15;
+    font-weight: var(--font-bold);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .lead {
+    margin: 1rem 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-lh);
+  }
+
+  .benefits {
+    display: grid;
+    gap: 1rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .benefits li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.875rem;
+  }
+
+  .benefit-icon {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.625rem;
+    background: var(--color-income-soft);
+    color: var(--color-income);
+  }
+
+  .benefits strong {
+    display: block;
+  }
+
+  .benefit-text {
+    display: block;
+    margin-top: 0.125rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2rem;
+  }
+
+  .claim-note {
+    margin: 1.5rem 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .claim .notice {
+    margin-top: 1.5rem;
+  }
+
+  .claim .actions {
+    margin-top: 1rem;
+  }
+
+  .switch {
+    margin: 1.25rem 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .switch a {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  @media (max-width: 30rem) {
+    .actions .btn {
+      flex: 1 1 100%;
+    }
+  }
+</style>

@@ -1,7 +1,7 @@
 // planLimits solo muestra los límites: la base los aplica. Este test avisa si dejan de coincidir.
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { bsTotal, daysLeft, discounted, founderMonthsLeft, priceOf, effectivePlan, planLimits, planUsd, TRIAL_DAYS, untilLabel, usdFor } from "./plans";
+import { bsTotal, daysLeft, discounted, founderMonthsLeft, priceOf, effectivePlan, planLimits, planUsd, TRIAL_DAYS, untilLabel, usdFor, referralOffer } from "./plans";
 
 const dir = new URL("../../supabase/migrations/", import.meta.url);
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
@@ -43,9 +43,9 @@ describe("planLimits coincide con la base", () => {
     expect(latest("private.promo_discount")).toMatch(/effective_plan\(p_business\) <> 'Gratis'/);
     expect([planLimits.Gratis.promotions, planLimits.Negocio.promotions, planLimits.Sucursales.promotions]).toEqual([false, true, true]);
   });
-  it("la prueba dura TRIAL_DAYS (hoy + días − 1, como plan_until)", () => {
-    const plus = Number(latest("private.start_trial").match(/private\.today\(\) \+ (\d+)/)?.[1]);
-    expect(plus + 1).toBe(TRIAL_DAYS);
+  it("la prueba dura TRIAL_DAYS (hoy + días − 1, como plan_until; el referido, referral_trial_days)", () => {
+    const days = Number(latest("private.start_trial").match(/v_days smallint := (\d+)/)?.[1]);
+    expect(days).toBe(TRIAL_DAYS);
   });
   it("el aviso de cada cierre va en todos los planes", () => {
     expect(latest("private.on_shift_closed_notify")).not.toMatch(/'Gratis'/);
@@ -165,5 +165,16 @@ describe("las funciones de pago miran el plan que vale hoy", () => {
 
   it("la prueba es una por persona", () => {
     expect(latest("private.start_trial")).toMatch(/insert into private\.trials/);
+  });
+});
+
+describe("referralOffer", () => {
+  const perks = { freeMonths: 1, trialDays: 60 };
+  it("con el programa fundador: precio fundador asegurado y la prueba larga", () => {
+    expect(referralOffer({ discount: 0.5, months: 12 }, perks)).toBe("precio fundador (50% de descuento el primer año), 60 días de prueba y la app configurada");
+  });
+  it("sin el programa: un mes gratis en el primer pago", () => {
+    expect(referralOffer(null, perks)).toBe("60 días de prueba, un mes gratis en tu primer pago y la app configurada");
+    expect(referralOffer(null, { freeMonths: 0, trialDays: 60 })).toBe("60 días de prueba y la app configurada");
   });
 });
