@@ -81,7 +81,11 @@ export function ProductDetail({
           {product.image ? (
             // Sin el fundido de carga de ProductImage: la foto ya está en caché (la mostró la tarjeta) y la transición
             // necesita verla desde el primer cuadro. decoding sync: decodificada antes de capturar la vista nueva.
-            <img src={product.image} alt="" decoding="sync" className="absolute inset-0 size-full object-cover" data-fallback />
+            <>
+              <img src={product.image} alt="" decoding="sync" className="absolute inset-0 size-full object-cover" data-fallback />
+              {/* Capa negra translúcida: baja el contraste de la foto para que el nombre y la categoría se lean encima. */}
+              <div className="absolute inset-0 bg-[light-dark(rgb(0_0_0/0.3),rgb(0_0_0/0.5))]" aria-hidden="true" />
+            </>
           ) : (
             <ProductImage color={color} />
           )}
@@ -95,7 +99,7 @@ export function ProductDetail({
         <div className="grid min-w-0 gap-5 p-5 sm:p-6">
           {/* Sube sobre la parte ya opaca del degradado, como una portada: el nombre se lee sobre fondo sólido. */}
           <div className="relative -mt-12 grid min-w-0 gap-2">
-            <Badge variant="outline" className="max-w-full gap-1.5 justify-self-start truncate font-medium text-muted-foreground">
+            <Badge variant="outline" className="max-w-full gap-1.5 justify-self-start truncate bg-card font-medium text-muted-foreground shadow-sm">
               <span className="size-1.5 shrink-0 rounded-full" style={{ background: color }} aria-hidden="true" />
               {category?.name ?? "Sin categoría"}
             </Badge>

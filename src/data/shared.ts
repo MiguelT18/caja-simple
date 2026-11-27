@@ -157,25 +157,32 @@ export async function saleLines(sb: Supabase, branchId: string, from: string, to
   return map;
 }
 
-/** Cierres de turno terminados entre `from` y `to`, con quién abrió, quién cerró y la diferencia. Los más recientes primero. */
-export async function closesBetween(sb: Supabase, branchId: string, from: string, to: string) {
-  const [{ data, error }, moves] = await Promise.all([
+export const CLOSES_PAGE_SIZE = 10;
+
+/** Una página de cierres de turno terminados entre `from` y `to`, con quién abrió, quién cerró y la diferencia, y cuántos hay en total. Los más recientes primero. */
+export async function closesBetween(sb: Supabase, branchId: string, from: string, to: string, page = 1) {
+  const start = (page - 1) * CLOSES_PAGE_SIZE;
+  const [{ data, error, count }, moves] = await Promise.all([
     sb
       .from("shift_closes")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("branch_id", branchId)
       .eq("status", "cerrado")
       .gte("business_date", from)
       .lte("business_date", to)
       .order("business_date", { ascending: false })
-      .order("closed_at", { ascending: false }),
+      .order("closed_at", { ascending: false })
+      .order("id")
+      .range(start, start + CLOSES_PAGE_SIZE - 1),
     movements(sb, [branchId], from, to),
   ]);
+  // Una página que ya no existe (enlace viejo o rango más corto): PostgREST responde 416; se muestra la primera.
+  if (error?.code === "PGRST103" && page > 1) return closesBetween(sb, branchId, from, to, 1);
   fail(error);
   const rows = data ?? [];
   const people = await recorders(sb, rows.flatMap((c) => [c.opened_by, c.closed_by]));
   const name = (id: string | null) => (id && people.get(id)?.firstName) || "—";
-  return rows.map((c): ClosedShift => {
+  const closes = rows.map((c): ClosedShift => {
     const cash = shiftCash([c], moves, c.shift_id, c.business_date);
     return {
       id: c.id,
@@ -192,13 +199,14 @@ export async function closesBetween(sb: Supabase, branchId: string, from: string
       reopened: c.reopened_at !== null,
     };
   });
+  return { closes, total: count ?? 0, page };
 }
 
 /** Entradas, mermas y ajustes de stock de la sucursal, los más recientes primero (máximo 200). */
 export async function stockMoves(sb: Supabase, branchId: string) {
   const { data, error } = await sb
     .from("stock_movements")
-    .select("id, kind, qty, reason, recorded_by, approved_by, occurred_at, products(name)")
+    .select("id, kind, qty, reason, note, recorded_by, approved_by, occurred_at, products(name)")
     .eq("branch_id", branchId)
     .order("occurred_at", { ascending: false })
     .limit(200);
@@ -210,6 +218,7 @@ export async function stockMoves(sb: Supabase, branchId: string) {
       kind: m.kind,
       qty: m.qty,
       reason: m.reason,
+      note: m.note,
       product: m.products?.name ?? "Producto quitado",
       by: (m.recorded_by && people.get(m.recorded_by)?.firstName) || "—",
       approvedBy: (m.approved_by && people.get(m.approved_by)?.firstName) || null,

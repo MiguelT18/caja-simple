@@ -1,8 +1,43 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Package, Store, TriangleAlert, X } from "lucide-react";
 import type { CatalogEntry } from "@/data/queries";
 import { formatBs } from "@/lib/format";
-import { Field, MoneyInput, selectClass } from "./form";
+import { SelectMenu } from "../SelectMenu";
+import { Field, MoneyInput } from "./form";
+import { priceSummary, stockSummary } from "./ProductCard";
+
+/** Una opción de «Agregar un producto»: foto, nombre y lo que sirve para armar el combo (precio, stock, dónde se vende). */
+function ComboOption({ p }: { p: CatalogEntry }) {
+  const { stock, low } = stockSummary(p.soldIn);
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md bg-muted text-muted-foreground">
+        {p.image ? <img src={p.image} alt="" width={40} height={40} loading="lazy" decoding="async" className="size-full object-cover" /> : <Package className="size-5" strokeWidth={1.75} aria-hidden="true" />}
+      </span>
+      <span className="grid min-w-0 flex-1">
+        <span className="truncate text-sm font-semibold">{p.name}</span>
+        <span className="truncate text-sm text-muted-foreground">
+          {[p.category ?? "Sin categoría", p.soldIn.length ? priceSummary(p.soldIn.map((s) => s.price)) : null].filter(Boolean).join(" · ")}
+        </span>
+      </span>
+      <span className="grid shrink-0 justify-items-end text-sm tabular-nums">
+        {stock === null ? (
+          <span className="text-muted-foreground">Sin control</span>
+        ) : (
+          <span className={low ? "inline-flex items-center gap-1 font-semibold text-[var(--color-warning)]" : "font-semibold"}>
+            {/* Stock bajo: escrito con ícono, no solo con color. */}
+            {low && <TriangleAlert className="size-3.5" strokeWidth={2.25} aria-label="Stock bajo" />}
+            Hay {stock}
+          </span>
+        )}
+        <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <Store className="size-3.5" strokeWidth={1.75} aria-hidden="true" />
+          {p.soldIn.length === 0 ? "En ninguna" : p.soldIn.length === 1 ? p.soldIn[0].branch : `${p.soldIn.length} sucursales`}
+        </span>
+      </span>
+    </span>
+  );
+}
 
 /**
  * Lo que incluye un combo (productos del catálogo con su cantidad) y su precio en cada sucursal. Al crear, se ofrece
@@ -90,20 +125,18 @@ export function ComboFields({
           </ul>
         )}
         <Field id="combo-add" label={parts.length ? "Agregar otro producto" : "Agregar un producto"} error={errors.components}>
-          <select
+          <SelectMenu
             id="combo-add"
-            className={selectClass}
             value=""
-            disabled={options.length === 0 || parts.length >= 20}
-            onChange={(e) => e.target.value && setParts((list) => [...list, { productId: e.target.value, qty: 1 }])}
-          >
-            <option value="">{options.length ? "Elige un producto del catálogo" : "No quedan productos para agregar"}</option>
-            {options.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            disabled={parts.length >= 20}
+            placeholder="Elige un producto del catálogo"
+            emptyText="No quedan productos para agregar"
+            searchPlaceholder="Nombre, categoría o código"
+            noun="productos"
+            options={options.map((p) => ({ value: p.id, label: p.name, keywords: [p.category, p.barcode].filter(Boolean).join(" "), product: p }))}
+            renderOption={(o) => <ComboOption p={o.product} />}
+            onValueChange={(id) => id && setParts((list) => [...list, { productId: id, qty: 1 }])}
+          />
         </Field>
       </fieldset>
 

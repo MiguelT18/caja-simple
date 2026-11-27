@@ -3,7 +3,7 @@
 // La base decide si un turno abre (private.shift_closed_reason); esto solo lo muestra y lo edita.
 import { actions } from "astro:actions";
 import { useState } from "react";
-import { CalendarX2, Trash2 } from "lucide-react";
+import { CalendarCheck, Trash2 } from "lucide-react";
 import { es } from "react-day-picker/locale";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -59,39 +59,76 @@ export default function ClosuresCalendar({ branchId, today, isOwner, shifts, hou
     toast("Cierre quitado.", "success");
   };
 
+  const monthShort = (d: string) => new Intl.DateTimeFormat("es-BO", { month: "short" }).format(toDate(d)).replace(".", "");
+
   return (
-    <div className="grid min-w-0 gap-4 md:grid-cols-[auto_minmax(0,1fr)] md:items-start md:gap-6">
-      {/* La tarjeta mide lo que el calendario: la leyenda (w-0 min-w-full) se acomoda a ese ancho sin ensancharla. */}
-      <div className="card grid w-full min-w-0 justify-items-center gap-3 p-3 sm:p-4 md:w-fit">
-        <Calendar
-          mode="single"
-          locale={es}
-          weekStartsOn={1}
-          selected={day ? toDate(day) : undefined}
-          onSelect={(date) => date && isOwner && setDay(toDay(date))}
-          disabled={isOwner ? { before: toDate(today) } : true}
-          // Celdas de 36 a 44 px según el ancho: caben siete a 320 px sin scroll y se tocan bien con el dedo.
-          className="max-w-full bg-transparent p-0 [--cell-size:clamp(2.25rem,calc((100vw-6rem)/7),2.75rem)]"
-          modifiers={{ closed: (date) => closedDays.has(toDay(date)), weekClosed }}
-          modifiersClassNames={{
-            // Fondo, color y un punto debajo del número: no se comunica solo con color.
-            closed:
-              "[&>button]:bg-[color-mix(in_oklab,var(--color-expense)_14%,transparent)] [&>button]:font-bold [&>button]:text-[var(--color-expense)] [&>button]:after:absolute [&>button]:after:bottom-1 [&>button]:after:left-1/2 [&>button]:after:size-1.5 [&>button]:after:-translate-x-1/2 [&>button]:after:rounded-full [&>button]:after:bg-current",
-            weekClosed: "[&>button]:text-muted-foreground [&>button]:line-through",
-          }}
-          labels={{
-            labelDayButton: (date, m) => {
-              const d = toDay(date);
-              const notes = upcoming.filter((c) => c.day === d).map((c) => closureLabel(c, shifts));
-              return [longDay(d), notes.length ? `cerrado: ${notes.join("; ")}` : m.weekClosed ? "no trabaja ningún turno" : ""]
-                .filter(Boolean)
-                .join(", ");
-            },
-          }}
-        />
-        <div className="grid w-0 min-w-full gap-2 border-t pt-3 text-sm text-muted-foreground">
-          {isOwner && <p className="m-0 font-medium text-foreground">Toca un día para cerrarlo.</p>}
-          <ul className="m-0 grid list-none gap-1.5 p-0" role="list">
+    // Calendario y lista en una sola tarjeta: lado a lado si el panel da (la lista usa el espacio a la derecha), apilados si no.
+    <div className="@container min-w-0">
+      <div className="card grid min-w-0 overflow-hidden p-0 @2xl:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="grid min-w-0 justify-items-center p-3 sm:p-4 @2xl:border-r @2xl:border-border">
+          <Calendar
+            mode="single"
+            locale={es}
+            weekStartsOn={1}
+            selected={day ? toDate(day) : undefined}
+            onSelect={(date) => date && isOwner && setDay(toDay(date))}
+            disabled={isOwner ? { before: toDate(today) } : true}
+            // Celdas de 36 a 44 px según el ancho: caben siete a 320 px sin scroll y se tocan bien con el dedo.
+            className="max-w-full bg-transparent p-0 [--cell-size:clamp(2.25rem,calc((100vw-6rem)/7),2.75rem)]"
+            modifiers={{ closed: (date) => closedDays.has(toDay(date)), weekClosed }}
+            modifiersClassNames={{
+              // Fondo, color y un punto debajo del número: no se comunica solo con color.
+              closed:
+                "[&>button]:bg-[color-mix(in_oklab,var(--color-expense)_14%,transparent)] [&>button]:font-bold [&>button]:text-[var(--color-expense)] [&>button]:after:absolute [&>button]:after:bottom-1 [&>button]:after:left-1/2 [&>button]:after:size-1.5 [&>button]:after:-translate-x-1/2 [&>button]:after:rounded-full [&>button]:after:bg-current",
+              weekClosed: "[&>button]:text-muted-foreground [&>button]:line-through",
+            }}
+            labels={{
+              labelDayButton: (date, m) => {
+                const d = toDay(date);
+                const notes = upcoming.filter((c) => c.day === d).map((c) => closureLabel(c, shifts));
+                return [longDay(d), notes.length ? `cerrado: ${notes.join("; ")}` : m.weekClosed ? "no trabaja ningún turno" : ""]
+                  .filter(Boolean)
+                  .join(", ");
+              },
+            }}
+          />
+        </div>
+
+        <div className="grid min-w-0 content-start gap-4 border-t border-border p-4 @2xl:border-t-0 @2xl:p-6">
+          <div className="grid gap-1">
+            <h3 className="m-0 text-lg font-bold">Próximos cierres</h3>
+            {isOwner && <p className="m-0 text-sm text-muted-foreground">Toca un día en el calendario para cerrarlo o ver su cierre.</p>}
+          </div>
+
+          {upcoming.length === 0 ? (
+            <p className="m-0 flex items-center gap-3 rounded-md bg-[var(--color-surface)] px-4 py-3 text-sm text-muted-foreground">
+              <CalendarCheck size={20} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
+              No hay feriados ni días cerrados por delante.
+            </p>
+          ) : (
+            <ul className="m-0 grid list-none gap-2 p-0" role="list">
+              {upcoming.map((c) => (
+                <li key={c.id} className="flex items-center gap-3 rounded-md bg-[var(--color-surface)] p-2 pr-3">
+                  {/* Hoja de calendario con el día: el número y el mes van escritos. */}
+                  <span aria-hidden="true" className="grid size-12 shrink-0 place-content-center rounded-md bg-[var(--color-expense-soft)] text-center leading-none text-[var(--color-expense)]">
+                    <span className="num text-lg font-extrabold">{Number(c.day.slice(8))}</span>
+                    <span className="mt-0.5 text-xs font-semibold">{monthShort(c.day)}</span>
+                  </span>
+                  <span className="min-w-0 flex-1 text-sm">
+                    <span className="block font-bold first-letter:uppercase">{c.day === today ? "Hoy" : longDay(c.day)}</span>
+                    <span className="block text-muted-foreground [overflow-wrap:anywhere]">{closureLabel(c, shifts)}</span>
+                  </span>
+                  {isOwner && (
+                    <Button type="button" variant="ghost" size="icon" aria-label={`Quitar el cierre del ${longDay(c.day)}`} onClick={() => remove(c)}>
+                      <Trash2 size={16} strokeWidth={1.75} />
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <ul className="m-0 grid list-none gap-1.5 border-t border-border p-0 pt-3 text-sm text-muted-foreground" role="list" aria-label="Qué marca el calendario">
             <li className="flex items-center gap-2">
               <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-[var(--color-expense)]" />
               Cerrado ese día (feriado o cierre)
@@ -102,30 +139,6 @@ export default function ClosuresCalendar({ branchId, today, isOwner, shifts, hou
             </li>
           </ul>
         </div>
-      </div>
-
-      <div className="grid gap-2">
-        <h3 className="text-sm font-semibold">Próximos cierres</h3>
-        {upcoming.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay feriados ni días cerrados por delante.</p>
-        ) : (
-          <ul className="grid gap-2" role="list">
-            {upcoming.map((c) => (
-              <li key={c.id} className="card flex items-center gap-3 px-4 py-3">
-                <CalendarX2 size={18} strokeWidth={1.75} className="shrink-0 text-[var(--color-expense)]" aria-hidden="true" />
-                <span className="min-w-0 flex-1 text-sm">
-                  <span className="block font-semibold first-letter:uppercase">{c.day === today ? "Hoy" : longDay(c.day)}</span>
-                  <span className="block text-muted-foreground [overflow-wrap:anywhere]">{closureLabel(c, shifts)}</span>
-                </span>
-                {isOwner && (
-                  <Button type="button" variant="ghost" size="icon" aria-label={`Quitar el cierre del ${longDay(c.day)}`} onClick={() => remove(c)}>
-                    <Trash2 size={16} strokeWidth={1.75} />
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
 
       {day && <ClosureDialog branchId={branchId} day={day} shifts={shifts} existing={upcoming.filter((c) => c.day === day)} onClose={() => setDay(undefined)} onRemove={remove} />}

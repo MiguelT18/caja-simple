@@ -265,7 +265,7 @@ export function ImportProducts({ businessId, branches }: { businessId: string; b
 
   return (
     <>
-      <Button variant="outline" className="h-11" onClick={() => setOpen(true)}>
+      <Button variant="outline" className="h-11 max-sm:flex-1" onClick={() => setOpen(true)}>
         <FileUp />
         Importar
       </Button>

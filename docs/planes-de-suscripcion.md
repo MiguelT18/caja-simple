@@ -115,7 +115,7 @@ La base de datos aplica los límites (migraciones `supabase/migrations/202610310
 
 ### Activar un plan tras el pago
 
-La dueña ve el uso de su plan en `/app/<negocio>/configuracion` y los planes con sus precios en `/app/<negocio>/plan`. Ahí genera el **cobro**: elige cuántos locales paga (nunca menos de los que tiene; 1 = Negocio, más = Sucursales) y mensual o anual, ve el total al instante, y ve el monto en bolivianos con impuestos, fijo hasta que vence, con su código y el QR para pagar. No puede cambiar de plan ella misma.
+La dueña ve el uso de su plan en `/app/<negocio>/configuracion` y los planes con sus precios en `/app/<negocio>/plan`. Ahí genera el **cobro**: elige cuántos locales paga (nunca menos de los que tiene; 1 = Negocio, más = Sucursales) y mensual o anual, ve el total al instante, y ve el monto en bolivianos con impuestos, fijo hasta que vence, con su código y el QR para pagar. No puede cambiar de plan ella misma. Con un plan pago vigente, pagar el mismo es **renovarlo** («Renovar», «Generar QR para renovar»): se suma desde el día siguiente al vencimiento. Pasar a otro plan empieza hoy y la página avisa que los días que quedan no se suman. La fecha la calcula `paidUntil()` (`src/data/plans.ts`), igual que `activate_plan_charge`.
 
 Cómo funciona por dentro (migración `20261104150000_plan_charges.sql`):
 
@@ -179,7 +179,7 @@ pnpm dlx supabase db query --db-url "$DB_URL" "select a.code, sum(c.amount_bs) f
 pnpm dlx supabase db query --db-url "$DB_URL" "select private.pay_commissions('<id del afiliado>', 'QR 12/11');"
 ```
 
-- **Lo que ve el afiliado:** `/app/cuenta/afiliado` (link, totales retenido / por cobrar / cobrado, comisiones y condiciones) y, en la página de plan de sus negocios, `AffiliateInvite`. Quien no es afiliado recibe 404.
+- **Lo que ve el afiliado:** `/app/cuenta/afiliado` (link, totales retenido / por cobrar / cobrado, comisiones y condiciones) y, en «Tu cuenta» (`/app/cuenta`), `AffiliateInvite`. Quien no es afiliado recibe 404.
 - **Dar de baja:** `update public.affiliates set active = false where code = '…';`. Los negocios que ya trajo dejan de generar comisión; las ya creadas se pagan igual.
 - Sin NIT, las comisiones salen como gasto personal: confirmarlo con el contador al inscribirse.
 

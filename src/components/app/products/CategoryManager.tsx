@@ -91,9 +91,10 @@ export function CategoryManager({
       title="Categorías de productos"
       description="Arma las que use tu negocio. Sirven para filtrar el catálogo."
       trigger={
-        <Button variant="outline" className="h-11 bg-card">
+        // Junto a los filtros, que es lo que administra: liviano para no competir con las acciones de crear.
+        <Button variant="ghost" size="sm" className="h-9 shrink-0 text-muted-foreground hover:text-foreground pointer-coarse:h-11">
           <Tags />
-          Categorías
+          Editar categorías
         </Button>
       }
       contentProps={{

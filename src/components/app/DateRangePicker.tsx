@@ -136,7 +136,12 @@ export default function DateRangePicker({
             <span className="min-w-0 flex-1 truncate tabular-nums">{text}</span>
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-auto max-w-[calc(100vw-2rem)] p-0">
+        {/* Si no cabe ni arriba ni abajo, Radix elige el lado con más lugar y el panel se achica a ese alto con scroll adentro. */}
+        <PopoverContent
+          align="start"
+          collisionPadding={8}
+          className="max-h-(--radix-popover-content-available-height) w-auto max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain p-0"
+        >
           <div className="grid gap-1.5 border-b p-2">
             {field("from")}
             <ArrowRight size={12} strokeWidth={1.75} aria-hidden="true" className="mx-auto text-muted-foreground" />
@@ -152,7 +157,8 @@ export default function DateRangePicker({
             disabled={[...(max ? [{ after: toDate(max) }] : []), ...(min ? [{ before: toDate(min) }] : [])]}
             className="mx-auto p-2 [--cell-size:--spacing(7)] pointer-coarse:[--cell-size:--spacing(9)]"
           />
-          <div className="flex items-center justify-between gap-3 border-t p-2">
+          {/* «Aplicar» siempre a la vista, aunque el panel tenga scroll. */}
+          <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t bg-popover p-2">
             {withTime ? (
               <div className="flex items-center gap-2">
                 <Switch id={`${uid}-time`} checked={timeOn} onCheckedChange={setTimeOn} />

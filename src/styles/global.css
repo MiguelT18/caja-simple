@@ -934,6 +934,42 @@ select.input {
 	}
 }
 
+/* Tarjeta que pasa al encabezado de la página que carga (scripts/nav-skeleton.ts): no se cambia por el esqueleto, brilla. */
+[data-morph][aria-busy='true'] {
+	position: relative;
+	cursor: progress;
+}
+
+[data-morph][aria-busy='true']::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	border-radius: inherit;
+	background: linear-gradient(
+		100deg,
+		transparent 30%,
+		color-mix(in srgb, var(--color-surface) 45%, transparent) 50%,
+		transparent 70%
+	);
+	background-size: 250% 100%;
+	background-position: 100% 0;
+	pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	[data-morph][aria-busy='true']::before {
+		animation: skeleton-shine 1.2s ease-in-out infinite;
+	}
+}
+
+/* Con movimiento reducido no hay barrido: la tarjeta se atenúa. */
+@media (prefers-reduced-motion: reduce) {
+	[data-morph][aria-busy='true'] {
+		opacity: 0.7;
+	}
+}
+
 @keyframes skeleton-shine {
 	to {
 		background-position: -150% 0;

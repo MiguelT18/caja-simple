@@ -2,11 +2,27 @@
 // Programa de afiliados (docs/planes-de-suscripcion.md › Afiliados): el link del afiliado, su saldo, el rendimiento
 // en un rango de días (?desde=&hasta=&periodo=, como Reportes), sus comisiones y las reglas.
 // Solo para quien tiene ficha de afiliado activa; a los demás, 404.
-import { CalendarRange, Copy, HandCoins, MessageCircle, ScrollText, Wallet } from "@lucide/astro";
+import {
+  Banknote,
+  CalendarClock,
+  ChartColumn,
+  ChevronRight,
+  CircleCheck,
+  Clock,
+  Copy,
+  Gift,
+  MessageCircle,
+  Percent,
+  ScrollText,
+  UserPlus,
+  Wallet,
+  Wrench,
+} from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import DonutChart from "@/components/app/charts/DonutChart";
 import WeekChart from "@/components/app/charts/WeekChart";
 import RangeFilter from "@/components/app/RangeFilter.astro";
+import SelectMenu from "@/components/app/SelectMenu.astro";
 import Layout from "@/layouts/Layout.astro";
 import { affiliateSummary, commissionsByPeriod, founderPromo, myAffiliate, referralPerks } from "@/data/queries";
 import { referralOffer } from "@/data/plans";
@@ -41,52 +57,99 @@ const chartConfig = {
 };
 const statusName = { retenida: "Retenida", "por pagar": "Por cobrar", pagada: "Cobrada" } as const;
 
+
 const link = `${Astro.url.origin}/r/${affiliate.code}`;
 const pct = `${Math.round(affiliate.rate * 100)}%`;
 const share = `https://wa.me/?text=${encodeURIComponent(`Yo uso Caja Simple para llevar la caja del negocio: ventas, gastos y cuadre, desde el celular. Con este enlace tienes ${offer}: te ayudo a cargar tus productos, armar los turnos e invitar a tu equipo. ${link}`)}`;
 const bs = (n: number) => `Bs ${n.toLocaleString("es-BO")}`;
 const rangeText = `del ${shortDate(range.from)} al ${shortDate(range.to)}`;
 const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", pagada: "chip-income" } as const;
+const periodOptions = Object.entries(periods).map(([value, label]) => ({ value, label }));
+
+// Te pagamos una vez al mes cuando lo que tienes por cobrar llega a este monto.
+const PAYOUT_MIN = 100;
+const payoutShare = Math.min(1, totals.payable / PAYOUT_MIN);
+const payoutNote =
+  totals.payable >= PAYOUT_MIN
+    ? "Llegaste a Bs 100: entra en el pago de este mes"
+    : totals.payable > 0
+      ? `Te faltan ${bs(PAYOUT_MIN - totals.payable)} para llegar a Bs 100`
+      : "Te pagamos cada mes, desde Bs 100";
+const freeMonths = perks.freeMonths === 1 ? "un mes gratis" : `${perks.freeMonths} meses gratis`;
+const funnel = [
+  { label: "Cuentas creadas", value: referrals.people },
+  { label: "Negocios creados", value: referrals.businesses },
+  { label: "Negocios que pagaron", value: referrals.paying },
+];
 ---
 
 <Layout title="Afiliados">
-  <PageHeader title="Programa de afiliados" description={`Ganas el ${pct} de lo que paguen los negocios que lleguen con tu enlace, durante sus primeros 12 meses.`} />
+  <PageHeader title="Programa de afiliados" description={`Ganas el ${pct} de lo que paguen los negocios que lleguen con tu enlace, durante sus primeros 12 meses.`}>
+    <span slot="cover" class="cover-art" aria-hidden="true">
+      <span class="cover-rate">{pct}</span>
+      <span class="cover-note">de comisión</span>
+    </span>
+  </PageHeader>
 
   <div class="affiliate-page">
-    <section class="card panel" aria-labelledby="link-title">
-      <h2 class="card-title" id="link-title"><HandCoins size={20} stroke-width={1.75} aria-hidden="true" />Tu enlace</h2>
-      <div class="link-row">
-        <label class="sr-only" for="affiliate-link">Tu enlace de afiliado</label>
-        <input id="affiliate-link" class="input num" type="text" value={link} readonly />
-        <button type="button" class="btn btn-primary" data-copy-link><Copy size={18} stroke-width={1.75} aria-hidden="true" /><span>Copiar enlace</span></button>
-        <a class="btn btn-secondary" href={share} target="_blank" rel="noopener">
-          <MessageCircle size={18} stroke-width={1.75} aria-hidden="true" />WhatsApp<span class="sr-only"> (se abre en otra pestaña)</span>
-        </a>
+    <section class="card share" aria-labelledby="link-title">
+      <div class="share-main">
+        <h2 class="share-title" id="link-title">Comparte tu enlace</h2>
+        <p class="share-lead">Quien crea su cuenta con él tiene {offer}.</p>
+        <div class="link-row">
+          <label class="sr-only" for="affiliate-link">Tu enlace de afiliado</label>
+          <input id="affiliate-link" class="input num" type="text" value={link} readonly />
+          <button type="button" class="btn btn-primary" data-copy-link><Copy size={18} stroke-width={1.75} aria-hidden="true" /><span>Copiar enlace</span></button>
+          <a class="btn btn-secondary" href={share} target="_blank" rel="noopener">
+            <MessageCircle size={18} stroke-width={1.75} aria-hidden="true" />WhatsApp<span class="sr-only"> (se abre en otra pestaña)</span>
+          </a>
+        </div>
       </div>
-      <dl class="mini-stats">
-        <div><dt>Cuentas creadas</dt><dd class="num">{referrals.people}</dd></div>
-        <div><dt>Negocios</dt><dd class="num">{referrals.businesses}</dd></div>
-        <div><dt>Negocios que pagaron</dt><dd class="num">{referrals.paying}</dd></div>
-      </dl>
+      <div class="share-funnel">
+        <h3 class="funnel-title">Tus referidos</h3>
+        <ol class="funnel">
+          {
+            funnel.map((step, i) => (
+              <li>
+                {i > 0 && <ChevronRight class="funnel-arrow" size={18} stroke-width={1.75} aria-hidden="true" />}
+                <span class="funnel-value num">{step.value}</span>
+                <span class="funnel-label">{step.label}</span>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
     </section>
 
     <section aria-labelledby="balance-title">
-      <h2 class="section-title" id="balance-title"><Wallet size={20} stroke-width={1.75} aria-hidden="true" />Tu saldo</h2>
-      <dl class="balance">
-        <div class="card stat"><dt>Retenido</dt><dd class="num">{bs(totals.held)}</dd><dd class="note">30 días desde el pago del cliente</dd></div>
-        <div class="card stat"><dt>Por cobrar</dt><dd class="num amount-income">{bs(totals.payable)}</dd><dd class="note">Te pagamos cada mes, desde Bs 100</dd></div>
-        <div class="card stat"><dt>Cobrado</dt><dd class="num">{bs(totals.paid)}</dd><dd class="note">Desde que eres afiliado</dd></div>
+      <h2 class="section-title" id="balance-title">Tu saldo</h2>
+      <dl class="kpis balance">
+        <div class="kpi">
+          <dt class="kpi-label"><Clock size={18} stroke-width={1.75} aria-hidden="true" />Retenido</dt>
+          <dd class="kpi-value num">{bs(totals.held)}</dd>
+          <dd class="kpi-note">30 días desde el pago del cliente</dd>
+        </div>
+        <div class="kpi">
+          <dt class="kpi-label"><Wallet size={18} stroke-width={1.75} aria-hidden="true" />Por cobrar</dt>
+          <dd class="kpi-value num amount-income">{bs(totals.payable)}</dd>
+          <dd class="kpi-note">
+            <span class="payout-bar" aria-hidden="true"><span style={`--fill: ${payoutShare}`}></span></span>
+            {payoutNote}
+          </dd>
+        </div>
+        <div class="kpi">
+          <dt class="kpi-label"><CircleCheck size={18} stroke-width={1.75} aria-hidden="true" />Cobrado</dt>
+          <dd class="kpi-value num">{bs(totals.paid)}</dd>
+          <dd class="kpi-note">Desde que eres afiliado</dd>
+        </div>
       </dl>
     </section>
 
-    <section aria-labelledby="performance-title" data-region="affiliate-performance">
-      <h2 class="section-title" id="performance-title"><CalendarRange size={20} stroke-width={1.75} aria-hidden="true" />Rendimiento</h2>
+    <section class="performance" aria-labelledby="performance-title" data-region="affiliate-performance">
+      <h2 class="section-title" id="performance-title">Rendimiento</h2>
       <RangeFilter from={range.from} to={range.to} max={today} maxDays={MAX_DAYS}>
-        <div class="field">
-          <label class="field-label" for="range-period">Agrupar</label>
-          <select class="input" id="range-period" name="periodo">
-            {Object.entries(periods).map(([value, label]) => <option value={value} selected={value === period}>{label}</option>)}
-          </select>
+        <div class="period-field">
+          <SelectMenu form="range" name="periodo" label="Agrupar" options={periodOptions} value={period} keepOrder searchPlaceholder="Buscar" noun="agrupaciones" />
         </div>
       </RangeFilter>
 
@@ -97,66 +160,111 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
         <div><dt>Negocios que pagaron</dt><dd class="num">{summary.businesses}</dd></div>
       </dl>
 
-      <div class="charts">
-        <section class="card panel" aria-labelledby="period-title">
-          <h3 class="card-title" id="period-title">{periods[period]}</h3>
-          <WeekChart client:visible days={rows} config={chartConfig} caption={`Pagado por tus referidos y tu comisión ${periods[period].toLowerCase()}, ${rangeText}`} empty={`Sin pagos de tus referidos ${rangeText}.`} />
-        </section>
-        <section class="card panel" aria-labelledby="status-title">
-          <h3 class="card-title" id="status-title">Tu comisión por estado</h3>
-          <DonutChart client:visible items={summary.byStatus.filter((s) => s.value > 0).map((s) => ({ name: statusName[s.status], value: s.value }))} totalLabel="Comisión" empty={`Sin comisiones ${rangeText}.`} />
-        </section>
-      </div>
-
-      <section class="card panel" aria-labelledby="commissions-title">
-        <h3 class="card-title" id="commissions-title">Comisiones {rangeText}</h3>
-        {inRange.length === 0 ? (
-          <p class="empty">Sin comisiones {rangeText}. Aparecen aquí cuando un negocio que llegó con tu enlace paga su plan.</p>
-        ) : (
-          <div class="table-wrap" role="region" aria-label="Tabla de comisiones" tabindex="0">
-            <table class="commissions">
-              <caption class="sr-only">Comisiones por cada pago de un negocio referido, {rangeText}</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Pago</th>
-                  <th scope="col">Negocio</th>
-                  <th scope="col" class="end">Cobro</th>
-                  <th scope="col" class="end">Comisión</th>
-                  <th scope="col">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inRange.map((c) => (
-                  <tr>
-                    <td class="muted num">{shortDate(c.date)}</td>
-                    <td>{c.businessName}</td>
-                    <td class="end num">{bs(c.chargeBs)}</td>
-                    <td class="end num">
-                      {bs(c.amountBs)}
-                      <span class="muted"> · {Math.round(c.rate * 100)}%{c.months > 1 ? ` × ${c.months} meses` : ""}</span>
-                    </td>
-                    <td>
-                      <span class:list={["chip", statusTone[c.status]]}>{c.status === "retenida" ? `Retenida hasta el ${shortDate(c.payableAt.slice(0, 10))}` : statusName[c.status]}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {
+        inRange.length === 0 ? (
+          <div class="card empty-state">
+            <span class="empty-art" aria-hidden="true"><ChartColumn size={28} stroke-width={1.75} /></span>
+            <h3>{referrals.paying === 0 ? "Todavía no te pagó ningún referido" : `Sin pagos ${rangeText}`}</h3>
+            <p>Cuando un negocio que llegó con tu enlace paga su plan, aquí ves cuánto pagó, tu comisión y cuándo la cobras.</p>
+            <button type="button" class="btn btn-secondary" data-copy-link><Copy size={18} stroke-width={1.75} aria-hidden="true" />Copiar enlace</button>
           </div>
-        )}
-      </section>
+        ) : (
+          <>
+            <div class="charts">
+              <section class="card panel" aria-labelledby="period-title">
+                <h3 class="card-title" id="period-title">{periods[period]}</h3>
+                <WeekChart client:visible days={rows} config={chartConfig} caption={`Pagado por tus referidos y tu comisión ${periods[period].toLowerCase()}, ${rangeText}`} empty={`Sin pagos de tus referidos ${rangeText}.`} />
+              </section>
+              <section class="card panel" aria-labelledby="status-title">
+                <h3 class="card-title" id="status-title">Tu comisión por estado</h3>
+                <DonutChart client:visible items={summary.byStatus.filter((s) => s.value > 0).map((s) => ({ name: statusName[s.status], value: s.value }))} totalLabel="Comisión" empty={`Sin comisiones ${rangeText}.`} />
+              </section>
+            </div>
+
+            <section class="card panel" aria-labelledby="commissions-title">
+              <h3 class="card-title" id="commissions-title">Comisiones {rangeText}</h3>
+              <div class="table-wrap" role="region" aria-label="Tabla de comisiones" tabindex="0">
+                <table class="commissions">
+                  <caption class="sr-only">Comisiones por cada pago de un negocio referido, {rangeText}</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Pago</th>
+                      <th scope="col">Negocio</th>
+                      <th scope="col" class="end">Cobro</th>
+                      <th scope="col" class="end">Comisión</th>
+                      <th scope="col">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inRange.map((c) => (
+                      <tr>
+                        <td class="muted num">{shortDate(c.date)}</td>
+                        <td>{c.businessName}</td>
+                        <td class="end num">{bs(c.chargeBs)}</td>
+                        <td class="end num">
+                          {bs(c.amountBs)}
+                          <span class="muted"> · {Math.round(c.rate * 100)}%{c.months > 1 ? ` × ${c.months} meses` : ""}</span>
+                        </td>
+                        <td>
+                          <span class:list={["chip", statusTone[c.status]]}>{c.status === "retenida" ? `Retenida hasta el ${shortDate(c.payableAt.slice(0, 10))}` : statusName[c.status]}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        )
+      }
     </section>
 
-    <section class="card panel" aria-labelledby="rules-title">
-      <h2 class="card-title" id="rules-title"><ScrollText size={20} stroke-width={1.75} aria-hidden="true" />Condiciones</h2>
+    <section aria-labelledby="rules-title">
+      <h2 class="section-title" id="rules-title">Condiciones</h2>
       <ul class="rules">
-        <li>Ganas el {pct} de lo que paga, en bolivianos, cada negocio que llegó con tu enlace, durante los 12 meses que siguen a su primer pago. Un plan anual cuenta solo por los meses que caen dentro de esos 12.</li>
-        <li>El negocio que llega con tu enlace tiene {offer}.{founder && ` Después del programa fundador, en vez del precio fundador tiene ${perks.freeMonths === 1 ? "un mes gratis" : `${perks.freeMonths} meses gratis`} en su primer pago.`}</li>
-        <li><strong>Alta asistida:</strong> a cada negocio que traes le dejas la app lista. Importas sus productos, armas los turnos e invitas a su equipo. Es lo que el negocio gana por llegar contigo.</li>
-        <li>Vale para cuentas nuevas: la persona tiene que crear su cuenta con tu enlace (dura 60 días en su navegador) y no haber pagado antes.</li>
-        <li>No cuentan tus propios negocios.</li>
-        <li>Cada comisión queda retenida 30 días después del pago del cliente. Te pagamos una vez al mes, cuando lo que tienes por cobrar llega a Bs 100.</li>
+        <li class="card rule">
+          <span class="rule-icon" aria-hidden="true"><Percent size={20} stroke-width={1.75} /></span>
+          <strong>Ganas el {pct}</strong>
+          <span>De lo que paga, en bolivianos, cada negocio que llegó con tu enlace.</span>
+        </li>
+        <li class="card rule">
+          <span class="rule-icon" aria-hidden="true"><CalendarClock size={20} stroke-width={1.75} /></span>
+          <strong>Durante 12 meses</strong>
+          <span>Contados desde su primer pago.</span>
+        </li>
+        <li class="card rule">
+          <span class="rule-icon" aria-hidden="true"><Gift size={20} stroke-width={1.75} /></span>
+          <strong>El negocio también gana</strong>
+          <span>Tiene {offer}.</span>
+        </li>
+        <li class="card rule">
+          <span class="rule-icon" aria-hidden="true"><Wrench size={20} stroke-width={1.75} /></span>
+          <strong>Alta asistida</strong>
+          <span>Le dejas la app lista: sus productos, sus turnos y su equipo.</span>
+        </li>
+        <li class="card rule">
+          <span class="rule-icon" aria-hidden="true"><UserPlus size={20} stroke-width={1.75} /></span>
+          <strong>Solo cuentas nuevas</strong>
+          <span>Que se creen con tu enlace y nunca hayan pagado. Tus negocios no cuentan.</span>
+        </li>
+        <li class="card rule">
+          <span class="rule-icon" aria-hidden="true"><Banknote size={20} stroke-width={1.75} /></span>
+          <strong>Cobras cada mes</strong>
+          <span>Desde Bs 100, con 30 días de espera por cada comisión.</span>
+        </li>
       </ul>
+
+      <details class="fine-print">
+        <summary><ScrollText size={18} stroke-width={1.75} aria-hidden="true" />Ver las condiciones completas<ChevronRight class="fine-chevron" size={18} stroke-width={1.75} aria-hidden="true" /></summary>
+        <ul>
+          <li>Ganas el {pct} de lo que paga, en bolivianos, cada negocio que llegó con tu enlace, durante los 12 meses que siguen a su primer pago. Un plan anual cuenta solo por los meses que caen dentro de esos 12.</li>
+          <li>El negocio que llega con tu enlace tiene {offer}.{founder && ` Después del programa fundador, en vez del precio fundador tiene ${freeMonths} en su primer pago.`}</li>
+          <li>Alta asistida: a cada negocio que traes le dejas la app lista. Importas sus productos, armas los turnos e invitas a su equipo. Es lo que el negocio gana por llegar contigo.</li>
+          <li>Vale para cuentas nuevas: la persona tiene que crear su cuenta con tu enlace (dura 60 días en su navegador) y no haber pagado antes.</li>
+          <li>No cuentan tus propios negocios.</li>
+          <li>Cada comisión queda retenida 30 días después del pago del cliente. Te pagamos una vez al mes, cuando lo que tienes por cobrar llega a Bs 100.</li>
+        </ul>
+      </details>
     </section>
   </div>
 </Layout>
@@ -165,30 +273,229 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
   import { toast } from "@/scripts/dialogs";
   import { onPage } from "@/scripts/refresh";
 
-  onPage(() => {
+  onPage((signal) => {
     const field = document.querySelector<HTMLInputElement>("#affiliate-link");
-    field?.addEventListener("focus", () => field.select());
-    document.querySelector("[data-copy-link]")?.addEventListener("click", async () => {
-      if (!field) return;
-      try {
-        await navigator.clipboard.writeText(field.value);
-        toast("Enlace copiado.", "success");
-      } catch {
-        field.focus();
-        toast("No se pudo copiar. El enlace quedó seleccionado: cópialo a mano.", "warning");
-      }
-    });
+    field?.addEventListener("focus", () => field.select(), { signal });
+    // Delegado: el botón del estado vacío entra y sale con la región de Rendimiento.
+    document.addEventListener(
+      "click",
+      async (event) => {
+        if (!field || !(event.target as Element).closest("[data-copy-link]")) return;
+        try {
+          await navigator.clipboard.writeText(field.value);
+          toast("Enlace copiado.", "success");
+        } catch {
+          field.focus();
+          toast("No se pudo copiar. El enlace quedó seleccionado: cópialo a mano.", "warning");
+        }
+      },
+      { signal },
+    );
+    // Agrupar (campo oculto de SelectMenu) avisa con «change»: se aplica sin tocar «Ver».
+    document.addEventListener(
+      "change",
+      (event) => {
+        const input = event.target as HTMLInputElement;
+        if (input.matches('.range input[name="periodo"]')) input.form?.requestSubmit();
+      },
+      { signal },
+    );
   });
 </script>
 
 <style>
   .affiliate-page {
     display: grid;
-    gap: 2rem;
+    gap: 2.5rem;
   }
 
   .affiliate-page > section {
     min-width: 0;
+  }
+
+  /* Portada tipo álbum: la comisión es lo que define el programa. */
+  .cover-art {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 55%, var(--color-surface)), color-mix(in oklab, var(--color-primary) 20%, var(--color-surface)));
+    color: var(--color-text);
+    text-align: center;
+  }
+
+  .cover-rate {
+    font-size: clamp(1.75rem, 5vw, 3.5rem);
+    font-weight: var(--font-extrabold);
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+
+  .cover-note {
+    margin-top: 0.25rem;
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+  }
+
+  .section-title {
+    margin: 0 0 1rem;
+    font-size: var(--text-2xl);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.02em;
+  }
+
+  /* Compartir: la acción principal de la página, con un velo del acento para que mande. */
+  .share {
+    display: grid;
+    gap: 1.5rem 2.5rem;
+    padding: clamp(1.25rem, 3vw, 2rem);
+    background: linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 12%, var(--color-surface-muted)), var(--color-surface-muted) 70%);
+  }
+
+  .share-funnel {
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .share-main {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .share-title {
+    margin: 0;
+    font-size: var(--text-2xl);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.02em;
+  }
+
+  .share-lead {
+    max-width: 52ch;
+    margin: 0 0 0.25rem;
+    color: var(--color-text-muted);
+  }
+
+  .link-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+  }
+
+  .link-row .input {
+    flex: 1 1 16rem;
+    min-width: 0;
+    background: var(--color-surface);
+  }
+
+  .link-row .btn,
+  .empty-state .btn {
+    display: inline-flex;
+    flex: 0 1 auto;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .funnel-title {
+    margin: 0 0 0.75rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  .funnel {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .funnel li {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 0.25rem;
+  }
+
+  .funnel li + li {
+    padding-left: 1.5rem;
+  }
+
+  .funnel :global(.funnel-arrow) {
+    position: absolute;
+    top: 0.5rem;
+    left: 0;
+    color: var(--color-text-muted);
+  }
+
+  .funnel-value {
+    font-size: var(--text-3xl);
+    font-weight: var(--font-extrabold);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+
+  .funnel-label {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: 1.3;
+  }
+
+  /* Saldo: las cifras del día de la app (.kpis), con dt/dd. */
+  .balance {
+    margin: 0;
+  }
+
+  .balance dd {
+    margin: 0.25rem 0 0;
+  }
+
+  .kpi-label {
+    display: flex;
+    gap: 0.375rem;
+    align-items: center;
+  }
+
+  .payout-bar {
+    display: block;
+    height: 0.375rem;
+    margin: 0.5rem 0;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--color-surface-hover);
+  }
+
+  .payout-bar span {
+    display: block;
+    width: calc(var(--fill) * 100%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-income);
+  }
+
+  .period-field {
+    flex: 0 1 11rem;
+  }
+
+  /* El campo mide lo mismo que el de los días (SelectMenu trae 3.5rem para opciones de dos líneas). */
+  .period-field :global(.select-trigger) {
+    min-height: 2.75rem;
+  }
+
+  @media (min-width: 769px) and (pointer: fine) {
+    .period-field :global(.select-trigger) {
+      min-height: 2.5rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .period-field {
+      flex: 1 1 8rem;
+    }
   }
 
   .panel {
@@ -203,99 +510,41 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
     min-width: 0;
   }
 
-  .card-title,
-  .section-title {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .section-title {
-    margin: 0 0 1rem;
-  }
-
-  .card-title :global(svg),
-  .section-title :global(svg) {
-    flex: none;
-    color: var(--color-primary);
-  }
-
-  .link-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.625rem;
-  }
-
-  .link-row .input {
-    flex: 1 1 16rem;
-    min-width: 0;
-  }
-
-  .link-row .btn {
-    display: inline-flex;
-    flex: 0 1 auto;
-    gap: 0.5rem;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .mini-stats,
-  .balance,
-  .totals {
-    display: grid;
+  .card-title {
     margin: 0;
   }
 
-  .mini-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--color-border);
-  }
-
-  .balance {
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-    gap: 1rem;
-  }
-
-  .stat {
-    display: grid;
-    align-content: start;
-    gap: 0.375rem;
-    padding: 1.25rem 1.5rem;
-  }
-
   .totals {
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.25rem 1.5rem;
-    margin-bottom: 1.25rem;
+    margin: 0 0 1.25rem;
     padding: clamp(1.25rem, 3vw, 1.75rem);
   }
 
-  .mini-stats div,
+  @media (min-width: 900px) {
+    .totals {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
   .totals div {
     display: grid;
     align-content: start;
     gap: 0.375rem;
   }
 
-  dt {
+  .totals dt {
     color: var(--color-text-muted);
     font-size: var(--text-sm);
-  }
-
-  dd {
-    margin: 0;
-    font-size: var(--text-xl);
     font-weight: var(--font-semibold);
-    letter-spacing: -0.03em;
   }
 
-  dd.note {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    font-weight: var(--font-regular);
-    letter-spacing: normal;
+  .totals dd {
+    margin: 0;
+    font-size: var(--text-2xl);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.03em;
   }
 
   .charts {
@@ -311,9 +560,34 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
     }
   }
 
-  .empty {
-    margin: 0;
+  .empty-state {
+    display: grid;
+    justify-items: center;
+    gap: 0.75rem;
+    padding: clamp(2rem, 5vw, 3rem) 1.5rem;
+    text-align: center;
+  }
+
+  .empty-state h3 {
+    margin: 0.25rem 0 0;
+    font-size: var(--text-xl);
+    font-weight: var(--font-extrabold);
+  }
+
+  .empty-state p {
+    max-width: 46ch;
+    margin: 0 0 0.5rem;
     color: var(--color-text-muted);
+  }
+
+  .empty-art {
+    display: grid;
+    place-items: center;
+    width: 4rem;
+    aspect-ratio: 1;
+    border-radius: 0.375rem;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
   }
 
   .commissions {
@@ -349,17 +623,116 @@ const statusTone = { retenida: "chip-neutral", "por pagar": "chip-warning", paga
 
   .rules {
     display: grid;
-    gap: 0.625rem;
-    max-width: 72ch;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+    gap: 1rem;
     margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rule {
+    display: grid;
+    align-content: start;
+    gap: 0.375rem;
+    padding: 1.25rem;
+  }
+
+  .rule strong {
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+  }
+
+  .rule span:last-child {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  .rule-icon {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    aspect-ratio: 1;
+    margin-bottom: 0.375rem;
+    border-radius: 0.375rem;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+  }
+
+  .fine-print {
+    margin-top: 1rem;
+  }
+
+  .fine-print summary {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .fine-print summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .fine-print summary:hover {
+    color: var(--color-text);
+  }
+
+  .fine-print :global(.fine-chevron) {
+    transition: transform 160ms ease;
+  }
+
+  .fine-print[open] :global(.fine-chevron) {
+    transform: rotate(90deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fine-print :global(.fine-chevron) {
+      transition: none;
+    }
+  }
+
+  .fine-print ul {
+    display: grid;
+    gap: 0.5rem;
+    max-width: 72ch;
+    margin: 0.5rem 0 0;
     padding-left: 1.25rem;
     color: var(--color-text-muted);
+    font-size: var(--text-sm);
     line-height: 1.6;
   }
 
   @media (max-width: 480px) {
     .link-row .btn {
       flex: 1 1 auto;
+    }
+  }
+
+  /* En el celular, condiciones como filas con el ícono al lado: menos alto que recorrer. */
+  @media (max-width: 640px) {
+    .rules {
+      gap: 0.5rem;
+    }
+
+    .rule {
+      grid-template-columns: auto minmax(0, 1fr);
+      column-gap: 0.875rem;
+      padding: 1rem;
+    }
+
+    .rule-icon {
+      grid-row: span 2;
+      margin: 0;
+    }
+
+    .rule strong {
+      font-size: var(--text-base);
     }
   }
 </style>

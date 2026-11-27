@@ -6,9 +6,11 @@ import type { Period, Quote } from "@/data/plans";
 interface Props {
   period: Period;
   quote: Quote | null;
+  /** En la app el tipo de cambio ya va en la cuenta de la calculadora: sin la nota, se dice una sola vez. */
+  note?: boolean;
 }
 
-const { period, quote } = Astro.props;
+const { period, quote, note = true } = Astro.props;
 const href = (p: Period) => {
   const url = new URL(Astro.url);
   if (p === "anual") url.searchParams.set("periodo", "anual");
@@ -24,7 +26,7 @@ const tax = quote && Math.round(quote.tax * 100);
     <a id="period-mensual" href={href("mensual")} aria-current={period === "mensual" ? "page" : undefined} data-period="mensual">Mensual</a>
     <a id="period-anual" href={href("anual")} aria-current={period === "anual" ? "page" : undefined} data-period="anual">Anual <span class="save">2 meses gratis</span></a>
   </nav>
-  <p class="rate-note">
+  {note && <p class="rate-note">
     {
       // Sin NIT (tasa 0) no se habla de impuestos: el precio es el final.
       quote
@@ -33,7 +35,7 @@ const tax = quote && Math.round(quote.tax * 100);
           : `Precios en dólares. Pagas en bolivianos: el precio por el tipo de cambio oficial del BCB del ${shortDate(quote.rateDate)} (Bs ${rate}), redondeado al boliviano. El monto queda fijo al generar el cobro.`
         : "Precios en dólares. Pagas en bolivianos, con el tipo de cambio oficial del BCB del día de tu cobro."
     }
-  </p>
+  </p>}
 </div>
 
 <script>
@@ -41,9 +43,14 @@ const tax = quote && Math.round(quote.tax * 100);
 
   // Cambiar de período sin recargar: la URL cambia (se puede compartir y volver atrás) y solo se cambian los precios.
   // Avisa con «period:change» a lo que guarda estado propio (la calculadora conserva sus locales).
+  // Con movimiento permitido, los precios se funden al cambiar (View Transitions); sin soporte, cambian igual.
   async function show(url: string, period: string) {
-    await refreshRegions(undefined, url);
-    document.dispatchEvent(new CustomEvent("period:change", { detail: period }));
+    const swap = async () => {
+      await refreshRegions(undefined, url);
+      document.dispatchEvent(new CustomEvent("period:change", { detail: period }));
+    };
+    if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return swap();
+    await document.startViewTransition(swap).finished.catch(() => {});
   }
 
   document.addEventListener("click", (event) => {

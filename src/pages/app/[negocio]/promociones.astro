@@ -5,7 +5,6 @@ import Layout from "@/layouts/Layout.astro";
 import { businessContext, businessHref, businessPromotions } from "@/data/queries";
 import { planLimits } from "@/data/plans";
 import { today } from "@/lib/dates";
-import { plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
@@ -21,7 +20,7 @@ const branches = ctx.membership.branches.map((b) => ({ id: b.id, name: b.name })
   <PageHeader {...ctx.backdrop}
     title="Promociones"
     live
-    description={`${promotions.length ? plural(promotions.length, "promoción", "promociones") + ". " : ""}Descuentos para algunos productos, por un tiempo, sin fecha límite o ciertos días. Al vender se aplican solos; si varias valen para el mismo producto, se usa la que más descuenta.`}
+    description="Descuentos que se aplican solos al vender. Si varias valen para el mismo producto, se usa la que más descuenta."
   />
 
   <div data-region="promotions">

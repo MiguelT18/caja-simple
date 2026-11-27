@@ -43,6 +43,7 @@ export function notificationHref(n: Notification, memberships: Membership[]): st
     case "stock_answer":
     case "stock_delivery":
     case "stock_received":
+    case "stock_move":
       return inBranch("inventario");
     case "expense_added":
     case "cash_withdrawal":

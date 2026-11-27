@@ -200,6 +200,8 @@ export interface StockMove {
   /** Con signo: lo que sumó o restó al stock. */
   qty: number;
   reason: string | null;
+  /** Lo que anotó quien recibió el envío. */
+  note: string | null;
   product: string;
   by: string;
   /** Quien aceptó la entrada que pidió una empleada. */
@@ -319,7 +321,12 @@ export type Notification = {
       pending: boolean;
       data: { person: string; product: string; qty: number; branch: string; reason: string | null };
     }
-  | { kind: "stock_received"; data: { person: string; product: string; qty: number; received: number; branch: string } }
+  | { kind: "stock_received"; data: { person: string; product: string; qty: number; received: number; branch: string; note?: string | null } }
+  | {
+      /** Una entrada, merma o ajuste de la sucursal; `self`: lo registró quien recibe el aviso. `pending`: envío por confirmar. */
+      kind: "stock_move";
+      data: { person: string; self: boolean; product: string; kind: "entrada" | "merma" | "ajuste"; qty: number; branch: string; reason: string | null; pending: boolean };
+    }
   | { kind: "reopen_answer"; data: { accepted: boolean; person: string; branch: string; shift: string; date: string } }
   | { kind: "ownership"; data: { business: string; person: string } }
   | {

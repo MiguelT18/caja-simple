@@ -1,5 +1,5 @@
 ---
-// Anuncio del programa de afiliados al final de /app/[negocio]/plan: solo para quien tiene perfil de afiliado
+// Anuncio del programa de afiliados en /app/cuenta (es de la persona, no de un negocio): solo para quien tiene perfil de afiliado
 // (`affiliate` de la sesión, public.affiliates). Su enlace `/r/<código>` abre una invitación con su nombre y guarda la cookie `ref`;
 // las comisiones y las condiciones están en /app/cuenta/afiliado.
 import { ArrowRight, Check, Copy, HandCoins, MessageCircle, Share2, Store, Wallet } from "@lucide/astro";
@@ -42,7 +42,7 @@ const share = `https://wa.me/?text=${encodeURIComponent(`Yo llevo la caja de mi 
     <label class="field-label" for="affiliate-link">Tu enlace de afiliado</label>
     <div class="link-row">
       <input id="affiliate-link" class="input num" type="text" value={link} readonly data-affiliate-link />
-      <button type="button" class="btn btn-primary" data-affiliate-copy>
+      <button type="button" class="btn btn-secondary" data-affiliate-copy>
         <span class="copy-icon" aria-hidden="true"><Copy size={18} stroke-width={1.75} /></span>
         <span class="done-icon" aria-hidden="true"><Check size={18} stroke-width={1.75} /></span>
         <span data-copy-label>Copiar enlace</span>

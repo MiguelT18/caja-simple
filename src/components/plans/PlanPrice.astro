@@ -1,22 +1,42 @@
 ---
 // Precio de un plan como pide docs/planes-de-suscripcion.md: «US$ 5,50 al mes · hoy Bs 64».
-import { priceOf, type Period, type PlanName, type Quote } from "@/data/plans";
+// En la app (lead="bs") se paga en bolivianos: Bs como cifra grande y los dólares de nota.
+import { bsTotal, planUsd, priceOf, type Period, type PlanName, type Quote } from "@/data/plans";
 
 interface Props {
   plan: PlanName;
   period: Period;
   quote: Quote | null;
+  lead?: "usd" | "bs";
 }
 
-const { plan, period, quote } = Astro.props;
+const { plan, period, quote, lead = "usd" } = Astro.props;
 const price = priceOf(plan, period, quote);
+const bs = (usd: number) => quote && `Bs ${bsTotal(usd, quote.rate, quote.tax).toLocaleString("es-BO")}`;
+const per = period === "mensual" ? "/mes" : "/año";
+// Sin tipo de cambio no hay Bs: queda el precio en dólares.
+const inBs = lead === "bs" && (plan === "Gratis" || quote);
+const big = plan === "Gratis" ? "Bs 0" : bs(planUsd.base[period]);
 ---
 
-<p class="plan-price" data-region={`price-${plan}`}>
-  <span class="usd num">{price.usd}</span>
-  <span class="detail">{price.detail}</span>
-  {price.today && <span class="today num">{price.today}</span>}
-</p>
+{
+  inBs ? (
+    <p class="plan-price lead-bs" data-region={`price-${plan}`}>
+      <span class="big num">
+        {big}
+        {plan !== "Gratis" && <small>{per}</small>}
+      </span>
+      {plan === "Sucursales" && <span class="extra num">+ {bs(planUsd.extraBranch[period])} por sucursal extra</span>}
+      <span class="detail num">{plan === "Gratis" ? price.detail : `${price.usd}${quote?.tax ? " + impuestos" : ""}`}</span>
+    </p>
+  ) : (
+    <p class="plan-price" data-region={`price-${plan}`}>
+      <span class="usd num">{price.usd}</span>
+      <span class="detail">{price.detail}</span>
+      {price.today && <span class="today num">{price.today}</span>}
+    </p>
+  )
+}
 
 <style>
   .plan-price {
@@ -39,6 +59,26 @@ const price = priceOf(plan, period, quote);
 
   .today {
     margin-top: 0.25rem;
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  .big {
+    font-size: var(--text-4xl);
+    line-height: var(--text-4xl-lh);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.03em;
+  }
+
+  .big small {
+    margin-left: 0.25rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    letter-spacing: 0;
+  }
+
+  .extra {
     font-size: var(--text-sm);
     font-weight: var(--font-semibold);
   }

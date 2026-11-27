@@ -1,14 +1,14 @@
 ---
-import { ArrowLeft, Check, ChevronDown, ExternalLink, MessageCircle, Sparkles, Store, X } from "@lucide/astro";
+import { ArrowLeft, ArrowRight, Building2, CalendarCheck, CalendarClock, ChartColumnIncreasing, Check, ChevronDown, MessageCircle, QrCode, Sparkles, Store, X } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
-import AffiliateInvite from "@/components/app/AffiliateInvite.astro";
+import ContextSwitcher from "@/components/ContextSwitcher.astro";
 import PlanCalculator from "@/components/PlanCalculator.astro";
 import PeriodSwitch from "@/components/plans/PeriodSwitch.astro";
 import PlanPrice from "@/components/plans/PlanPrice.astro";
 import Layout from "@/layouts/Layout.astro";
-import { businessContext, businessHref, currentQuote, founderPromo, myAffiliate, myBusinesses, planCharges, referralPerks } from "@/data/queries";
-import { founderMonthsLeft, plans, untilLabel, upgradeUrl, usdLabel, type Period } from "@/data/plans";
-import { longDate, shortDate, stamp, today } from "@/lib/dates";
+import { businessContext, businessHref, currentQuote, founderPromo, myBusinesses, planCharges, referralPerks } from "@/data/queries";
+import { founderMonthsLeft, paidUntil, plans, untilLabel, upgradeUrl, usdLabel, type Period } from "@/data/plans";
+import { addDays, longDate, shortDate, stamp, today } from "@/lib/dates";
 import { plural } from "@/lib/format";
 
 const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
@@ -29,12 +29,14 @@ const freeMonths = perks && !promo && !charges.some((c) => c.status === "pagado"
 const discount = promo ? promo.discount : 0;
 // En el anual, el descuento cubre solo los meses de fundador que le quedan (un fundador nuevo, el año entero).
 const founderMonths = promo?.until ? founderMonthsLeft(promo.until, today()) : 12;
-const affiliate = myAffiliate(Astro.locals);
 const pct = (d: number) => `${Math.round(d * 100)}%`;
 const branches = ctx.membership.branches.length;
 // Cada negocio paga su plan: desde aquí se puede pasar al de otro negocio propio.
 const ownedOthers = myBusinesses(Astro.locals).filter((other) => other.role === "dueño" && other.business.id !== business.id);
 const chargeHref = (id: string) => `${businessHref(business)}/cobro/${id}`;
+// Cada plan con su arte: más color cuanto más abarca (el acento queda para los planes pagos).
+const art = { Gratis: Store, Negocio: ChartColumnIncreasing, Sucursales: Building2 } as const;
+const SHOWN = 4;
 
 // Se cobra solo por QR; los otros nombres quedan para los cobros viejos del historial.
 const methodLabel: Record<string, string> = { qr: "QR bancario", transferencia: "Transferencia bancaria", tarjeta: "Tarjeta de crédito" };
@@ -50,6 +52,23 @@ const proofUrl =
         `Hola, pagué el plan de ${business.name}: Bs ${pending.amountBs.toLocaleString("es-BO")}, código ${code(pending.id)}. Te envío el comprobante.`,
       )}`
     : upgradeUrl;
+// Los locales con los que arranca la calculadora: los del cobro pendiente o los que ya tiene. 1 → Negocio; más → Sucursales.
+const startBranches = Math.max(pending ? pending.extraBranches + 1 : branches, branches, 1);
+const pickedPlan = startBranches > 1 ? "Sucursales" : "Negocio";
+// Con un plan pago vigente, pagar el mismo lo renueva (se suma al final); otro plan empieza hoy (activate_plan_charge).
+const day = (date: string) => longDate(date).replace(/^\S+ /, "");
+// El vencimiento exacto del plan vigente, con el día de la semana y el año si no es este.
+const expires = business.planUntil && `${longDate(business.planUntil)}${business.planUntil.slice(0, 4) !== today().slice(0, 4) ? ` de ${business.planUntil.slice(0, 4)}` : ""}`;
+const active = business.plan !== "Gratis" && !!business.planUntil && business.planUntil >= today();
+const paid = (["Negocio", "Sucursales"] as const).map((name) => ({ name, ...paidUntil(business, name, period, today(), freeMonths) }));
+const payNote = ({ name, renews, until }: (typeof paid)[number]) =>
+  renews
+    ? business.trial
+      ? `Tu prueba sigue hasta el ${day(business.planUntil!)}; el pago se suma después y ${name} queda hasta el ${day(until)}.`
+      : `Renuevas ${name}: se suma desde el ${day(addDays(business.planUntil!, 1))} y queda hasta el ${day(until)}.`
+    : active
+      ? `Pasas a ${name} desde hoy, hasta el ${day(until)}. Los días que te quedan de ${business.plan} no se suman.`
+      : `${name} desde hoy hasta el ${day(until)}.`;
 const statusLabel = { pendiente: "Por pagar", vencido: "Vencido", pagado: "Pagado" } as const;
 const chargeName = (c: (typeof charges)[number]) =>
   `${c.plan}${c.extraBranches ? ` + ${plural(c.extraBranches, "sucursal extra", "sucursales extra")}` : ""} · ${c.period}${c.discount > 0 ? ` · ${c.discountReason === "referido" ? "recomendación" : "precio fundador"} −${pct(c.discount)}${c.discountMonths && c.discountMonths < 12 ? ` en ${c.discountMonths} de 12 meses` : ""}` : ""}`;
@@ -58,38 +77,70 @@ const rateText = (c: (typeof charges)[number]) =>
 ---
 
 <Layout title={`Plan · ${business.name}`} context={{ membership: ctx.membership }}>
-  <PageHeader {...ctx.backdrop} title="Planes" description={`${business.name} está en el plan ${business.plan}${business.planUntil ? ` (${untilLabel(business, today())})` : ""}. Tus empleados entran siempre gratis; pagas por negocio y por sucursal.`} >
+  <PageHeader {...ctx.backdrop} title="Planes" description={`${business.name} está en el plan ${business.plan}${business.planUntil ? ` (${untilLabel(business, today())}${business.trial ? `: termina el ${day(business.planUntil)}` : ""})` : ""}.`} >
     <a slot="back" class="back" href={`${businessHref(business)}/configuracion`}><ArrowLeft size={16} stroke-width={1.75} />Configuración</a>
   </PageHeader>
-
-  <PeriodSwitch period={period} quote={quote} />
 
   <div class="plan-grid">
     {
       plans.map((plan) => {
         const current = plan.name === business.plan;
+        const picked = quote && plan.name === pickedPlan;
+        const Art = art[plan.name];
+        const shown = plan.features.slice(0, SHOWN);
+        const rest = plan.features.slice(SHOWN);
+        const feature = (f: (typeof plan.features)[number]) => (
+          <li>
+            <Check size={16} stroke-width={1.75} />
+            {typeof f === "string" ? f : <span>{f.text} <span class="chip chip-neutral">Próximamente</span></span>}
+          </li>
+        );
         return (
-          <article class:list={["card", "plan", { current }]} aria-labelledby={`plan-${plan.name}`}>
+          <article class:list={["card", "plan", `plan-${plan.name.toLowerCase()}`, { picked }]} data-plan={plan.name} aria-labelledby={`plan-${plan.name}`}>
             <header>
-              <h2 id={`plan-${plan.name}`}>{plan.name}</h2>
-              {current && <span class="chip chip-income">Tu plan</span>}
+              <span class="art" aria-hidden="true"><Art size={24} stroke-width={1.75} /></span>
+              <div class="plan-name">
+                <h2 id={`plan-${plan.name}`}>{plan.name}</h2>
+                <p class="audience">{plan.audience}</p>
+              </div>
             </header>
-            <p class="audience">{plan.audience}</p>
-            <PlanPrice plan={plan.name} period={period} quote={quote} />
-            <ul role="list">
-              {plan.features.map((feature) => (
-                <li>
-                  <Check size={16} stroke-width={1.75} />
-                  {typeof feature === "string" ? (
-                      feature
-                    ) : (
-                      <span>
-                        {feature.text} <span class="chip chip-neutral">Próximamente</span>
-                      </span>
-                    )}
-                </li>
-              ))}
-            </ul>
+            <p class="plan-tags">
+              {current && (
+                <span class="chip chip-neutral">
+                  <Check size={12} stroke-width={1.75} />
+                  Tu plan{business.trial && plan.name !== "Gratis" ? " · en prueba" : ""}
+                </span>
+              )}
+              <span class="chip chip-picked" data-picked-chip hidden={!picked}>{current && active && !business.trial ? "Renuevas" : "Lo que pagas"}</span>
+            </p>
+            {current && expires && plan.name !== "Gratis" && (
+              <p class="plan-until">
+                <CalendarClock size={16} stroke-width={1.75} aria-hidden="true" />
+                <span>{business.trial ? "Tu prueba vence el" : "Vence el"} <strong>{expires}</strong></span>
+              </p>
+            )}
+            <PlanPrice plan={plan.name} period={period} quote={quote} lead="bs" />
+            <ul role="list">{shown.map(feature)}</ul>
+            {rest.length > 0 && (
+              <details class="more">
+                <summary>
+                  Ver {rest.length} más
+                  <ChevronDown size={16} stroke-width={1.75} aria-hidden="true" />
+                </summary>
+                <ul role="list">{rest.map(feature)}</ul>
+              </details>
+            )}
+            <div class="plan-action">
+              {plan.name === "Gratis" ? (
+                <p class="plan-note">Siempre disponible, sin pagar.</p>
+              ) : !quote ? null : plan.name === "Negocio" && branches > 1 ? (
+                <p class="plan-note">Tienes {branches} sucursales: te toca Sucursales.</p>
+              ) : (
+                <button type="button" class="btn btn-secondary" data-pick={plan.name === "Negocio" ? 1 : Math.max(2, branches)} aria-pressed={picked ? "true" : "false"} aria-controls="calc-branches">
+                  {current && active && !business.trial ? "Renovar" : plan.name === "Negocio" ? "Elegir · 1 local" : `Elegir · ${Math.max(2, branches)} locales`}
+                </button>
+              )}
+            </div>
           </article>
         );
       })
@@ -97,93 +148,116 @@ const rateText = (c: (typeof charges)[number]) =>
   </div>
 
   <section class="card pay" aria-labelledby="pay-title">
-    <h2 class="card-title" id="pay-title">Pagar tu plan</h2>
-    <p class="pay-intro">
-      Elige cuántos locales pagas y el período arriba (mensual o anual): el total cambia al instante. Pagas por QR desde cualquier banco y
-      activamos tu plan apenas vemos el comprobante. No pierdes nada de lo que ya registraste.
-    </p>
+    <header class="pay-head">
+      <h2 class="pay-title" id="pay-title">Pagar tu plan</h2>
+      {ownedOthers.length > 0 ? (
+        <div class="pay-for">
+          <ContextSwitcher
+            id="pay-business"
+            label="Pagas el plan de"
+            icon={Store}
+            options={[
+              { label: business.name, detail: `Plan ${business.plan} · ${plural(branches, "sucursal", "sucursales")}`, href: `${businessHref(business)}/plan`, current: true },
+              ...ownedOthers.map((other) => ({
+                label: other.business.name,
+                detail: `Plan ${other.business.plan} · ${plural(other.branches.length, "sucursal", "sucursales")}`,
+                href: `${businessHref(other.business)}/plan${period === "anual" ? "?periodo=anual" : ""}`,
+              })),
+            ]}
+          />
+        </div>
+      ) : (
+        <p class="pay-for pay-for-static">
+          <span class="pay-for-icon" aria-hidden="true"><Store size={18} stroke-width={1.75} /></span>
+          <span class="pay-for-text">
+            <span>Pagas el plan de</span>
+            <strong>{business.name}</strong>
+          </span>
+        </p>
+      )}
+    </header>
     {
       quote ? (
         <form id="pay" class="pay-form" data-action="createPlanCharge" data-redirect={`${businessHref(business)}/cobro/{id}`} novalidate>
           <input type="hidden" name="businessId" value={business.id} />
           <input type="hidden" name="period" id="pay-period" value={period} />
-          <div class="for-business">
-            <p>
-              <Store size={18} stroke-width={1.75} aria-hidden="true" />
-              <span>Pagas el plan de <strong>{business.name}</strong></span>
-            </p>
-            {ownedOthers.length > 0 && (
-              <details class="switch">
-                <summary>
-                  Cambiar de negocio
-                  <ChevronDown size={16} stroke-width={1.75} aria-hidden="true" />
-                </summary>
-                <ul role="list">
-                  {ownedOthers.map((other) => (
-                    <li>
-                      <a href={`${businessHref(other.business)}/plan${period === "anual" ? "?periodo=anual" : ""}`}>
-                        <strong>{other.business.name}</strong>
-                        <span>Plan {other.business.plan} · {plural(other.branches.length, "sucursal", "sucursales")}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </div>
-          {freeMonths > 0 && (
-            <p class="founder">
-              <Sparkles size={16} stroke-width={1.75} aria-hidden="true" />
-              <span><strong>{freeMonths === 1 ? "Un mes gratis" : `${freeMonths} meses gratis`}:</strong> tu primer pago suma {freeMonths === 1 ? "un mes más" : `${freeMonths} meses más`}, por llegar con el enlace de un socio de Caja Simple.</span>
-            </p>
+          {(freeMonths > 0 || promo) && (
+            <ul class="perks" role="list">
+              {freeMonths > 0 && (
+                <li>
+                  <span class="chip chip-income"><Sparkles size={12} stroke-width={1.75} />{freeMonths === 1 ? "1 mes gratis" : `${freeMonths} meses gratis`}</span>
+                  <span>Tu primer pago suma {freeMonths === 1 ? "un mes más" : `${freeMonths} meses más`}, por llegar con el enlace de un socio.</span>
+                </li>
+              )}
+              {promo && (
+                <li>
+                  <span class="chip chip-income"><Sparkles size={12} stroke-width={1.75} />−{pct(promo.discount)} fundador</span>
+                  <span>
+                    {promo.until
+                      ? `En tus cobros hasta el ${longDate(promo.until).replace(/^\S+ /, "")}; en el anual, por los meses que te quedan.`
+                      : `${promo.months === 12 ? "El primer año" : `Por ${promo.months} meses`} desde tu primer pago${promo.referred ? ", asegurado por el enlace de un socio" : `. ${promo.left === 1 ? "Queda 1 cupo" : `Quedan ${promo.left} cupos`}`}.`}
+                  </span>
+                </li>
+              )}
+            </ul>
           )}
-          {promo && (
-            <p class="founder">
-              <Sparkles size={16} stroke-width={1.75} aria-hidden="true" />
-              <span>
-                <strong>Precio fundador{promo.referred && !promo.until ? " asegurado" : ""}: −{pct(promo.discount)}</strong>{" "}
-                {promo.referred && !promo.until && "por llegar con el enlace de un socio de Caja Simple, "}
-                {promo.until
-                  ? `en tus cobros hasta el ${longDate(promo.until).replace(/^\S+ /, "")}. En el plan anual, solo por los meses que te quedan.`
-                  : `${promo.months === 12 ? "el primer año" : `por ${promo.months} meses`} desde tu primer pago. ${promo.left === 1 ? "Queda 1 cupo" : `Quedan ${promo.left} cupos`}: el tuyo se reserva al confirmar el pago.`}
-              </span>
-            </p>
-          )}
-          <PlanCalculator branches={pending ? pending.extraBranches + 1 : branches} current={branches} min={Math.max(branches, 1)} name="branches" form="pay" discount={discount} founderMonths={founderMonths} period={period} quote={quote} />
+          <PeriodSwitch period={period} quote={quote} note={false} />
+          <PlanCalculator branches={startBranches} current={branches} min={Math.max(branches, 1)} name="branches" form="pay" discount={discount} founderMonths={founderMonths} period={period} quote={quote} lead="bs" />
 
           {pending && (
             <div class="pending" role="group" aria-labelledby="pending-title">
-              {/* Dentro del formulario #pay: la X envía el de eliminar, que está afuera (los formularios no se anidan). */}
-              <button type="submit" form={`delete-charge-${pending.id}`} class="icon-btn charge-delete pending-delete" aria-label={`Eliminar el cobro ${code(pending.id)}`} title="Eliminar cobro">
-                <X size={18} stroke-width={1.75} aria-hidden="true" />
-              </button>
               <p class="pending-head">
                 <span class="chip chip-warning">{statusLabel.pendiente}</span>
-                <strong id="pending-title">
-                  Tienes un cobro de <span class="num">Bs {pending.amountBs.toLocaleString("es-BO")}</span> · {chargeName(pending)}
-                </strong>
+                <span class="pending-name">{chargeName(pending)}</span>
+              </p>
+              <p class="pending-amount num" id="pending-title">
+                <span class="sr-only">Tienes un cobro de </span>Bs {pending.amountBs.toLocaleString("es-BO")}
               </p>
               <p class="charge-meta">
                 Código <strong class="num">{code(pending.id)}</strong> · el monto vale hasta el {stamp(pending.expiresAt)}. {rateText(pending)}.
               </p>
               <div class="pending-actions">
-                <a href={chargeHref(pending.id)} class="btn btn-primary" target="_blank" rel="noopener">
-                  <ExternalLink size={16} stroke-width={1.75} />Ver QR y cómo pagar<span class="sr-only"> (se abre en otra pestaña)</span>
+                <a href={chargeHref(pending.id)} class="btn btn-primary">
+                  <QrCode size={16} stroke-width={1.75} />Ver QR y cómo pagar
                 </a>
                 {proofUrl && (
                   <a href={proofUrl} class="btn btn-secondary" target="_blank" rel="noopener">
                     <MessageCircle size={16} stroke-width={1.75} />Ya pagué: enviar comprobante<span class="sr-only"> por WhatsApp (se abre en otra pestaña)</span>
                   </a>
                 )}
+                {/* Dentro del formulario #pay: envía el de eliminar, que está afuera (los formularios no se anidan). */}
+                <button type="submit" form={`delete-charge-${pending.id}`} class="icon-btn charge-delete" aria-label={`Eliminar el cobro ${code(pending.id)}`} title="Eliminar cobro">
+                  <X size={18} stroke-width={1.75} aria-hidden="true" />
+                </button>
               </div>
-              <p class="charge-meta">Si cambias los locales o el período, genera un cobro nuevo con ese monto.</p>
+              <p class="charge-meta">Si cambias los locales o el período, genera un QR nuevo con ese monto.</p>
             </div>
           )}
 
+          <div class="pay-note" data-region="pay-note">
+            {paid.map((p) => (
+              <p data-note-for={p.name} hidden={p.name !== pickedPlan}>
+                <CalendarCheck size={16} stroke-width={1.75} aria-hidden="true" />
+                {payNote(p)}
+              </p>
+            ))}
+          </div>
           <p class="notice notice-error" role="alert" data-form-notice />
-          <button type="submit" class:list={["btn", pending ? "btn-secondary" : "btn-primary"]}>
-            {pending ? "Generar cobro nuevo" : "Generar cobro y ver QR"}
-          </button>
+          <div class="pay-foot">
+            <ol class="steps" role="list" aria-label="Cómo se paga">
+              <li><span class="step-num num" aria-hidden="true">1</span>Genera el QR</li>
+              <li><span class="step-num num" aria-hidden="true">2</span>Paga en Bs desde tu banco</li>
+              <li><span class="step-num num" aria-hidden="true">3</span>Envía el comprobante</li>
+            </ol>
+            <button type="submit" class:list={["btn", "pay-submit", pending ? "btn-secondary" : "btn-primary"]}>
+              {paid.map((p) => (
+                <span data-cta-for={p.name} hidden={p.name !== pickedPlan}>
+                  {pending ? "Generar QR nuevo" : p.renews && !business.trial ? "Generar QR para renovar" : "Generar QR de pago"}
+                </span>
+              ))}
+              <ArrowRight size={16} stroke-width={1.75} />
+            </button>
+          </div>
         </form>
       ) : (
         <p class="notice" role="status">
@@ -245,14 +319,45 @@ const rateText = (c: (typeof charges)[number]) =>
     )
   }
 
-  {affiliate && <AffiliateInvite affiliate={affiliate} />}
 </Layout>
 
 <script>
+  import { onPage } from "@/scripts/refresh";
+
   // El selector «Período» del cobro sigue al de arriba (mensual/anual sin recargar, PeriodSwitch).
   document.addEventListener("period:change", (event) => {
     const field = document.querySelector<HTMLInputElement>("#pay-period");
     if (field) field.value = (event as CustomEvent<string>).detail;
+  });
+
+  // «Elegir» en una tarjeta pone sus locales en la calculadora; la tarjeta elegida sigue a los locales (1 → Negocio, más → Sucursales).
+  onPage((signal) => {
+    const calc = document.querySelector<HTMLElement>(".pay .calc");
+    if (!calc) return;
+    const mark = (branches: number) => {
+      const name = branches > 1 ? "Sucursales" : "Negocio";
+      for (const card of document.querySelectorAll<HTMLElement>(".plan[data-plan]")) {
+        const on = card.dataset.plan === name;
+        card.classList.toggle("picked", on);
+        card.querySelector<HTMLElement>("[data-picked-chip]")!.hidden = !on;
+        card.querySelector("[data-pick]")?.setAttribute("aria-pressed", String(on));
+      }
+      for (const el of document.querySelectorAll<HTMLElement>("[data-note-for], [data-cta-for]")) el.hidden = (el.dataset.noteFor ?? el.dataset.ctaFor) !== name;
+    };
+    // Al cambiar de período, las regiones vuelven como las dibujó el servidor: se marcan otra vez con los locales de ahora.
+    const input = calc.querySelector<HTMLInputElement>("input")!;
+    document.addEventListener("period:change", () => mark(Number(input.value)), { signal });
+    calc.addEventListener("calc:change", (event) => mark((event as CustomEvent<{ branches: number }>).detail.branches), { signal });
+    document.addEventListener(
+      "click",
+      (event) => {
+        const button = (event.target as Element).closest<HTMLButtonElement>("[data-pick]");
+        if (!button) return;
+        calc.dispatchEvent(new CustomEvent("calc:set", { detail: { branches: Number(button.dataset.pick) } }));
+        calc.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+      },
+      { signal },
+    );
   });
 </script>
 
@@ -269,38 +374,68 @@ const rateText = (c: (typeof charges)[number]) =>
     text-decoration: none;
   }
 
-  .back:hover {
-    color: var(--color-text);
+  [hidden] {
+    display: none !important;
   }
 
+  /* Tarjetas de plan: arte cuadrado con más color cuanto más abarca, Bs como cifra y la elegida con el anillo ámbar. */
   .plan-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
     gap: 1rem;
   }
 
+  /* Columna: el botón queda abajo aunque las tarjetas tengan distinto contenido. */
   .plan {
-    display: grid;
-    align-content: start;
-    gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
     padding: 1.25rem;
   }
 
-  .plan.current {
-    border-color: var(--color-primary);
+  .plan.picked {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
   }
 
   .plan header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.875rem;
+  }
+
+  .art {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.375rem;
+    background: var(--color-surface-hover);
+    color: var(--color-text-muted);
+  }
+
+  .plan-negocio .art {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+  }
+
+  .plan-sucursales .art {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+
+  .plan-name {
+    display: grid;
+    gap: 0.125rem;
+    min-width: 0;
   }
 
   .plan h2 {
     margin: 0;
-    font-size: var(--text-lg);
-    line-height: var(--text-lg-lh);
+    font-size: var(--text-xl);
+    line-height: var(--text-xl-lh);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.02em;
   }
 
   .audience {
@@ -309,10 +444,43 @@ const rateText = (c: (typeof charges)[number]) =>
     font-size: var(--text-sm);
   }
 
+  .plan-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    min-height: 1.5rem;
+    margin: 0;
+  }
+
+  .plan-until {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .plan-until :global(svg) {
+    flex-shrink: 0;
+    margin-top: 0.15em;
+    color: var(--color-text-muted);
+  }
+
+  .chip-picked {
+    background: var(--color-primary-soft);
+    color: var(--color-text);
+  }
+
+  .plan :global(.plan-price) {
+    margin: 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
   .plan ul {
     display: grid;
     gap: 0.5rem;
-    margin: 0.5rem 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
     font-size: var(--text-sm);
@@ -326,14 +494,122 @@ const rateText = (c: (typeof charges)[number]) =>
   .plan li :global(svg) {
     flex-shrink: 0;
     margin-top: 0.125rem;
-    color: var(--color-income);
+    color: var(--color-text-muted);
   }
 
+  .more summary {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    min-height: 2rem;
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .more summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .more[open] summary :global(svg) {
+    rotate: 180deg;
+  }
+
+  .more ul {
+    margin-top: 0.5rem;
+  }
+
+  .plan-action {
+    margin-top: auto;
+  }
+
+  .plan-action .btn {
+    width: 100%;
+  }
+
+  .plan-action .btn[aria-pressed="true"] {
+    border-color: var(--color-primary);
+  }
+
+  .plan-note {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  /* Pagar tu plan: el panel donde se decide. Arriba el negocio y los beneficios; la cuenta; abajo los pasos y el botón. */
   .pay {
     display: grid;
-    gap: 0.75rem;
+    gap: 1.25rem;
     margin-top: 1.5rem;
-    padding: 1.25rem;
+    padding: 1.5rem;
+  }
+
+  /* Título y, debajo, para qué negocio se paga (el selector de negocio del menú, si tiene otros). */
+  .pay-head {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .pay-title {
+    margin: 0;
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl-lh);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.02em;
+  }
+
+  .pay-for {
+    width: min(100%, 22rem);
+    margin: 0;
+  }
+
+  .pay-for-static {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .pay-for-icon {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    background: var(--color-surface);
+    color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .pay-for-text {
+    display: grid;
+    min-width: 0;
+    line-height: 1.3;
+  }
+
+  .pay-for-text span {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .pay-for-text strong {
+    overflow: hidden;
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pay-form {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .pay-form :global(.period-row) {
+    margin: 0;
   }
 
   /* La calculadora va dentro de la tarjeta: sin su propio marco. */
@@ -344,42 +620,30 @@ const rateText = (c: (typeof charges)[number]) =>
     background: none;
   }
 
-  .founder {
-    display: flex;
+  .perks {
+    display: grid;
     gap: 0.5rem;
-    align-items: flex-start;
     margin: 0;
-    padding: 0.75rem 1rem;
-    border-radius: var(--radius-panel);
-    background: var(--color-primary-soft);
+    padding: 0;
+    list-style: none;
+  }
+
+  .perks li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.625rem;
     font-size: var(--text-sm);
   }
 
-  .founder :global(svg) {
-    flex-shrink: 0;
-    margin-top: 0.15em;
-    color: var(--color-primary);
-  }
-
-  /* El cobro por pagar: borde y chip (no solo color). */
+  /* El cobro por pagar: anillo ámbar y chip (no solo color), con el monto en Bs como cifra. */
   .pending {
-    position: relative;
     display: grid;
     gap: 0.5rem;
-    padding: 1rem 3.25rem 1rem 1rem;
-    border: 2px solid var(--color-primary);
+    padding: 1rem 1.25rem;
     border-radius: var(--radius-panel);
-  }
-
-  .charge-delete {
-    width: 2.75rem;
-    height: 2.75rem;
-  }
-
-  .pending-delete {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
+    background: var(--color-surface);
+    box-shadow: inset 0 0 0 2px var(--color-primary);
   }
 
   .pending-head {
@@ -388,102 +652,128 @@ const rateText = (c: (typeof charges)[number]) =>
     align-items: center;
     gap: 0.5rem;
     margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  .pending-amount {
+    margin: 0;
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl-lh);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.02em;
   }
 
   .pending-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .charge-delete {
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-left: auto;
   }
 
   .charge-meta,
-  .pay-intro,
   .history-meta {
     margin: 0;
     color: var(--color-text-muted);
     font-size: var(--text-sm);
   }
 
-  .charge-code {
-    margin: 0;
-  }
-
-  .for-business {
-    display: grid;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-panel);
-  }
-
-  .for-business > p {
+  .pay-note p {
     display: flex;
     gap: 0.5rem;
-    align-items: center;
+    align-items: flex-start;
     margin: 0;
-  }
-
-  .for-business :global(svg) {
-    flex-shrink: 0;
-    color: var(--color-primary);
-  }
-
-  .switch summary {
-    display: inline-flex;
-    gap: 0.25rem;
-    align-items: center;
-    color: var(--color-text);
     font-size: var(--text-sm);
-    font-weight: var(--font-semibold);
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
-    cursor: pointer;
-    list-style: none;
   }
 
-  .switch summary::-webkit-details-marker {
-    display: none;
+  .pay-note :global(svg) {
+    flex-shrink: 0;
+    margin-top: 0.15em;
+    color: var(--color-text-muted);
   }
 
-  .switch[open] summary :global(svg) {
-    transform: rotate(180deg);
-  }
-
-  .switch ul {
-    display: grid;
-    margin: 0.5rem 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .switch li + li {
+  .pay-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+    padding-top: 1.25rem;
     border-top: 1px solid var(--color-border);
   }
 
-  .switch a {
-    display: grid;
-    padding: 0.625rem 0.25rem;
-    color: var(--color-text);
-    text-decoration: none;
-  }
-
-  .switch a span {
-    color: var(--color-text-muted);
+  .steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
     font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
   }
 
-  .switch a:hover strong {
-    text-decoration: underline;
+  .steps li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
-
-  .pay-form .btn {
-    justify-self: start;
-  }
-
-  .pay-form {
+  .step-num {
     display: grid;
-    gap: 1rem;
+    flex-shrink: 0;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 999px;
+    background: var(--color-surface);
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .plan {
+      transition:
+        box-shadow 200ms var(--ease-out),
+        background-color 200ms var(--ease-out);
+    }
+
+    .more summary :global(svg) {
+      transition: rotate 200ms var(--ease-out);
+    }
+
+    .pending {
+      animation: pending-in 260ms var(--ease-out);
+    }
+  }
+
+  @keyframes pending-in {
+    from {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .pay {
+      padding: 1.25rem;
+    }
+
+    .steps {
+      display: grid;
+    }
+
+    .pay-submit {
+      width: 100%;
+    }
   }
 
   .history {

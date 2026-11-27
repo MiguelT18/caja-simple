@@ -1,13 +1,15 @@
 // Promociones del negocio: lista con su estado de hoy y diálogo para crear o editar. La base aplica el descuento al vender.
 import { actions } from "astro:actions";
 import { useMemo, useState } from "react";
-import { BadgePercent, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { BadgePercent, CalendarClock, CalendarDays, CalendarX, CircleAlert, CircleCheck, Ellipsis, Package, Pause, Pencil, Plus, Store, Trash2 } from "lucide-react";
 import type { Promotion } from "@/data/promotions";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { AppDialog } from "./AppDialog";
 import { Field, safeAction } from "./products/form";
-import { productsLabel, promoBadge, promoLabel, promoStatus, statusLabel, whenLabel, type PromoKind } from "@/lib/promos";
+import { productsLabel, promoBadge, promoLabel, promoStatus, statusLabel, whenLabel, type PromoKind, type PromoStatus } from "@/lib/promos";
 import { confirmDialog, toast } from "@/scripts/dialogs";
 import { refreshRegions } from "@/scripts/refresh";
 
@@ -27,6 +29,15 @@ const KINDS: { kind: PromoKind; label: string; hint: string }[] = [
   { kind: "bundle", label: "Lleva y paga", hint: "Ej.: lleva 3, paga 2" },
 ];
 
+/** El estado con ícono y texto (nunca solo color); lo que vale hoy, primero. */
+const STATUS: Record<PromoStatus, { icon: typeof CircleCheck; chip: string; order: number }> = {
+  hoy: { icon: CircleCheck, chip: "chip-income", order: 0 },
+  "otro-dia": { icon: CalendarX, chip: "chip-neutral", order: 1 },
+  programada: { icon: CalendarClock, chip: "chip-info", order: 2 },
+  pausada: { icon: Pause, chip: "chip-neutral", order: 3 },
+  vencida: { icon: CircleAlert, chip: "chip-warning", order: 4 },
+};
+
 export default function PromotionsManager({
   businessId,
   promotions,
@@ -44,8 +55,11 @@ export default function PromotionsManager({
   const productName = useMemo(() => new Map(products.map((p) => [p.id, p.name])), [products]);
   const branchName = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches]);
 
+  const [toggling, setToggling] = useState<string | null>(null);
   const toggle = async (p: Promotion) => {
+    setToggling(p.id);
     const { error } = await safeAction(() => actions.togglePromotion({ id: p.id, active: !p.active }));
+    setToggling(null);
     if (error) return toast(error.message, "error");
     await refreshRegions();
     toast(p.active ? `«${p.name}» quedó en pausa.` : `«${p.name}» volvió a estar activa.`, "success");
@@ -58,63 +72,129 @@ export default function PromotionsManager({
     toast(`Promoción «${p.name}» borrada.`, "success");
   };
 
-  return (
-    <div className="grid gap-4">
-      <div>
-        <Button className="h-11" onClick={() => setEditing("new")} disabled={products.length === 0}>
-          <Plus />
-          Nueva promoción
-        </Button>
-        {products.length === 0 && <p className="field-hint mt-2">Primero agrega productos al catálogo.</p>}
-      </div>
+  const sorted = [...promotions].sort((a, b) => STATUS[promoStatus(a, today)].order - STATUS[promoStatus(b, today)].order);
+  const validToday = promotions.filter((p) => promoStatus(p, today) === "hoy").length;
+  // Activas: las que se pueden aplicar (hoy u otro día); desactivadas: en pausa o vencidas.
+  const isOff = (p: Promotion) => ["pausada", "vencida"].includes(promoStatus(p, today));
+  const active = sorted.filter((p) => !isOff(p));
+  const inactive = sorted.filter(isOff);
+  const card = (p: Promotion) => {
+              const status = promoStatus(p, today);
+              const { icon: StatusIcon, chip } = STATUS[status];
+              const off = status === "pausada" || status === "vencida";
+              const names = p.productIds.map((id) => productName.get(id)).filter(Boolean) as string[];
+              const where = !p.branchIds ? "Todas las sucursales" : p.branchIds.map((id) => branchName.get(id) ?? "Sucursal quitada").join(", ");
+              const switchId = `promo-active-${p.id}`;
+              return (
+                <li key={p.id} className="flex flex-col gap-4 rounded-[var(--radius-panel)] bg-card p-4">
+                  <div className="flex items-start gap-4">
+                    {/* El descuento es el arte: lo primero que se lee. En pausa o vencida, atenuado (el texto no). */}
+                    <span
+                      className={`grid size-[4.5rem] shrink-0 place-items-center rounded-[0.375rem] bg-[var(--color-income-soft)] px-1 text-center text-[length:var(--text-xl)] leading-none font-extrabold tracking-[-0.02em] text-[var(--color-income)] num ${off ? "opacity-45" : ""}`}
+                      aria-hidden="true"
+                    >
+                      {promoBadge(p)}
+                    </span>
+                    <div className="grid min-w-0 flex-1 gap-1.5">
+                      <h3 className="m-0 text-[length:var(--text-lg)] leading-[var(--text-lg-lh)] font-bold [overflow-wrap:anywhere]">{p.name}</h3>
+                      <span className={`chip ${chip} justify-self-start`}>
+                        <StatusIcon size={12} strokeWidth={1.75} aria-hidden="true" />
+                        {statusLabel[status]}
+                      </span>
+                      <p className="m-0 text-sm font-semibold">{promoLabel(p)}</p>
+                    </div>
+                  </div>
 
+                  <ul role="list" className="m-0 grid list-none gap-1.5 p-0 text-sm text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <CalendarDays className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                      <span>{whenLabel(p)}</span>
+                    </li>
+                    <li className="flex items-start gap-2 [overflow-wrap:anywhere]">
+                      <Package className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                      <span>
+                        <span className="font-semibold text-foreground">{productsLabel(names.length)}</span>
+                        {names.length > 0 && `: ${names.slice(0, 3).join(", ")}${names.length > 3 ? ` y ${names.length - 3} más` : ""}`}
+                      </span>
+                    </li>
+                    {branches.length > 1 && (
+                      <li className="flex items-start gap-2 [overflow-wrap:anywhere]">
+                        <Store className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                        <span>{where}</span>
+                      </li>
+                    )}
+                  </ul>
+
+                  {/* Acciones por peso: el interruptor y Editar a la vista; Borrar, en el menú. */}
+                  <div className="mt-auto flex items-center gap-2 border-t border-[var(--color-border)] pt-3">
+                    {status === "vencida" ? (
+                      // Vencida: pausarla no cambia nada; vuelve a valer cambiando las fechas.
+                      <p className="mr-auto m-0 text-sm text-muted-foreground">Cambia las fechas para volver a usarla.</p>
+                    ) : (
+                      <label htmlFor={switchId} className="mr-auto flex min-h-11 cursor-pointer items-center gap-2.5 text-sm font-semibold">
+                        <Switch id={switchId} checked={p.active} disabled={toggling === p.id} onCheckedChange={() => toggle(p)} aria-label={`Activa: «${p.name}»`} />
+                        {p.active ? "Activa" : "En pausa"}
+                      </label>
+                    )}
+                    <Button variant="outline" size="sm" className="h-10" onClick={() => setEditing(p)}>
+                      <Pencil />
+                      Editar<span className="sr-only"> «{p.name}»</span>
+                    </Button>
+                    {/* modal={false}: el menú abre un diálogo; así Radix no deja la página bloqueada al cerrarlo. */}
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-sm" className="size-10" aria-label={`Más opciones de «${p.name}»`}>
+                          <Ellipsis />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem variant="destructive" onSelect={() => remove(p)}>
+                          <Trash2 />
+                          Borrar promoción
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </li>
+              );
+  };
+  const create = (
+    <Button className="h-11" onClick={() => setEditing("new")} disabled={products.length === 0}>
+      <Plus />
+      Nueva promoción
+    </Button>
+  );
+
+  return (
+    <div className="grid gap-8">
       {promotions.length === 0 ? (
-        <div className="grid justify-items-center gap-2 rounded-xl border border-dashed p-8 text-center">
-          <BadgePercent className="size-8 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
-          <p className="font-semibold">Todavía no hay promociones</p>
-          <p className="max-w-prose text-sm text-muted-foreground">
-            Crea un descuento para algunos productos: por un tiempo, sin fecha límite o solo ciertos días, como «todos los viernes».
-          </p>
+        <div className="grid justify-items-center gap-3 rounded-[var(--radius-panel)] border border-dashed border-[var(--color-border-strong)] p-8 text-center">
+          <span className="grid size-14 place-items-center rounded-[0.375rem] bg-[var(--color-income-soft)] text-[var(--color-income)]" aria-hidden="true">
+            <BadgePercent className="size-7" strokeWidth={1.75} />
+          </span>
+          <p className="m-0 text-lg font-bold">Todavía no hay promociones</p>
+          <p className="m-0 max-w-prose text-sm text-muted-foreground">Un descuento para algunos productos: por un tiempo, sin fecha límite o solo ciertos días, como «todos los viernes».</p>
+          {create}
+          {products.length === 0 && <p className="field-hint m-0">Primero agrega productos al catálogo.</p>}
         </div>
       ) : (
-        <ul role="list" className="grid gap-3">
-          {promotions.map((p) => {
-            const status = promoStatus(p, today);
-            const names = p.productIds.map((id) => productName.get(id)).filter(Boolean) as string[];
-            const where = !p.branchIds ? "Todas las sucursales" : p.branchIds.map((id) => branchName.get(id) ?? "Sucursal quitada").join(", ");
-            return (
-              <li key={p.id} className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-                <div className="grid min-w-0 gap-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="chip chip-income num">{promoBadge(p)}</span>
-                    <h2 className="font-bold [overflow-wrap:anywhere]">{p.name}</h2>
-                    <span className={`chip ${status === "hoy" ? "chip-income" : status === "vencida" ? "chip-warning" : "chip-neutral"}`}>{statusLabel[status]}</span>
-                  </div>
-                  <p className="text-sm">{promoLabel(p)} · {whenLabel(p)}</p>
-                  <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">
-                    {productsLabel(names.length)}: {names.slice(0, 4).join(", ")}
-                    {names.length > 4 && ` y ${names.length - 4} más`}
-                    {branches.length > 1 && ` · ${where}`}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" className="h-10" onClick={() => setEditing(p)} aria-label={`Editar «${p.name}»`}>
-                    <Pencil />
-                    Editar
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-10" onClick={() => toggle(p)} aria-label={`${p.active ? "Pausar" : "Activar"} «${p.name}»`}>
-                    {p.active ? <Pause /> : <Play />}
-                    {p.active ? "Pausar" : "Activar"}
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-10" onClick={() => remove(p)} aria-label={`Borrar «${p.name}»`}>
-                    <Trash2 />
-                    Borrar
-                  </Button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="m-0 text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{promotions.length === 1 ? "1 promoción" : `${promotions.length} promociones`}</span>
+              {` · ${validToday === 1 ? "1 vale hoy" : `${validToday} valen hoy`}`}
+            </p>
+            {create}
+          </div>
+          <Section id="promos-active" title="Activas" count={active.length} empty="Ninguna promoción activa: las desactivadas esperan abajo.">
+            {active.map(card)}
+          </Section>
+          {inactive.length > 0 && (
+            <Section id="promos-inactive" title="Desactivadas" count={inactive.length} hint="En pausa o vencidas: no se aplican al vender.">
+              {inactive.map(card)}
+            </Section>
+          )}
+        </>
       )}
 
       {editing && (
@@ -127,6 +207,27 @@ export default function PromotionsManager({
         />
       )}
     </div>
+  );
+}
+
+function Section({ id, title, count, hint, empty, children }: { id: string; title: string; count: number; hint?: string; empty?: string; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-3" aria-labelledby={id}>
+      <div className="grid gap-0.5">
+        <h2 id={id} className="m-0 flex items-baseline gap-2 text-[length:var(--text-2xl)] leading-[var(--text-2xl-lh)] font-extrabold tracking-[-0.02em]">
+          {title}
+          <span className="num text-base font-semibold text-muted-foreground">{count}</span>
+        </h2>
+        {hint && <p className="m-0 text-sm text-muted-foreground">{hint}</p>}
+      </div>
+      {count === 0 ? (
+        <p className="m-0 text-sm text-muted-foreground">{empty}</p>
+      ) : (
+        <ul role="list" className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,21rem),1fr))] gap-4 p-0">
+          {children}
+        </ul>
+      )}
+    </section>
   );
 }
 
