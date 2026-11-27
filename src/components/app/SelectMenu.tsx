@@ -33,6 +33,7 @@ export function SelectMenu<T extends SelectMenuOption>({
   searchPlaceholder = "Buscar",
   noun = "opciones",
   emptyText,
+  keepOrder,
   disabled,
   "aria-invalid": invalid,
   "aria-describedby": describedBy,
@@ -52,6 +53,8 @@ export function SelectMenu<T extends SelectMenuOption>({
   noun?: string;
   /** Si no hay ninguna opción. */
   emptyText?: string;
+  /** Las opciones ya vienen en el orden que importa (tallas: XS, S, M…): no se ordenan por nombre. */
+  keepOrder?: boolean;
   disabled?: boolean;
   "aria-invalid"?: boolean;
   "aria-describedby"?: string;
@@ -72,14 +75,15 @@ export function SelectMenu<T extends SelectMenuOption>({
   const matches = useMemo(() => {
     const q = fold(query.trim());
     const words = q.split(/\s+/).filter(Boolean);
-    const byName = (a: T, b: T) => fold(a.label).localeCompare(fold(b.label));
+    // La opción vacía («Sin categoría», «Sin elegir») va siempre primero.
+    const byName = (a: T, b: T) => Number(b.value === "") - Number(a.value === "") || (keepOrder ? 0 : fold(a.label).localeCompare(fold(b.label)));
     if (!words.length) return [...options].sort(byName);
     const hay = (o: T) => " " + fold([o.label, o.keywords].filter(Boolean).join(" "));
     let found = options.filter((o) => words.every((w) => hay(o).includes(" " + w)));
     if (!found.length) found = options.filter((o) => words.every((w) => hay(o).includes(w)));
     const rank = (o: T) => (fold(o.label).startsWith(q) ? 0 : (" " + fold(o.label)).includes(" " + words[0]) ? 1 : 2);
     return found.sort((a, b) => rank(a) - rank(b) || byName(a, b));
-  }, [options, query]);
+  }, [options, query, keepOrder]);
 
   // Lo resaltado sigue a la búsqueda: lo primero que coincide o, sin buscar, lo elegido.
   useEffect(() => {

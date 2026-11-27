@@ -8,7 +8,7 @@ import { formatBs } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { colorOf, saleMode } from "./catalog";
-import { Field, FilePicker, MoneyInput, safeAction, selectClass, useActionForm } from "./form";
+import { Field, FilePicker, MoneyInput, safeAction, useActionForm } from "./form";
 import { ProductCard } from "./ProductCard";
 import { ComboFields } from "./ComboFields";
 import { SelectMenu } from "../SelectMenu";
@@ -634,15 +634,19 @@ export default function ProductEditor({
                       <input type="hidden" name="attrId" value={f.id} />
                       <Field id={id} label={f.label}>
                         {f.kind === "select" ? (
-                          <select id={id} name="attrValue" className={selectClass} defaultValue={value}>
-                            <option value="">Sin elegir</option>
-                            {/* Un valor que ya no está en la lista se conserva hasta que se cambie. */}
-                            {[...(f.options ?? []), ...(value && !f.options?.includes(value) ? [value] : [])].map((o) => (
-                              <option key={o} value={o}>
-                                {o}
-                              </option>
-                            ))}
-                          </select>
+                          <SelectMenu
+                            id={id}
+                            name="attrValue"
+                            defaultValue={value}
+                            placeholder="Sin elegir"
+                            searchPlaceholder={`Buscar ${f.label.toLowerCase()}`}
+                            keepOrder
+                            options={[
+                              { value: "", label: "Sin elegir" },
+                              // Un valor que ya no está en la lista se conserva hasta que se cambie.
+                              ...[...(f.options ?? []), ...(value && !f.options?.includes(value) ? [value] : [])].map((o) => ({ value: o, label: o })),
+                            ]}
+                          />
                         ) : (
                           <input
                             id={id}
