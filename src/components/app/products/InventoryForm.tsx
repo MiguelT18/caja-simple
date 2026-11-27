@@ -27,7 +27,7 @@ export function InventoryForm({
   const save = useActionForm(
     (form) => actions.saveInventory(form) as never,
     onClose,
-    stockLocked ? `Precio de «${product.name}» guardado.` : `Precio y stock de «${product.name}» guardados.`,
+    stockLocked || product.stock !== null ? `Precio de «${product.name}» guardado.` : `Precio y stock de «${product.name}» guardados.`,
   );
 
   async function remove() {
@@ -43,13 +43,31 @@ export function InventoryForm({
     toast(`«${product.name}» ya no se vende en esta sucursal.`, "success");
   }
 
+  // «Registrar movimiento» es el formulario de la página de Inventario (Modal + SelectMenu): se abre con este producto
+  // elegido. Sin ese formulario en la página (otra página, o Gratis), no hay enlace.
+  const opener = typeof document === "undefined" ? null : document.querySelector<HTMLElement>('[data-open-dialog="stock-move"]');
+  const option = () => document.querySelector<HTMLElement>(`#stock-move [role="option"][data-value="${product.id}"]`);
+  const recordMove =
+    opener && option()
+      ? () => {
+          onClose();
+          // Después de que este diálogo (Radix) se desmonte: mientras está, retiene el foco y los clics.
+          const open = () => {
+            if (document.querySelector('[role="dialog"][data-state]')) return requestAnimationFrame(open);
+            opener.click();
+            option()?.click();
+          };
+          requestAnimationFrame(open);
+        }
+      : undefined;
+
   return (
-    <AppDialog title={product.name} description={stockLocked ? "Precio en esta sucursal." : "Precio y stock en esta sucursal."} onClose={onClose}>
+    <AppDialog title={product.name} description={stockLocked || product.stock !== null ? "Precio en esta sucursal." : "Precio y stock en esta sucursal."} onClose={onClose}>
         <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
           <input type="hidden" name="businessId" value={businessId} />
           <input type="hidden" name="branchId" value={branchId} />
           <input type="hidden" name="productId" value={product.id} />
-          <StockFields product={product} errors={save.errors} stockLocked={stockLocked} planHref={planHref} />
+          <StockFields product={product} errors={save.errors} stockLocked={stockLocked} planHref={planHref} onRecordMove={recordMove} />
           {save.message && (
             <p className="notice notice-error m-0" role="alert">
               {save.message}

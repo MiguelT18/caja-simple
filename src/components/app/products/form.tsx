@@ -208,12 +208,15 @@ export function StockFields({
   errors,
   stockLocked = false,
   planHref,
+  onRecordMove,
 }: {
   product?: Product;
   errors: Record<string, string>;
   /** Plan Gratis: el stock se ve pero no se cambia (la base lo tiene congelado). */
   stockLocked?: boolean;
   planHref?: string;
+  /** Abre «Registrar movimiento» con este producto: la única forma de cambiar un stock que ya se controla. */
+  onRecordMove?: () => void;
 }) {
   const [fixedPrice, setFixedPrice] = useState(product?.price !== null);
   const [trackStock, setTrackStock] = useState(product?.stock !== null);
@@ -264,9 +267,26 @@ export function StockFields({
       ) : (
       <div className="grid min-w-0 gap-2 border-t pt-4">
         <Toggle name="trackStock" label="Controlar stock" checked={trackStock} onChange={setTrackStock} />
-        {/* Si ya se controlaba, el stock de ahora: al guardar se aplica solo la diferencia (ver saveInventory). */}
-        {trackStock && product && product.stock !== null && <input type="hidden" name="stockBefore" value={product.stock} />}
-        {trackStock ? (
+        {trackStock && product && product.stock !== null ? (
+          // Ya se controla: el stock solo cambia con las ventas y con movimientos registrados (con autor y motivo).
+          <div className="grid min-w-0 grid-cols-2 items-start gap-3">
+            <div className="grid gap-2">
+              <span className="field-label">Stock</span>
+              <p className="num m-0 flex min-h-11 items-center text-lg font-semibold">{product.stock}</p>
+            </div>
+            <Field id="inv-min" label="Stock mínimo" hint="Avisa cuando baje de aquí." error={errors.minStock}>
+              <input id="inv-min" name="minStock" type="number" inputMode="numeric" step="1" min="0" className="input" defaultValue={product.minStock ?? 0} required />
+            </Field>
+            <p className="field-hint col-span-2 m-0">
+              El stock cambia con las ventas y con entradas, mermas y ajustes, que quedan registrados.{" "}
+              {onRecordMove && (
+                <button type="button" className="font-semibold text-foreground underline underline-offset-2" onClick={onRecordMove}>
+                  Registrar movimiento
+                </button>
+              )}
+            </p>
+          </div>
+        ) : trackStock ? (
           <div className="grid min-w-0 grid-cols-2 items-start gap-3">
             <Field id="inv-stock" label="Stock" error={errors.stock}>
               <input id="inv-stock" name="stock" type="number" inputMode="numeric" step="1" min="0" className="input" defaultValue={product?.stock ?? 0} required />

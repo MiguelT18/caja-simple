@@ -304,15 +304,13 @@ export const products = {
         fixedPrice: z.coerce.boolean().default(false),
         trackStock: z.coerce.boolean().default(false),
         price: money.optional(),
+        // Solo al empezar a controlar el stock (el inicial); después cambia con ventas y movimientos (recordStockMove).
         stock: count.optional(),
-        // El stock que mostraba el formulario al abrirse (si ya se controlaba): lo editado se aplica como ajuste.
-        stockBefore: count.optional(),
         minStock: count.optional(),
       })
       .refine((v) => !v.fixedPrice || v.price !== undefined, { message: "Ingresa un monto", path: ["price"] })
-      .refine((v) => !v.trackStock || v.stock !== undefined, { message: "Ingresa un número", path: ["stock"] })
       .refine((v) => !v.trackStock || v.minStock !== undefined, { message: "Ingresa un número", path: ["minStock"] }),
-    handler: async ({ businessId, branchId, productId, fixedPrice, trackStock, price, stock, stockBefore, minStock }, context) => {
+    handler: async ({ businessId, branchId, productId, fixedPrice, trackStock, price, stock, minStock }, context) => {
       const sb = db(context);
       // Gratis: el stock queda congelado (la base no deja cambiarlo). Se guarda solo el precio y el stock queda como estaba.
       if (!(await limitsOf(sb, businessId)).stock) {
@@ -324,9 +322,10 @@ export const products = {
         check(error);
         return { ok: true };
       }
-      // Ya se controlaba el stock: no se pisa (una venta mientras el formulario estaba abierto se perdería).
-      // Se guarda el resto y, si la dueña cambió el número, la diferencia entra como ajuste registrado.
-      if (trackStock && stockBefore !== undefined) {
+      // Ya se controlaba el stock (lo dice la base, no el formulario): aquí no se cambia. Se guardan el precio y el
+      // mínimo; el stock cambia con las ventas y con entradas, mermas y ajustes registrados (recordStockMove).
+      const { data: current } = await sb.from("inventory").select("stock").eq("branch_id", branchId).eq("product_id", productId).maybeSingle();
+      if (trackStock && current && current.stock !== null) {
         check(
           (
             await sb
@@ -338,19 +337,9 @@ export const products = {
               .single()
           ).error,
         );
-        const delta = stock! - stockBefore;
-        if (delta !== 0) {
-          const { error } = await sb.rpc("record_stock_move", {
-            p_branch: branchId,
-            p_product: productId,
-            p_kind: "ajuste",
-            p_qty: delta,
-            p_reason: "Corrección desde el inventario",
-          });
-          check(error);
-        }
         return { ok: true };
       }
+      if (trackStock && stock === undefined) throw new ActionError({ code: "BAD_REQUEST", message: "Ingresa el stock inicial." });
       const { error } = await sb
         .from("inventory")
         .upsert({
@@ -435,9 +424,10 @@ export const products = {
     input: z.object({
       deliveryId: uuid,
       qty: z.coerce.number({ error: "Ingresa un número" }).int("Usa un número entero").min(0, "Usa 0 o más").max(100_000),
+      note: z.string().trim().max(200, "Usa hasta 200 letras").optional(),
     }),
-    handler: async ({ deliveryId, qty }, context) => {
-      check((await db(context).rpc("receive_stock", { p_delivery: deliveryId, p_qty: qty })).error);
+    handler: async ({ deliveryId, qty, note }, context) => {
+      check((await db(context).rpc("receive_stock", { p_delivery: deliveryId, p_qty: qty, p_note: note || undefined })).error);
       return { ok: true };
     },
   }),

@@ -11,6 +11,7 @@ import { colorOf, saleMode } from "./catalog";
 import { Field, FilePicker, MoneyInput, safeAction, selectClass, useActionForm } from "./form";
 import { ProductCard } from "./ProductCard";
 import { ComboFields } from "./ComboFields";
+import { SelectMenu } from "../SelectMenu";
 import { ScanBarcode } from "./ScanBarcode";
 import { MODES, ProductFormSettings } from "./ProductFormSettings";
 import { navigate } from "astro:transitions/client";
@@ -29,7 +30,7 @@ function read(form: HTMLFormElement, branches: Branch[]): Snapshot {
   const value = (id: string) => (form.querySelector<HTMLInputElement>(`#${CSS.escape(id)}`)?.value ?? "").trim();
   return {
     name: value("product-name"),
-    categoryId: value("product-category"),
+    categoryId: value("product-category-value"),
     branches: branches.map((b) => ({
       id: b.id,
       on: form.querySelector<HTMLInputElement>(`#sell-${CSS.escape(b.id)}`)?.checked ?? true,
@@ -53,8 +54,9 @@ function fingerprint(section: Element) {
 function Section({ id, title, hint, children, aside, bare, dirty }: { id: string; title: string; hint?: string; children: React.ReactNode; aside?: React.ReactNode; bare?: boolean; dirty?: Set<string> }) {
   const changed = dirty?.has(id);
   return (
-    <section id={`section-${id}`} data-section={id} aria-labelledby={`${id}-title`} className="grid min-w-0 scroll-mt-6 gap-3">
-      <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-1">
+    <section id={`section-${id}`} data-section={id} aria-labelledby={`${id}-title`} className={cn("grid min-w-0 scroll-mt-6", bare ? "gap-5" : "gap-3")}>
+      {/* Sin tarjeta, el contorno de «Sin guardar» va por fuera del control: gap-5 le deja aire bajo el encabezado. */}
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="grid min-w-0 gap-0.5">
           <h2 id={`${id}-title`} className="m-0 flex flex-wrap items-center gap-2 text-xl font-extrabold tracking-[-0.02em]">
             {title}
@@ -393,14 +395,29 @@ export default function ProductEditor({
               />
             </Field>
             <Field id="product-category" label="Categoría">
-              <select id="product-category" name="categoryId" className={selectClass} defaultValue={product?.categoryId ?? ""}>
-                <option value="">Sin categoría</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <SelectMenu
+                id="product-category"
+                name="categoryId"
+                defaultValue={product?.categoryId ?? ""}
+                placeholder="Sin categoría"
+                searchPlaceholder="Buscar categoría"
+                noun="categorías"
+                options={[
+                  { value: "", label: "Sin categoría", color: null },
+                  ...categories.map((c, i) => ({ value: c.id, label: c.name, color: colorOf(i) })),
+                ]}
+                renderOption={(o) => (
+                  <span className="flex min-w-0 items-center gap-2">
+                    {/* El mismo punto de color que las píldoras del catálogo; «Sin categoría», con un anillo vacío. */}
+                    <span
+                      className={cn("size-2.5 shrink-0 rounded-full", !o.color && "border border-[var(--color-border-strong)]")}
+                      style={o.color ? { background: o.color } : undefined}
+                      aria-hidden="true"
+                    />
+                    <span className={cn("truncate", !o.color && "text-muted-foreground")}>{o.label}</span>
+                  </span>
+                )}
+              />
             </Field>
           </Section>
 

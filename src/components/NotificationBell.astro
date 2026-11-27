@@ -1,5 +1,5 @@
 ---
-import { AlarmClock, ArrowLeftRight, HandCoins, Wallet, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Crown, Hourglass, PackageCheck, PackageMinus, PackagePlus, PackageX, RotateCcw, TriangleAlert, Truck, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
+import { AlarmClock, ArrowLeftRight, HandCoins, Wallet, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CircleX, Crown, Hourglass, ClipboardCheck, PackageCheck, PackageMinus, PackagePlus, PackageX, RotateCcw, TriangleAlert, Truck, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
 import type { HTMLAttributes } from "astro/types";
 import { branchColor, branchImages, inbox, myBusinesses, notificationHref } from "@/data/queries";
 import type { Notification } from "@/data/types";
@@ -133,15 +133,34 @@ function describe(n: Notification) {
         detail: [n.data.branch, n.data.reason && `«${n.data.reason}»`, n.pending && "Confirma cuánto llegó"].filter(Boolean).join(" · "),
         tone: n.pending ? "warning" : undefined,
       };
-    case "stock_received":
+    case "stock_received": {
+      const note = n.data.note ? ` · «${n.data.note}»` : "";
       return n.data.received === n.data.qty
-        ? { icon: PackageCheck, title: `${n.data.person} recibió ${n.data.qty} de ${n.data.product}`, detail: `${n.data.branch}: el stock ya subió` }
+        ? { icon: PackageCheck, title: `${n.data.person} recibió ${n.data.qty} de ${n.data.product}`, detail: `${n.data.branch}: el stock ya subió${note}` }
         : {
             icon: PackageX,
             title: n.data.received === 0 ? `A ${n.data.branch} no le llegó ${n.data.product}` : `${n.data.person} recibió ${n.data.received} de ${n.data.qty} ${n.data.product}`,
-            detail: n.data.received === 0 ? `${n.data.person} avisó que no llegó nada: el stock no cambió` : `${n.data.branch}: faltaron ${n.data.qty - n.data.received}; el stock subió ${n.data.received}`,
+            detail: (n.data.received === 0 ? `${n.data.person} avisó que no llegó nada: el stock no cambió` : `${n.data.branch}: faltaron ${n.data.qty - n.data.received}; el stock subió ${n.data.received}`) + note,
             tone: "warning",
           };
+    }
+    case "stock_move": {
+      const d = n.data;
+      const n2 = Math.abs(d.qty);
+      // «Sumaste 5 de Leche» / «Ana restó 3 de Leche (merma)» / «Ana ajustó Leche: −2».
+      const [verb, icon] =
+        d.kind === "entrada"
+          ? [d.pending ? (d.self ? "Enviaste" : "envió") : d.self ? "Sumaste" : "sumó", PackagePlus]
+          : d.kind === "merma"
+            ? [d.self ? "Restaste" : "restó", PackageMinus]
+            : [d.self ? "Ajustaste" : "ajustó", ClipboardCheck];
+      const what = d.kind === "ajuste" ? `${d.product}: ${d.qty > 0 ? "+" : "−"}${n2}` : `${n2} de ${d.product}${d.kind === "merma" ? " (merma)" : ""}`;
+      return {
+        icon,
+        title: d.self ? `${verb} ${what}` : `${d.person} ${verb} ${what}`,
+        detail: [d.branch, d.reason && `«${d.reason}»`, d.pending && "La sucursal confirma cuánto llegó"].filter(Boolean).join(" · "),
+      };
+    }
     case "stock_answer":
       return n.data.accepted
         ? { icon: PackagePlus, title: `${n.data.person} aceptó tu entrada de ${n.data.qty} ${n.data.product}`, detail: `${n.data.branch}: el stock ya subió` }
@@ -299,6 +318,11 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
                             Confirmar
                           </button>
                           <p class="field-error" id={`bell-receive-${n.id}-qty-error`} aria-live="polite"></p>
+                          <label class="bell-note">
+                            <span>Nota</span>
+                            <input class="input" name="note" type="text" maxlength="200" placeholder="Opcional: qué faltó o llegó dañado" aria-describedby={`bell-receive-${n.id}-note-error`} />
+                          </label>
+                          <p class="field-error" id={`bell-receive-${n.id}-note-error`} aria-live="polite"></p>
                         </form>
                         <form
                           data-action="receiveStock"
@@ -1069,6 +1093,16 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
   .bell-receive .input {
     width: 5rem;
     min-height: 2.25rem;
+  }
+
+  .bell-receive .bell-note {
+    flex-basis: 100%;
+  }
+
+  .bell-receive .bell-note .input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
   }
 
   .bell-receive .field-error {

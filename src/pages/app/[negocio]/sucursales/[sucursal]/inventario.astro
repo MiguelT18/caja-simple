@@ -1,11 +1,12 @@
 ---
-import { Clock, PackagePlus, Package } from "@lucide/astro";
+import { CircleSlash, ClipboardCheck, Clock, PackageMinus, PackagePlus, Package, TriangleAlert } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
+import SelectMenu from "@/components/app/SelectMenu.astro";
 import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
-import { plural } from "@/lib/format";
+import { formatBs, plural } from "@/lib/format";
 import { stamp } from "@/lib/dates";
 import { branchContext, shiftBarData, businessHref, isLowStock, stockDeliveries, stockMoves, stockRequests } from "@/data/queries";
 import { planLimits } from "@/data/plans";
@@ -28,7 +29,8 @@ const lowCount = products.filter(isLowStock).length;
 // queda congelado: la base no deja cambiarlo). La base exige el rol (record_stock_move).
 const limits = planLimits[business.plan];
 const planHref = `${businessHref(business)}/plan`;
-const tracked = limits.stock ? products.filter((p) => p.stock !== null) : [];
+// Los combos no tienen stock propio (sale de sus productos): la base no deja moverlo.
+const tracked = limits.stock ? products.filter((p) => p.stock !== null && !p.components) : [];
 const frozen = !limits.stock && products.some((p) => p.stock !== null);
 const [moves, requests, deliveries] = await Promise.all([
   stockMoves(Astro.locals.supabase, branch.id),
@@ -38,13 +40,9 @@ const [moves, requests, deliveries] = await Promise.all([
 // Lo que la dueña envía lo confirma quien trabaja en la sucursal (la dueña, solo si se agregó como empleada aquí).
 const canReceive = ctx.works;
 const kinds = [
-  { value: "entrada", label: "Entrada de mercadería (suma)" },
-  ...(isOwner
-    ? [
-        { value: "merma", label: "Merma: vencido, roto o perdido (resta)" },
-        { value: "ajuste", label: "Ajuste por conteo (suma o resta)" },
-      ]
-    : []),
+  { value: "entrada", label: "Entrada", hint: "Llegó mercadería. Suma al stock.", Icon: PackagePlus },
+  { value: "merma", label: "Merma", hint: "Vencido, roto o perdido. Resta.", Icon: PackageMinus },
+  { value: "ajuste", label: "Ajuste", hint: "Corrige con lo que contaste. Suma o resta.", Icon: ClipboardCheck },
 ];
 const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
 ---
@@ -186,6 +184,11 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
                         Confirmar
                       </button>
                       <p class="field-error" id={`receive-${d.id}-qty-error`} aria-live="polite"></p>
+                      <label class="receive-field receive-note">
+                        <span>Nota</span>
+                        <input class="input" name="note" type="text" maxlength="200" placeholder="Opcional: qué faltó o llegó dañado" aria-describedby={`receive-${d.id}-note-error`} />
+                      </label>
+                      <p class="field-error" id={`receive-${d.id}-note-error`} aria-live="polite"></p>
                     </form>
                     <form
                       data-action="receiveStock"
@@ -243,7 +246,7 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
                   <td>{m.product}</td>
                   <td>{kindLabel[m.kind]}</td>
                   <td class:list={["right num", m.qty > 0 ? "amount-income" : "amount-expense"]}>{m.qty > 0 ? `+${m.qty}` : `−${Math.abs(m.qty)}`}</td>
-                  <td class="muted">{m.reason ?? "—"}</td>
+                  <td class="muted">{[m.reason, m.note && `Nota: «${m.note}»`].filter(Boolean).join(" · ") || "—"}</td>
                   <td class="muted">{m.approvedBy ? `${m.by} · aceptó ${m.approvedBy}` : m.by}</td>
                 </tr>
               ))}
@@ -267,8 +270,58 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
         hidden={{ branchId: branch.id }}
         success={isOwner ? "Stock actualizado" : "Pedido enviado. El stock sube cuando quien administra el negocio lo acepte."}
       >
-        <FormInput form="stock-move-form" name="productId" label="Producto" options={tracked.map((p) => ({ value: p.id, label: `${p.name} (hay ${p.stock})` }))} required />
-        {isOwner && <FormInput form="stock-move-form" name="kind" label="Tipo" options={kinds} required />}
+        <SelectMenu
+          form="stock-move-form"
+          name="productId"
+          label="Producto"
+          placeholder="Elige un producto"
+          searchPlaceholder="Nombre, categoría o código"
+          noun="productos"
+          required
+          requiredMessage="Elige un producto."
+          options={tracked.map((p) => ({ value: p.id, label: p.name, keywords: [p.category, p.barcode].filter(Boolean).join(" "), product: p }))}
+        >
+          {({ product: p }: { product: (typeof tracked)[number] }) => {
+            // Como en la tabla de productos: el estado va escrito y con ícono, no solo con color.
+            const tone = p.stock === 0 ? "expense" : isLowStock(p) ? "warning" : null;
+            const ToneIcon = p.stock === 0 ? CircleSlash : TriangleAlert;
+            return (
+              <span class="product-row">
+                {p.image ? <img src={p.image} alt="" width="40" height="40" loading="lazy" /> : <span class="product-thumb"><Package size={20} stroke-width={1.75} /></span>}
+                <span class="product-text">
+                  <span class="product-name">{p.name}</span>
+                  <span class="product-meta">{[p.category, p.price !== null && formatBs(p.price)].filter(Boolean).join(" · ")}</span>
+                </span>
+                <span class="product-stock">
+                  <span class="product-count num" style={tone ? `color: var(--color-${tone})` : undefined}>
+                    {tone && <ToneIcon size={14} stroke-width={2.25} aria-hidden="true" />}
+                    {tone && <span class="product-tone">{p.stock === 0 ? "Sin stock" : "Stock bajo"}</span>}
+                    Hay {p.stock}
+                  </span>
+                  {p.minStock !== null && <span class="product-min num">mín. {p.minStock}</span>}
+                </span>
+              </span>
+            );
+          }}
+        </SelectMenu>
+        {
+          isOwner && (
+            <fieldset class="choice-field">
+              <legend class="field-label">Tipo</legend>
+              <div class="kind-options">
+                {kinds.map(({ value, label, hint, Icon }, i) => (
+                  <label class="kind">
+                    <input type="radio" name="kind" value={value} checked={i === 0} required aria-describedby="stock-move-form-kind-error" />
+                    <Icon size={20} stroke-width={1.75} />
+                    <span class="kind-label">{label}</span>
+                    <span class="kind-hint">{hint}</span>
+                  </label>
+                ))}
+              </div>
+              <p class="field-error" id="stock-move-form-kind-error"></p>
+            </fieldset>
+          )
+        }
         <FormInput
           form="stock-move-form"
           name="qty"
@@ -287,6 +340,131 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
 </Layout>
 
 <style>
+  .choice-field {
+    display: grid;
+    gap: 0.5rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .choice-field legend {
+    padding: 0;
+    margin-bottom: 0.25rem;
+  }
+
+  .product-row {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .product-row img,
+  .product-thumb {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.375rem;
+    object-fit: cover;
+  }
+
+  .product-thumb {
+    display: grid;
+    place-items: center;
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+  }
+
+  .product-text,
+  .product-stock {
+    display: grid;
+    min-width: 0;
+  }
+
+  .product-name {
+    font-weight: var(--font-semibold);
+    overflow-wrap: anywhere;
+  }
+
+  .product-meta,
+  .product-min {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .product-stock {
+    justify-items: end;
+    text-align: end;
+  }
+
+  .product-count {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    font-weight: var(--font-semibold);
+    white-space: nowrap;
+  }
+
+  .product-tone {
+    font-size: var(--text-xs);
+  }
+
+  .kind-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.5rem;
+  }
+
+  .kind {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 0.25rem;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 0.5rem;
+    background: var(--color-surface);
+    cursor: pointer;
+    transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out);
+  }
+
+  .kind:hover {
+    border-color: var(--color-text-muted);
+  }
+
+  .kind input {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0;
+    accent-color: var(--color-primary);
+  }
+
+  .kind :global(svg) {
+    color: var(--color-text-muted);
+  }
+
+  .kind-label {
+    font-weight: var(--font-bold);
+  }
+
+  .kind-hint {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .kind:has(input:checked) {
+    border-color: var(--color-text);
+    box-shadow: inset 0 0 0 1px var(--color-text);
+  }
+
+  .kind:has(input:checked) :global(svg) {
+    color: var(--color-primary);
+  }
+
   .frozen {
     margin-top: 1.25rem;
   }
@@ -358,6 +536,16 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
 
   .receive-field .input {
     width: 6rem;
+  }
+
+  .receive-note {
+    flex-basis: 100%;
+  }
+
+  .receive-note .input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
   }
 
   .receive .field-error {

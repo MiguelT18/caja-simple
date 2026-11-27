@@ -1,16 +1,19 @@
 ---
 import { Bell, Clock, Download, KeyRound, ShieldCheck, Trash2, UserRound } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
+import AffiliateInvite from "@/components/app/AffiliateInvite.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import PhotoField from "@/components/app/PhotoField.astro";
 import Layout from "@/layouts/Layout.astro";
-import { accountSettings, myBusinesses } from "@/data/queries";
+import { accountSettings, myAffiliate, myBusinesses } from "@/data/queries";
 import { shiftHours } from "@/lib/format";
 import { PUBLIC_VAPID_PUBLIC_KEY } from "astro:env/client";
 
 const { user, jobs, totpFactorId, hasPassword } = await accountSettings(Astro.locals);
 const vapidKey = PUBLIC_VAPID_PUBLIC_KEY ?? "";
+// El programa de afiliados es de la persona, no de un negocio: va en su cuenta.
+const affiliate = myAffiliate(Astro.locals);
 const owned = myBusinesses(Astro.locals).filter((m) => m.role === "dueño").map((m) => m.business.name);
 import CodeInput from "@/components/CodeInput.astro";
 ---
@@ -113,6 +116,8 @@ import CodeInput from "@/components/CodeInput.astro";
       <p class="field-hint" id="push-status" aria-live="polite" data-push-status>Revisando si este navegador puede recibir avisos…</p>
       <p class="field-hint">Te llegan las invitaciones, sus respuestas, la caja descuadrada y el stock bajo, aunque tengas la app cerrada. Se activa en cada dispositivo.</p>
     </section>
+
+    {affiliate && <AffiliateInvite affiliate={affiliate} />}
 
     <section class="card block" aria-labelledby="data-title">
       <h2 class="card-title" id="data-title"><Download size={20} stroke-width={1.75} />Tus datos</h2>
@@ -306,6 +311,11 @@ import CodeInput from "@/components/CodeInput.astro";
     display: grid;
     gap: 1.25rem;
     max-width: 48rem;
+  }
+
+  /* En la grilla de la cuenta el espacio lo da el gap. */
+  .settings > :global(.affiliate) {
+    margin-top: 0;
   }
 
   .block {

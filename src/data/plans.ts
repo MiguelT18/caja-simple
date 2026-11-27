@@ -1,7 +1,8 @@
 // Planes y precios (docs/planes-de-suscripcion.md). El precio está en dólares sin impuestos; en bolivianos se calcula
 // al mostrarlo y al cobrar, con el tipo de cambio del BCB del día. Nunca se guarda un precio fijo en Bs.
 import { PUBLIC_UPGRADE_URL } from "astro:env/client";
-import { longDate } from "@/lib/dates";
+import { addDays, longDate } from "@/lib/dates";
+import { occurrence } from "@/lib/payables";
 
 export type PlanName = "Gratis" | "Negocio" | "Sucursales";
 
@@ -39,6 +40,18 @@ export function untilLabel({ planUntil, trial }: { planUntil?: string | null; tr
   if (!trial) return `pagado hasta el ${longDate(planUntil).replace(/^\S+ /, "")}`;
   const n = daysLeft(planUntil, today);
   return `prueba gratis, ${n <= 1 ? "último día" : `quedan ${n} días`}`;
+}
+
+/**
+ * Hasta cuándo queda el plan si se paga un cobro, como `private.activate_plan_charge`: el mismo plan todavía vigente
+ * (también en la prueba) se renueva desde el día siguiente al vencimiento; otro plan empieza hoy. `freeMonths`: los meses
+ * gratis del primer pago de un referido, que la base suma al final.
+ */
+export function paidUntil(business: { plan: PlanName; planUntil?: string | null }, plan: PlanName, period: Period, today: string, freeMonths = 0) {
+  const renews = business.plan === plan && !!business.planUntil && business.planUntil >= today;
+  const start = renews ? addDays(business.planUntil!, 1) : today;
+  const until = addDays(occurrence(start, "mensual", period === "mensual" ? 1 : 12), -1);
+  return { renews, until: freeMonths > 0 ? occurrence(until, "mensual", freeMonths) : until };
 }
 
 /** El plan que vale hoy (igual que private.effective_plan): uno pago con `until` ya pasado cuenta como Gratis. */
@@ -136,7 +149,7 @@ export function priceOf(plan: PlanName, period: Period, quote?: Quote | null) {
   if (plan === "Negocio") return { usd: usdLabel(base), detail: `${tax}${per}`, today: bs(base) && `hoy ${bs(base)}` };
   const extra = planUsd.extraBranch[period];
   return {
-    usd: `${usdLabel(base)} + ${usdFormat(extra)}`,
+    usd: `${usdLabel(base)} + ${usdLabel(extra)}`,
     detail: `por sucursal extra, ${tax}${per}`,
     today: bs(base) && `hoy ${bs(base)} + ${bs(extra)} por sucursal extra`,
   };

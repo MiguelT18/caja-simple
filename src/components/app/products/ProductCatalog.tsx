@@ -70,7 +70,7 @@ const OPEN: Pick<PlanLimits, "products" | "stock" | "bulk"> = { products: null, 
 /** Botón de algo que es de un plan pago: lleva a la página del plan, con un candado que lo dice (no solo el color). */
 function PaidOnly({ href, icon: Icon, children }: { href: string; icon: typeof Plus; children: React.ReactNode }) {
   return (
-    <Button asChild variant="outline" className="h-11">
+    <Button asChild variant="outline" className="h-11 max-sm:flex-1">
       <a href={href} title="Disponible en el plan Negocio">
         <Icon />
         {children}
@@ -205,7 +205,7 @@ export default function ProductCatalog({
     <div>
       <div className="mb-5 flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <label className="relative min-w-0 flex-1 basis-64">
+          <label className="relative min-w-0 flex-1 basis-72">
             <span className="sr-only">Buscar por nombre o código de barras</span>
             <Search
               className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
@@ -221,26 +221,18 @@ export default function ProductCatalog({
             />
           </label>
           {canEdit && mode === "business" && (
-            <>
-              <CategoryManager
-                businessId={businessId}
-                categories={categories}
-                setCategories={setCategories}
-                onDeleted={(id) =>
-                  setProducts((list) => list.map((p) => (p.categoryId === id ? { ...p, categoryId: undefined, category: undefined } : p)))
-                }
-                counts={counts}
-              />
-              {limits.bulk ? (
-                <ImportProducts businessId={businessId} branches={branches} />
-              ) : (
-                <PaidOnly href={planHref} icon={Upload}>
-                  Importar
-                </PaidOnly>
-              )}
+            // Crear: la principal primero (también para el teclado); combo e importar, secundarias al lado.
+            // En el celular, la principal ocupa la fila y las otras dos comparten la de abajo.
+            <div className="flex flex-wrap items-center gap-2 max-sm:w-full" role="group" aria-label="Agregar al catálogo">
+              <Button asChild className="h-11 max-sm:w-full">
+                <a href={`${catalogHref}/nuevo`}>
+                  <Plus />
+                  Agregar producto
+                </a>
+              </Button>
               {products.length > 0 &&
                 (limits.bulk ? (
-                  <Button asChild variant="outline" className="h-11">
+                  <Button asChild variant="outline" className="h-11 max-sm:flex-1">
                     <a href={`${catalogHref}/nuevo?tipo=combo`}>
                       <Layers />
                       Armar combo
@@ -251,13 +243,14 @@ export default function ProductCatalog({
                     Armar combo
                   </PaidOnly>
                 ))}
-              <Button asChild className="h-11">
-                <a href={`${catalogHref}/nuevo`}>
-                  <Plus />
-                  Agregar producto
-                </a>
-              </Button>
-            </>
+              {limits.bulk ? (
+                <ImportProducts businessId={businessId} branches={branches} />
+              ) : (
+                <PaidOnly href={planHref} icon={Upload}>
+                  Importar
+                </PaidOnly>
+              )}
+            </div>
           )}
           {canEdit && mode === "branch" && addable.length > 0 && (
             <AddToBranch businessId={businessId} branchId={branchId!} addable={addable} withStock={limits.stock} />
@@ -304,9 +297,11 @@ export default function ProductCatalog({
           </p>
         )}
 
+        {/* Filtros y, al final (siempre a la vista), «Editar categorías», que es lo que los arma. */}
+        <div className="flex items-start gap-2">
         {/* En celular, una tira que se desliza de lado en vez de varios renglones de filtros. */}
         <div
-          className="flex flex-wrap gap-2 max-sm:-mx-4 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,black_85%,transparent)]"
+          className="flex min-w-0 flex-1 flex-wrap gap-2 max-sm:-ml-4 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:pl-4 max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,black_85%,transparent)]"
           role="group"
           aria-label="Filtrar productos"
         >
@@ -334,6 +329,18 @@ export default function ProductCatalog({
             <TriangleAlert className="size-3.5" aria-hidden="true" />
             Stock bajo
           </FilterChip>
+        </div>
+          {canEdit && mode === "business" && (
+            <CategoryManager
+              businessId={businessId}
+              categories={categories}
+              setCategories={setCategories}
+              onDeleted={(id) =>
+                setProducts((list) => list.map((p) => (p.categoryId === id ? { ...p, categoryId: undefined, category: undefined } : p)))
+              }
+              counts={counts}
+            />
+          )}
         </div>
       </div>
 

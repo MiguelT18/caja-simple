@@ -198,7 +198,7 @@ export async function closesBetween(sb: Supabase, branchId: string, from: string
 export async function stockMoves(sb: Supabase, branchId: string) {
   const { data, error } = await sb
     .from("stock_movements")
-    .select("id, kind, qty, reason, recorded_by, approved_by, occurred_at, products(name)")
+    .select("id, kind, qty, reason, note, recorded_by, approved_by, occurred_at, products(name)")
     .eq("branch_id", branchId)
     .order("occurred_at", { ascending: false })
     .limit(200);
@@ -210,6 +210,7 @@ export async function stockMoves(sb: Supabase, branchId: string) {
       kind: m.kind,
       qty: m.qty,
       reason: m.reason,
+      note: m.note,
       product: m.products?.name ?? "Producto quitado",
       by: (m.recorded_by && people.get(m.recorded_by)?.firstName) || "—",
       approvedBy: (m.approved_by && people.get(m.approved_by)?.firstName) || null,

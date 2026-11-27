@@ -41,6 +41,25 @@ function describe({ kind, data }: Notice) {
       return data.accepted
         ? { title: `${data.person} aceptó tu entrada de ${data.qty} ${data.product}`, body: `${data.branch}: el stock ya subió` }
         : { title: `${data.person} rechazó tu entrada de ${data.qty} ${data.product}`, body: `${data.branch}: el stock no cambió` };
+    case "stock_received": {
+      const note = data.note ? ` · «${data.note}»` : "";
+      if (data.received === data.qty) return { title: `${data.person} recibió ${data.qty} de ${data.product}`, body: `${data.branch}: el stock ya subió${note}` };
+      return data.received === 0
+        ? { title: `A ${data.branch} no le llegó ${data.product}`, body: `${data.person} avisó que no llegó nada: el stock no cambió${note}` }
+        : { title: `${data.person} recibió ${data.received} de ${data.qty} ${data.product}`, body: `${data.branch}: faltaron ${data.qty - data.received}; el stock subió ${data.received}${note}` };
+    }
+    case "stock_move": {
+      const n = Math.abs(data.qty);
+      const verb =
+        data.kind === "entrada" ? (data.pending ? (data.self ? "Enviaste" : "envió") : data.self ? "Sumaste" : "sumó")
+        : data.kind === "merma" ? (data.self ? "Restaste" : "restó")
+        : data.self ? "Ajustaste" : "ajustó";
+      const what = data.kind === "ajuste" ? `${data.product}: ${data.qty > 0 ? "+" : "−"}${n}` : `${n} de ${data.product}${data.kind === "merma" ? " (merma)" : ""}`;
+      return {
+        title: data.self ? `${verb} ${what}` : `${data.person} ${verb} ${what}`,
+        body: [data.branch, data.reason && `«${data.reason}»`, data.pending && "La sucursal confirma cuánto llegó"].filter(Boolean).join(" · "),
+      };
+    }
     case "expense_added":
       return { title: `${data.person ?? "Alguien"} registró un gasto en ${data.branch}`, body: `${data.concept ?? "Gasto"} · ${money(Number(data.amount))}` };
     case "cash_withdrawal":

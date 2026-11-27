@@ -24,10 +24,12 @@ interface Props {
   discountName?: string;
   period: Period;
   quote: Quote | null;
+  /** En la app se paga en bolivianos: el total en Bs es la cifra grande y los dólares, la nota. */
+  lead?: "usd" | "bs";
 }
 
 const MAX = 20;
-const { period, quote, current, name, form, discount = 0, founderMonths = 12, discountName = "Precio fundador" } = Astro.props;
+const { period, quote, current, name, form, discount = 0, founderMonths = 12, discountName = "Precio fundador", lead = "usd" } = Astro.props;
 const min = Math.min(MAX, Math.max(1, Astro.props.min ?? 1));
 const branches = Math.min(MAX, Math.max(min, Astro.props.branches ?? 1));
 const per = period === "mensual" ? "al mes" : "al año";
@@ -37,7 +39,7 @@ const rateText = quote
   : "Todavía no tenemos el tipo de cambio de hoy: el total en bolivianos aparece apenas llegue.";
 ---
 
-<section class="calc" aria-labelledby="calc-title" data-branches={branches} data-current={current} data-min={min} data-discount={discount} data-founder-months={founderMonths} data-discount-name={discountName} data-max={MAX} data-period={period} data-quote={quote ? JSON.stringify(quote) : ""}>
+<section class="calc" aria-labelledby="calc-title" data-lead={lead} data-branches={branches} data-current={current} data-min={min} data-discount={discount} data-founder-months={founderMonths} data-discount-name={discountName} data-max={MAX} data-period={period} data-quote={quote ? JSON.stringify(quote) : ""}>
   <div class="calc-input">
     <div class="calc-head">
       <h2 id="calc-title" class="calc-title"><label for="calc-branches">¿Cuántos locales tienes?</label></h2>
@@ -81,7 +83,7 @@ const rateText = quote
   <div class="calc-bill">
     <dl class="bill">
       <div class="bill-row">
-        <dt>Plan Negocio · 1 local</dt>
+        <dt>Primer local</dt>
         <dd class="num" data-base></dd>
       </div>
       <div class="bill-row" data-extra-row>
@@ -165,6 +167,8 @@ const rateText = quote
           (extra === 0 ? "Plan Negocio (o Gratis, sin pagar)." : `Plan Sucursales: ${branches} locales en total.`) +
           (discount > 0 ? ` Sin el descuento serían ${usdLabel(full)}.` : "");
         if (currentNote) currentNote.hidden = current === undefined || branches === current;
+        // Para lo que sigue a los locales fuera de la calculadora (en la app, la tarjeta del plan elegido).
+        calc.dispatchEvent(new CustomEvent("calc:change", { bubbles: true, detail: { branches } }));
       };
 
       const set = (next: number) => {
@@ -172,10 +176,12 @@ const rateText = quote
         if (value === branches) return render();
         branches = value;
         render();
-        // Reinicia la animación del precio en cada cambio.
-        price.classList.remove("tick");
-        void price.offsetWidth;
-        price.classList.add("tick");
+        // Reinicia la animación del precio (US$ y Bs) en cada cambio.
+        for (const el of [price, bs]) {
+          el.classList.remove("tick");
+          void el.offsetWidth;
+          el.classList.add("tick");
+        }
       };
 
       // Mantener presionado − o + repite: tras una pausa, un paso cada 90 ms.
@@ -220,6 +226,9 @@ const rateText = quote
         calc.querySelector("[data-per]")!.textContent = `Total ${period === "mensual" ? "al mes" : "al año"}`;
         render();
       }, { signal });
+
+      // Desde fuera (en la app, «Elegir» en una tarjeta de plan): mismos límites que el stepper.
+      calc.addEventListener("calc:set", (event) => set((event as CustomEvent<{ branches: number }>).detail.branches));
 
       calc.querySelector("[data-reset]")?.addEventListener("click", () => {
         if (current !== undefined) set(current);
@@ -460,7 +469,24 @@ const rateText = quote
     line-height: var(--text-sm-lh);
   }
 
+  /* En la app (lead="bs"): primero y en grande lo que se paga, en bolivianos; los dólares, de nota. */
+  .calc[data-lead="bs"] .calc-bs {
+    order: -1;
+    font-size: var(--text-4xl);
+    line-height: var(--text-4xl-lh);
+    font-weight: var(--font-extrabold);
+    letter-spacing: -0.03em;
+  }
+
+  .calc[data-lead="bs"] .calc-price {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-semibold);
+  }
+
   @media (prefers-reduced-motion: no-preference) {
+    .calc-bs.tick,
     .calc-price.tick {
       animation: tick 280ms cubic-bezier(0.16, 1, 0.3, 1);
     }

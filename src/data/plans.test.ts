@@ -1,7 +1,7 @@
 // planLimits solo muestra los límites: la base los aplica. Este test avisa si dejan de coincidir.
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { bsTotal, daysLeft, discounted, founderMonthsLeft, priceOf, effectivePlan, planLimits, planUsd, TRIAL_DAYS, untilLabel, usdFor, referralOffer } from "./plans";
+import { bsTotal, daysLeft, discounted, founderMonthsLeft, paidUntil, priceOf, effectivePlan, planLimits, planUsd, TRIAL_DAYS, untilLabel, usdFor, referralOffer } from "./plans";
 
 const dir = new URL("../../supabase/migrations/", import.meta.url);
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
@@ -176,5 +176,21 @@ describe("referralOffer", () => {
   it("sin el programa: un mes gratis en el primer pago", () => {
     expect(referralOffer(null, perks)).toBe("60 días de prueba, un mes gratis en tu primer pago y la app configurada");
     expect(referralOffer(null, { freeMonths: 0, trialDays: 60 })).toBe("60 días de prueba y la app configurada");
+  });
+});
+
+describe("paidUntil, como activate_plan_charge", () => {
+  const today = "2026-11-27";
+  it("el mismo plan vigente se renueva desde el día siguiente al vencimiento", () => {
+    expect(paidUntil({ plan: "Negocio", planUntil: "2026-12-10" }, "Negocio", "mensual", today)).toEqual({ renews: true, until: "2027-01-10" });
+    expect(paidUntil({ plan: "Negocio", planUntil: "2026-12-10" }, "Negocio", "anual", today)).toEqual({ renews: true, until: "2027-12-10" });
+  });
+  it("otro plan, o uno vencido, empieza hoy", () => {
+    expect(paidUntil({ plan: "Negocio", planUntil: "2026-12-10" }, "Sucursales", "mensual", today)).toEqual({ renews: false, until: "2026-12-26" });
+    expect(paidUntil({ plan: "Gratis" }, "Negocio", "mensual", today)).toEqual({ renews: false, until: "2026-12-26" });
+  });
+  it("fin de mes como Postgres (31 → 30 o 28) y los meses gratis al final", () => {
+    expect(paidUntil({ plan: "Gratis" }, "Negocio", "mensual", "2027-01-31")).toEqual({ renews: false, until: "2027-02-27" });
+    expect(paidUntil({ plan: "Gratis" }, "Negocio", "mensual", today, 1)).toEqual({ renews: false, until: "2027-01-26" });
   });
 });

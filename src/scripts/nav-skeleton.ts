@@ -44,6 +44,19 @@ export function showPageSkeleton(url: URL) {
     announce("Cargando…");
     main.replaceChildren(template.content.cloneNode(true));
     main.setAttribute("aria-busy", "true");
+    // El esqueleto es el principio de otra página: arriba del todo (main se desplaza en escritorio; la ventana, en móvil).
+    main.scrollTop = 0;
+    window.scrollTo(0, 0);
+  }, DELAY);
+}
+
+/** Marca `card` como ocupada (global.css › [data-morph][aria-busy]) si la navegación tarda más de DELAY. */
+function showCardLoading(card: HTMLElement, pathname: string) {
+  markCurrent(pathname);
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    announce("Cargando…");
+    card.setAttribute("aria-busy", "true");
   }, DELAY);
 }
 
@@ -51,19 +64,25 @@ export function showPageSkeleton(url: URL) {
 document.addEventListener("astro:before-preparation", (event) => {
   const { to, from, sourceElement } = event;
   if (!to.pathname.startsWith("/app") || (to.pathname === from.pathname && to.search === from.search)) return;
-  // La tarjeta que pasa al encabezado (view transition) tiene que seguir en pantalla cuando llega la página nueva.
-  if (sourceElement?.closest("[data-morph]")) return markCurrent(to.pathname);
+  // La tarjeta que pasa al encabezado (view transition) tiene que seguir en pantalla cuando llega la página nueva:
+  // en vez del esqueleto, la propia tarjeta muestra que está cargando.
+  const card = sourceElement?.closest<HTMLElement>("[data-morph]");
+  if (card) return showCardLoading(card, to.pathname);
   showPageSkeleton(to);
 });
 
 // La página nueva trae su menú lateral: el que se conserva copia de él qué enlaces son los actuales.
+// Por tipo de enlace y href: la sucursal actual en la biblioteca lleva el mismo href que su sección («Ventas» y la
+// sucursal apuntan a …/ventas), y cada uno tiene su propio aria-current ("page" y "true").
+const linkKey = (a: HTMLAnchorElement) => `${a.classList[0] ?? ""} ${a.getAttribute("href")}`;
 document.addEventListener("astro:before-swap", (event) => {
   clearTimeout(timer);
+  for (const card of document.querySelectorAll("[data-morph][aria-busy]")) card.removeAttribute("aria-busy");
   const links = event.newDocument.querySelectorAll<HTMLAnchorElement>(".sidebar a[href]");
-  const current = new Map([...links].map((a) => [a.getAttribute("href"), a.getAttribute("aria-current")]));
+  const current = new Map([...links].map((a) => [linkKey(a), a.getAttribute("aria-current")]));
   for (const link of document.querySelectorAll<HTMLAnchorElement>(".sidebar a[href]")) {
-    const value = current.get(link.getAttribute("href"));
+    const value = current.get(linkKey(link));
     if (value) link.setAttribute("aria-current", value);
-    else if (current.has(link.getAttribute("href"))) link.removeAttribute("aria-current");
+    else if (current.has(linkKey(link))) link.removeAttribute("aria-current");
   }
 });
