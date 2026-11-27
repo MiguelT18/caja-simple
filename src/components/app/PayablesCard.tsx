@@ -1,6 +1,6 @@
 import { actions } from "astro:actions";
 import { Archive, CalendarDays, CircleAlert, CircleCheck, Clock, Ellipsis, Pencil, Plus, Repeat, UserRound, X } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { FixedExpense, Payable } from "@/data/payables";
 import { shortDate } from "@/lib/dates";
 import { formatBs } from "@/lib/format";
@@ -14,8 +14,42 @@ import { AppDialog } from "./AppDialog";
 import { Field, MoneyInput, safeAction, useActionForm } from "./products/form";
 
 const ICON = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
-const DUE_ICON = { late: CircleAlert, soon: Clock, later: CalendarDays, none: null };
+const DUE_ICON = { late: CircleAlert, soon: Clock, later: CalendarDays, none: CalendarDays };
 const DUE_CLASS = { late: "text-[var(--color-expense)] font-semibold", soon: "text-[var(--color-warning)] font-semibold", later: "text-muted-foreground", none: "text-muted-foreground" };
+/** Arte cuadrado de la fila: el ícono del vencimiento sobre el `-soft` de su tono (el estado también va escrito). */
+const DUE_ART = {
+  late: "bg-[var(--color-expense-soft)] text-[var(--color-expense)]",
+  soon: "bg-[var(--color-warning-soft)] text-[var(--color-warning)]",
+  later: "bg-[var(--color-surface-hover)] text-muted-foreground",
+  none: "bg-[var(--color-surface-hover)] text-muted-foreground",
+};
+type Tone = keyof typeof DUE_ART;
+/** Lo pendiente, por urgencia (el orden de cada grupo ya viene de `payableOrder`). */
+const GROUPS: { key: string; label: string; tones: Tone[] }[] = [
+  { key: "late", label: "Vencido", tones: ["late"] },
+  { key: "soon", label: "Esta semana", tones: ["soon"] },
+  { key: "later", label: "Más adelante", tones: ["later", "none"] },
+];
+/** Fila de lista «tipo canción»: sin borde, hover redondeado. */
+const ROW = "-mx-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md px-2 py-2.5 hover:bg-[var(--color-surface-hover)]";
+
+function Art({ className, children }: { className: string; children: ReactNode }) {
+  return <span className={`grid size-10 shrink-0 place-items-center rounded-[0.375rem] ${className}`}>{children}</span>;
+}
+
+function EmptyRow({ icon: Icon, tone, title, text }: { icon: typeof Repeat; tone: string; title: string; text: string }) {
+  return (
+    <div className="flex items-center gap-3 py-1">
+      <Art className={tone}>
+        <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+      </Art>
+      <p className="m-0 grid gap-0.5">
+        <span className="font-bold">{title}</span>
+        <span className="text-sm text-muted-foreground">{text}</span>
+      </p>
+    </div>
+  );
+}
 
 type Staff = { id: string; name: string };
 
@@ -96,25 +130,27 @@ export default function PayablesCard({
     await refreshRegions();
   }
 
+  const groups = GROUPS.map((g) => ({ ...g, items: pending.filter((p) => g.tones.includes(dueState(p.dueOn, today).tone)) })).filter((g) => g.items.length > 0);
+
   return (
-    <div className="grid gap-4">
-      <section className="card grid gap-3 p-5 max-[480px]:p-4" aria-labelledby={`payables-${branchId}`}>
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="grid gap-0.5">
+    <div className={`@container grid items-start gap-4 ${isOwner ? "@4xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""}`}>
+      <section className="card grid gap-4 p-5 max-[480px]:p-4" aria-labelledby={`payables-${branchId}`}>
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+          <div className="grid gap-1">
             <h2 id={`payables-${branchId}`} className="card-title m-0">
               {title}
             </h2>
-            <p className="m-0 text-sm text-muted-foreground">
-              {pending.length === 0 ? (
-                "No hay nada pendiente."
-              ) : (
-                <>
-                  <span className="num font-semibold text-foreground">{formatBs(total)}</span>
-                  {` en ${pending.length === 1 ? "1 pago" : `${pending.length} pagos`}`}
-                  {late > 0 && ` · ${late === 1 ? "1 vencido" : `${late} vencidos`}`}
-                </>
-              )}
-            </p>
+            {pending.length > 0 && (
+              <p className="m-0 flex flex-wrap items-baseline gap-x-2">
+                <span className="num text-[length:var(--text-2xl)] leading-[var(--text-2xl-lh)] font-extrabold tracking-[-0.02em]">{formatBs(total)}</span>
+                <span className="text-sm text-muted-foreground">
+                  en {pending.length === 1 ? "1 pago" : `${pending.length} pagos`}
+                  {late > 0 && (
+                    <span className="font-semibold text-[var(--color-expense)]">{` · ${late === 1 ? "1 vencido" : `${late} vencidos`}`}</span>
+                  )}
+                </span>
+              </p>
+            )}
           </div>
           {canAdd && (
             <Button type="button" variant="outline" size="sm" onClick={() => setDialog({ kind: "new" })}>
@@ -124,88 +160,100 @@ export default function PayablesCard({
           )}
         </div>
 
-        {pending.length > 0 && (
-          <ul className="m-0 grid list-none divide-y divide-[var(--color-border)] p-0">
-            {pending.map((p) => {
-              const due = dueState(p.dueOn, today);
-              const DueIcon = DUE_ICON[due.tone];
-              const canCancel = isOwner || p.createdById === userId;
-              return (
-                <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
-                  <div className="grid min-w-0 flex-1 basis-56 gap-1">
-                    <span className="inline-flex flex-wrap items-center gap-1.5 font-semibold [overflow-wrap:anywhere]">
-                      {p.concept}
-                      {p.fixed && (
-                        <span className="chip chip-neutral">
-                          <Repeat size={12} strokeWidth={1.75} aria-hidden="true" />
-                          Fijo
-                        </span>
-                      )}
-                      {p.employeeId && staffName(p.employeeId) && (
-                        <span className="chip chip-info">
-                          <UserRound size={12} strokeWidth={1.75} aria-hidden="true" />
-                          {p.employeeId === myEmployeeId ? "Tu sueldo" : staffName(p.employeeId)}
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex flex-wrap items-center gap-x-2 text-sm">
-                      <span className={`inline-flex items-center gap-1 ${DUE_CLASS[due.tone]}`}>
-                        {DueIcon && <DueIcon {...ICON} />}
-                        {due.label}
-                      </span>
-                      <span className="text-muted-foreground">· tocaba el {shortDate(p.owedOn)}</span>
-                    </span>
-                  </div>
-                  <div className="ml-auto flex items-center gap-2">
-                    <span className="grid text-right">
-                      <span className="num font-bold">{formatBs(p.balance)}</span>
-                      {p.paid > 0 && <span className="num text-xs text-muted-foreground">pagado {formatBs(p.paid)} de {formatBs(p.amount)}</span>}
-                    </span>
-                    {(isOwner || cashShift || p.employeeId === myEmployeeId) && (
-                      <Button type="button" size="sm" onClick={() => setDialog({ kind: "pay", item: p })}>
-                        {p.employeeId && p.employeeId === myEmployeeId ? "Me pagaron" : isOwner ? "Pagar" : "Saldar"}
-                      </Button>
-                    )}
-                    {(isOwner || canCancel) && (
-                      // modal={false}: el menú abre un diálogo; así Radix no deja la página bloqueada al cerrarlo.
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm" aria-label={`Opciones de ${p.concept}`}>
-                            <Ellipsis />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {isOwner && (
-                            <DropdownMenuItem onSelect={() => setDialog({ kind: "edit", item: p })}>
-                              <Pencil />
-                              Corregir monto o vencimiento
-                            </DropdownMenuItem>
-                          )}
-                          {canCancel && (
-                            <DropdownMenuItem variant="destructive" onSelect={() => cancel(p)}>
-                              <X />
-                              Cancelar pendiente
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+        {pending.length === 0 && (
+          <EmptyRow icon={CircleCheck} tone="bg-[var(--color-income-soft)] text-[var(--color-income)]" title="Todo al día" text="No hay pagos pendientes en esta sucursal." />
         )}
 
+        {groups.map((g) => (
+          <div key={g.key} className="grid gap-1">
+            <h3 className="m-0 flex items-baseline justify-between gap-3 border-b border-[var(--color-border)] pb-1.5 text-sm font-semibold text-muted-foreground">
+              <span>
+                {g.label} <span className="font-normal">({g.items.length})</span>
+              </span>
+              <span className="num">{formatBs(g.items.reduce((s, p) => s + p.balance, 0))}</span>
+            </h3>
+            <ul className="m-0 grid list-none p-0">
+              {g.items.map((p) => {
+                const due = dueState(p.dueOn, today);
+                const DueIcon = DUE_ICON[due.tone];
+                const canCancel = isOwner || p.createdById === userId;
+                return (
+                  <li key={p.id} className={ROW}>
+                    <Art className={DUE_ART[due.tone]}>
+                      <DueIcon size={18} strokeWidth={1.75} aria-hidden="true" />
+                    </Art>
+                    <div className="grid min-w-0 flex-1 basis-48 gap-0.5">
+                      <span className="inline-flex flex-wrap items-center gap-1.5 font-bold [overflow-wrap:anywhere]">
+                        {p.concept}
+                        {p.fixed && (
+                          <span className="chip chip-neutral">
+                            <Repeat size={12} strokeWidth={1.75} aria-hidden="true" />
+                            Fijo
+                          </span>
+                        )}
+                        {p.employeeId && staffName(p.employeeId) && (
+                          <span className="chip chip-info">
+                            <UserRound size={12} strokeWidth={1.75} aria-hidden="true" />
+                            {p.employeeId === myEmployeeId ? "Tu sueldo" : staffName(p.employeeId)}
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex flex-wrap items-center gap-x-2 text-sm">
+                        <span className={DUE_CLASS[due.tone]}>{due.label}</span>
+                        <span className="text-muted-foreground">· tocaba el {shortDate(p.owedOn)}</span>
+                      </span>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="grid text-right">
+                        <span className="num text-[length:var(--text-lg)] leading-[var(--text-lg-lh)] font-extrabold">{formatBs(p.balance)}</span>
+                        {p.paid > 0 && <span className="num text-xs text-muted-foreground">pagado {formatBs(p.paid)} de {formatBs(p.amount)}</span>}
+                      </span>
+                      {(isOwner || cashShift || p.employeeId === myEmployeeId) && (
+                        <Button type="button" size="sm" onClick={() => setDialog({ kind: "pay", item: p })}>
+                          {p.employeeId && p.employeeId === myEmployeeId ? "Me pagaron" : isOwner ? "Pagar" : "Saldar"}
+                        </Button>
+                      )}
+                      {(isOwner || canCancel) && (
+                        // modal={false}: el menú abre un diálogo; así Radix no deja la página bloqueada al cerrarlo.
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" aria-label={`Opciones de ${p.concept}`}>
+                              <Ellipsis />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {isOwner && (
+                              <DropdownMenuItem onSelect={() => setDialog({ kind: "edit", item: p })}>
+                                <Pencil />
+                                Corregir monto o vencimiento
+                              </DropdownMenuItem>
+                            )}
+                            {canCancel && (
+                              <DropdownMenuItem variant="destructive" onSelect={() => cancel(p)}>
+                                <X />
+                                Cancelar pendiente
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+
         {settled.length > 0 && (
-          <details className="group border-t border-[var(--color-border)] pt-3">
+          <details className="group border-t border-[var(--color-border)] pt-2">
             <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold">
               <CircleCheck {...ICON} />
-              Saldados ({settled.length}) · {formatBs(settled.reduce((s, p) => s + p.amount, 0))}
+              Saldados ({settled.length}) · <span className="num">{formatBs(settled.reduce((s, p) => s + p.amount, 0))}</span>
             </summary>
-            <ul className="m-0 grid list-none divide-y divide-[var(--color-border)] p-0">
+            <ul className="m-0 grid list-none p-0">
               {settled.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2.5 text-sm">
+                <li key={p.id} className="-mx-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-md px-2 py-2.5 text-sm hover:bg-[var(--color-surface-hover)]">
                   <span className="min-w-0 [overflow-wrap:anywhere]">
                     <span className="font-semibold">{p.concept}</span>
                     <span className="text-muted-foreground"> · tocaba el {shortDate(p.owedOn)}</span>
@@ -219,50 +267,61 @@ export default function PayablesCard({
       </section>
 
       {isOwner && (
-        <section className="card grid gap-3 p-5 max-[480px]:p-4" aria-labelledby={`fixed-${branchId}`}>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div className="grid gap-0.5">
+        <section className="card grid gap-4 p-5 max-[480px]:p-4" aria-labelledby={`fixed-${branchId}`}>
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div className="grid gap-1">
               <h2 id={`fixed-${branchId}`} className="card-title m-0">
                 Gastos fijos
               </h2>
-              <p className="m-0 text-sm text-muted-foreground">Alquiler, sueldos, luz, agua… Cada período se suma solo a Por pagar.</p>
+              {fixed.length > 0 && <p className="m-0 text-sm text-muted-foreground">{fixed.length === 1 ? "1 gasto que se repite" : `${fixed.length} gastos que se repiten`}</p>}
             </div>
             <Button type="button" variant="outline" size="sm" onClick={() => setDialog({ kind: "fixed" })}>
               <Plus />
               Agregar gasto fijo
             </Button>
           </div>
-          {fixed.length > 0 && (
-            <ul className="m-0 grid list-none divide-y divide-[var(--color-border)] p-0">
-              {fixed.map((f) => (
-                <li key={f.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
-                  <div className="grid min-w-0 flex-1 basis-48 gap-0.5">
-                    <span className="font-semibold [overflow-wrap:anywhere]">{f.concept}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {frequencyLabel[f.frequency]} · próximo el {shortDate(f.next)}
-                      {f.employeeId && staffName(f.employeeId) && ` · sueldo de ${staffName(f.employeeId)}`}
-                    </span>
-                  </div>
-                  <span className="ml-auto num font-semibold">{formatBs(f.amount)}</span>
-                  <DropdownMenu modal={false}>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm" aria-label={`Opciones de ${f.concept}`}>
-                        <Ellipsis />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => setDialog({ kind: "fixed", item: f })}>
-                        <Pencil />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem variant="destructive" onSelect={() => archive(f)}>
-                        <Archive />
-                        Quitar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </li>
-              ))}
+          {fixed.length === 0 ? (
+            <EmptyRow icon={Repeat} tone="border border-dashed border-[var(--color-border-strong)] text-muted-foreground" title="Alquiler, sueldos, luz, agua…" text="Cada período se suma solo a Por pagar." />
+          ) : (
+            <ul className="m-0 grid list-none p-0">
+              {fixed.map((f) => {
+                const FixedIcon = f.employeeId ? UserRound : Repeat;
+                return (
+                  <li key={f.id} className={ROW}>
+                    <Art className="bg-[var(--color-surface-hover)] text-muted-foreground">
+                      <FixedIcon size={18} strokeWidth={1.75} aria-hidden="true" />
+                    </Art>
+                    <div className="grid min-w-0 flex-1 basis-40 gap-0.5">
+                      <span className="inline-flex flex-wrap items-center gap-1.5 font-bold [overflow-wrap:anywhere]">
+                        {f.concept}
+                        <span className="chip chip-neutral">{frequencyLabel[f.frequency]}</span>
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        Próximo el {shortDate(f.next)}
+                        {f.employeeId && staffName(f.employeeId) && ` · sueldo de ${staffName(f.employeeId)}`}
+                      </span>
+                    </div>
+                    <span className="ml-auto num font-bold">{formatBs(f.amount)}</span>
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-sm" aria-label={`Opciones de ${f.concept}`}>
+                          <Ellipsis />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setDialog({ kind: "fixed", item: f })}>
+                          <Pencil />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem variant="destructive" onSelect={() => archive(f)}>
+                          <Archive />
+                          Quitar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
