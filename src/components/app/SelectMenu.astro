@@ -37,6 +37,8 @@ interface Props {
   required?: boolean;
   /** Aviso si se manda vacío (con `required`). */
   requiredMessage?: string;
+  /** Respeta el orden dado (día, semana, mes) en vez del alfabético. */
+  keepOrder?: boolean;
 }
 
 const {
@@ -50,6 +52,7 @@ const {
   noun = "opciones",
   required = false,
   requiredMessage = "Elige una opción.",
+  keepOrder = false,
 } = Astro.props;
 
 const id = `${form}-${name}`;
@@ -105,7 +108,7 @@ const grouped = groups.some((g) => g.title);
         data-select-search
       />
     </div>
-    <ul class="select-list" id={`${id}-list`} role="listbox" aria-label={label} data-grouped={grouped ? "" : undefined}>
+    <ul class="select-list" id={`${id}-list`} role="listbox" aria-label={label} data-grouped={grouped ? "" : undefined} data-keep-order={keepOrder ? "" : undefined}>
       {
         groups.map((g) => {
           const items = g.rows.map((o) => (
@@ -174,8 +177,8 @@ const grouped = groups.some((g) => g.title);
     const rank = (o: HTMLElement) => (o.dataset.name!.startsWith(q) ? 0 : (" " + o.dataset.name).includes(" " + words[0]) ? 1 : 2);
     const byName = (a: HTMLElement, b: HTMLElement) => a.dataset.name!.localeCompare(b.dataset.name!);
     options.forEach((o) => (o.hidden = !matches.includes(o)));
-    if (p.list.hasAttribute("data-grouped")) {
-      // Por grupos: el orden es el de la página; un grupo sin coincidencias se oculta con su título.
+    if (p.list.hasAttribute("data-grouped") || p.list.hasAttribute("data-keep-order")) {
+      // Por grupos o con keepOrder: el orden es el de la página; un grupo sin coincidencias se oculta con su título.
       p.list.querySelectorAll<HTMLElement>("[data-select-group]").forEach((g) => (g.hidden = !g.querySelector('[role="option"]:not([hidden])')));
     } else p.list.append(...(words.length ? matches.sort((a, b) => rank(a) - rank(b) || byName(a, b)) : options.sort(byName)));
     p.empty.hidden = matches.length > 0;
