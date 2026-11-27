@@ -427,3 +427,7 @@ verify_jwt = false
 
 [functions.send-invite]
 verify_jwt = false
+
+# La llama Meta (webhook de WhatsApp), que firma con X-Hub-Signature-256; no trae JWT.
+[functions.whatsapp]
+verify_jwt = false

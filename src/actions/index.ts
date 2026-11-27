@@ -10,6 +10,7 @@ import { products } from "./products";
 import { promotions } from "./promotions";
 import { sales } from "./sales";
 import { shifts } from "./shifts";
+import { whatsapp } from "./whatsapp";
 
 export const server = {
     ...businesses,
@@ -21,5 +22,6 @@ export const server = {
     ...products,
     ...promotions,
     ...employees,
-    ...account
+    ...account,
+    ...whatsapp
 };

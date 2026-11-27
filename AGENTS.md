@@ -51,6 +51,8 @@ Notificaciones push (Edge Function `send-push`; necesita `pnpm dlx supabase logi
 pnpm dlx supabase secrets set --project-ref <ref> VAPID_PUBLIC_KEY="$PUBLIC_VAPID_PUBLIC_KEY" VAPID_PRIVATE_KEY="$VAPID_PRIVATE_KEY" PUSH_WEBHOOK_SECRET="$PUSH_WEBHOOK_SECRET" VAPID_SUBJECT="mailto:<contacto>"
 pnpm dlx supabase functions deploy send-push --project-ref <ref>
 pnpm dlx supabase functions deploy send-invite --project-ref <ref>   # correo de invitación a quien no tiene cuenta (mismo secreto)
+pnpm dlx supabase secrets set --project-ref <ref> ANTHROPIC_API_KEY=… META_APP_SECRET=… WA_VERIFY_TOKEN=… WA_GRAPH_VERSION=…
+pnpm dlx supabase functions deploy whatsapp --project-ref <ref>      # webhook del asistente de WhatsApp (docs/modelo-de-datos.md › Asistente de WhatsApp)
 ```
 
 La base llama a la función con la URL y el secreto guardados en Vault (`project_url`, `push_webhook_secret`); ver `docs/modelo-de-datos.md` › Tu cuenta.

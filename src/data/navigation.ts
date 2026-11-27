@@ -1,4 +1,4 @@
-import { BadgePercent, Gem, CalendarClock, HandCoins, BriefcaseBusiness, Search, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
+import { MessageCircle, BadgePercent, Gem, CalendarClock, HandCoins, BriefcaseBusiness, Search, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
 import { catalogLabel } from "./kinds";
 import { planLimits } from "./plans";
 import type { Branch } from "./types";
@@ -53,6 +53,7 @@ export function appNav(m?: Membership, branch?: Branch, affiliate = false) {
         ...(planLimits[m.business.plan].promotions ? [{ id: "promociones", label: "Promociones", href: `${base}/promociones`, icon: BadgePercent }] : []),
         { id: "por-pagar", label: "Por pagar", href: `${base}/por-pagar`, icon: CalendarClock },
         { id: "empleados", label: "Empleados", href: `${base}/empleados`, icon: Users },
+        { id: "whatsapp", label: "WhatsApp", href: `${base}/whatsapp`, icon: MessageCircle },
         { id: "configuracion", label: "Configuración", href: `${base}/configuracion`, icon: Settings },
         { id: "planes", label: "Planes", href: `${base}/plan`, icon: Gem },
       ],

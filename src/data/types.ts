@@ -327,6 +327,11 @@ export type Notification = {
       kind: "stock_move";
       data: { person: string; self: boolean; product: string; kind: "entrada" | "merma" | "ajuste"; qty: number; branch: string; reason: string | null; pending: boolean };
     }
+  | {
+      /** El asistente de WhatsApp pasó una conversación a la dueña. */
+      kind: "wa_handoff";
+      data: { customer: string; reason: string | null };
+    }
   | { kind: "reopen_answer"; data: { accepted: boolean; person: string; branch: string; shift: string; date: string } }
   | { kind: "ownership"; data: { business: string; person: string } }
   | {

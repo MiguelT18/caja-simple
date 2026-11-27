@@ -16,3 +16,4 @@ export { daysSince, hourSpan, marketingIdeas, peakHour, trend, weekdayName, week
 export { today } from "@/lib/dates";
 export { paidSince, payables, type FixedExpense, type OutsidePayment, type Payable } from "./payables"; // gastos fijos y pendientes
 export { businessPromotions, promotionsToday, type Promotion } from "./promotions"; // promociones con descuento
+export { whatsappState, type WaConversation, type WhatsappState } from "./whatsapp"; // asistente de WhatsApp
