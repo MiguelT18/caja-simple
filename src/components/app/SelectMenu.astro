@@ -10,6 +10,8 @@
 // error siguen a FormInput (`<form>-<name>`, ver scripts/action-forms.ts). Búsqueda: sin mayúsculas ni tildes, cada
 // palabra al comienzo de una palabra de `label` + `keywords` (si no hay nada, en cualquier parte), y primero lo que
 // empieza con lo escrito. Mismo patrón de lista que PeopleSuggest: popover fijo, debajo del campo o arriba si no cabe.
+// Con `group` en las opciones, la lista va por grupos con su título (p. ej. los turnos de cada sucursal) y conserva su
+// orden al filtrar. Desde código: `input[name].dispatchEvent(new CustomEvent("select:set", { detail: valor, bubbles: true }))`.
 import { ChevronDown, Search } from "@lucide/astro";
 
 export interface SelectMenuOption {
@@ -17,6 +19,8 @@ export interface SelectMenuOption {
   label: string;
   /** Texto extra que también se busca (categoría, código…). */
   keywords?: string;
+  /** Título del grupo al que pertenece (las opciones de un grupo van juntas). */
+  group?: string;
   [key: string]: unknown;
 }
 
@@ -59,6 +63,9 @@ const rows = await Promise.all(
   })),
 );
 const chosen = rows.find((o) => o.value === value);
+// Grupos en el orden en que aparecen; sin `group`, uno solo sin título.
+const groups = [...new Set(rows.map((o) => o.group ?? ""))].map((title, i) => ({ title, id: `${id}-group-${i}`, rows: rows.filter((o) => (o.group ?? "") === title) }));
+const grouped = groups.some((g) => g.title);
 ---
 
 <div class="field select-menu" data-select-menu data-required-message={required ? requiredMessage : undefined} data-noun={noun}>
@@ -98,13 +105,23 @@ const chosen = rows.find((o) => o.value === value);
         data-select-search
       />
     </div>
-    <ul class="select-list" id={`${id}-list`} role="listbox" aria-label={label}>
+    <ul class="select-list" id={`${id}-list`} role="listbox" aria-label={label} data-grouped={grouped ? "" : undefined}>
       {
-        rows.map((o) => (
-          <li class="select-option" role="option" id={o.optionId} aria-selected="false" data-value={o.value} data-name={fold(o.label)} data-search={fold([o.label, o.keywords].filter(Boolean).join(" "))}>
-            <span class="select-option-body">{o.html ? <Fragment set:html={o.html} /> : o.label}</span>
-          </li>
-        ))
+        groups.map((g) => {
+          const items = g.rows.map((o) => (
+            <li class="select-option" role="option" id={o.optionId} aria-selected="false" data-value={o.value} data-name={fold(o.label)} data-search={fold([o.label, o.keywords, o.group].filter(Boolean).join(" "))}>
+              <span class="select-option-body">{o.html ? <Fragment set:html={o.html} /> : o.label}</span>
+            </li>
+          ));
+          return grouped ? (
+            <li class="select-group" role="group" aria-labelledby={g.id} data-select-group>
+              <span class="select-group-title" id={g.id}>{g.title}</span>
+              <ul role="none">{items}</ul>
+            </li>
+          ) : (
+            items
+          );
+        })
       }
     </ul>
     <p class="select-empty" hidden data-select-empty></p>
@@ -157,7 +174,10 @@ const chosen = rows.find((o) => o.value === value);
     const rank = (o: HTMLElement) => (o.dataset.name!.startsWith(q) ? 0 : (" " + o.dataset.name).includes(" " + words[0]) ? 1 : 2);
     const byName = (a: HTMLElement, b: HTMLElement) => a.dataset.name!.localeCompare(b.dataset.name!);
     options.forEach((o) => (o.hidden = !matches.includes(o)));
-    p.list.append(...(words.length ? matches.sort((a, b) => rank(a) - rank(b) || byName(a, b)) : options.sort(byName)));
+    if (p.list.hasAttribute("data-grouped")) {
+      // Por grupos: el orden es el de la página; un grupo sin coincidencias se oculta con su título.
+      p.list.querySelectorAll<HTMLElement>("[data-select-group]").forEach((g) => (g.hidden = !g.querySelector('[role="option"]:not([hidden])')));
+    } else p.list.append(...(words.length ? matches.sort((a, b) => rank(a) - rank(b) || byName(a, b)) : options.sort(byName)));
     p.empty.hidden = matches.length > 0;
     p.empty.textContent = `Nada coincide con «${typed}».`;
     p.status.textContent = words.length ? `${matches.length} ${matches.length === 1 ? "resultado" : "resultados"}` : "";
@@ -198,13 +218,13 @@ const chosen = rows.find((o) => o.value === value);
     if (opened?.menu === p.menu) opened = null;
   }
 
-  function choose(p: Parts, option: HTMLElement) {
+  function choose(p: Parts, option: HTMLElement, focus = true) {
     p.value.value = option.dataset.value!;
     p.shown.replaceChildren(option.querySelector(".select-option-body")!.cloneNode(true));
     p.trigger.removeAttribute("aria-invalid");
     p.error.textContent = "";
     p.value.dispatchEvent(new Event("change", { bubbles: true }));
-    close(p, true);
+    close(p, focus);
   }
 
   function clear(p: Parts) {
@@ -212,6 +232,20 @@ const chosen = rows.find((o) => o.value === value);
     p.shown.replaceChildren(p.menu.querySelector<HTMLTemplateElement>("[data-select-placeholder]")!.content.cloneNode(true));
     close(p);
   }
+
+  // Fijar el valor desde código (sin mover el foco): "" lo vacía.
+  document.addEventListener("select:set", (event) => {
+    const target = event.target as Element;
+    if (!target.matches?.("[data-select-value]")) return;
+    const p = parts(target);
+    const value = (event as CustomEvent<string>).detail;
+    const option = value ? p.list.querySelector<HTMLElement>(`[role="option"][data-value="${CSS.escape(value)}"]`) : null;
+    if (option) choose(p, option, false);
+    else if (p.value.value) {
+      clear(p);
+      p.value.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
 
   document.addEventListener("click", (event) => {
     const target = event.target as Element;
@@ -354,6 +388,31 @@ const chosen = rows.find((o) => o.value === value);
 
   .select-search .input {
     padding-left: 2.25rem;
+  }
+
+  .select-group > ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Título del grupo: chico, en mayúsculas finas y pegado arriba mientras se recorren sus opciones. */
+  .select-group-title {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: block;
+    padding: 0.5rem 0.625rem 0.25rem;
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .select-group + .select-group {
+    border-top: 1px solid var(--color-border);
   }
 
   .select-list {

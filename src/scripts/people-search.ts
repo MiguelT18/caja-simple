@@ -190,7 +190,7 @@ export function peopleSearch(input: HTMLInputElement, personId: HTMLInputElement
     personId.value = "";
     clearTimeout(timer);
     query = input.value.trim();
-    if (query.length < 3) return close();
+    if (!query) return close();
     // El esqueleto aparece al instante; la consulta espera a que se deje de teclear un momento.
     if (!cache.has(key(query, 1))) {
       show("loading");

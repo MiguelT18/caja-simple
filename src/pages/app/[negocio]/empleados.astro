@@ -5,6 +5,7 @@ import EmployeesTable from "@/components/app/EmployeesTable";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import PeopleSuggest from "@/components/app/PeopleSuggest.astro";
+import SelectMenu from "@/components/app/SelectMenu.astro";
 import Layout from "@/layouts/Layout.astro";
 import { businessContext, fullName, joinRequests } from "@/data/queries";
 import { stamp } from "@/lib/dates";
@@ -14,10 +15,16 @@ const ctx = await businessContext(Astro.locals, Astro.params.negocio!);
 if (!ctx) return Astro.rewrite("/404");
 const { business, branchById, employees, shiftById, shifts, branches } = ctx;
 const requests = await joinRequests(Astro.locals, business.id);
-const shiftOptions = [
-  { value: "", label: "Elige un turno" },
-  ...shifts.map((s) => ({ value: s.id, label: branches.length > 1 ? `${branchById(s.branchId)?.name} · ${s.name}` : s.name })),
-];
+const branchOptions = branches.map((b) => ({ value: b.id, label: b.name }));
+// Los turnos van agrupados por sucursal (con más de una); elegir uno elige también su sucursal (script de abajo).
+const shiftOptions = shifts.map((s) => ({
+  value: s.id,
+  label: s.name,
+  keywords: `${s.start} ${s.end}`,
+  group: branches.length > 1 ? branchById(s.branchId)?.name : undefined,
+  branchId: s.branchId,
+  hours: `${s.start}–${s.end}`,
+}));
 
 const rows = employees.map((e) => {
   const shift = shiftById(e.shiftId);
@@ -59,8 +66,15 @@ const rows = employees.map((e) => {
       >
         <FormInput form="work-here-form" name="jobTitle" label="Puesto" placeholder="Ej.: Encargada" required maxlength={60} />
         <div class="field-row-2">
-          <FormInput form="work-here-form" name="branchId" label="Sucursal" required options={branches.map((b) => ({ value: b.id, label: b.name }))} />
-          <FormInput form="work-here-form" name="shiftId" label="Turno" required options={shiftOptions} />
+          <SelectMenu form="work-here-form" name="branchId" label="Sucursal" options={branchOptions} placeholder="Elige una sucursal" searchPlaceholder="Buscar sucursal" noun="sucursales" required requiredMessage="Elige una sucursal." />
+          <SelectMenu form="work-here-form" name="shiftId" label="Turno" options={shiftOptions} placeholder="Elige un turno" searchPlaceholder="Nombre u hora" noun="turnos" required requiredMessage="Elige un turno.">
+            {(o: (typeof shiftOptions)[number]) => (
+              <span class="shift-option" data-branch={o.branchId}>
+                <span>{o.label}</span>
+                <span class="shift-hours num">{o.hours}</span>
+              </span>
+            )}
+          </SelectMenu>
         </div>
       </Modal>
     )
@@ -97,18 +111,16 @@ const rows = employees.map((e) => {
     <PeopleSuggest />
     <FormInput form="invite-form" name="jobTitle" label="Puesto" placeholder="Ej.: Cajera" required maxlength={60} />
     <div class="field-row-2">
-      <FormInput form="invite-form" name="branchId" label="Sucursal" required options={branches.map((b) => ({ value: b.id, label: b.name }))} />
-      <FormInput
-        form="invite-form"
-        name="shiftId"
-        label="Turno"
-        required
-        options={[
-          { value: "", label: "Elige un turno" },
-          ...shifts.map((s) => ({ value: s.id, label: branches.length > 1 ? `${branchById(s.branchId)?.name} · ${s.name}` : s.name })),
-        ]}
-      />
-    </div>
+          <SelectMenu form="invite-form" name="branchId" label="Sucursal" options={branchOptions} placeholder="Elige una sucursal" searchPlaceholder="Buscar sucursal" noun="sucursales" required requiredMessage="Elige una sucursal." />
+          <SelectMenu form="invite-form" name="shiftId" label="Turno" options={shiftOptions} placeholder="Elige un turno" searchPlaceholder="Nombre u hora" noun="turnos" required requiredMessage="Elige un turno.">
+            {(o: (typeof shiftOptions)[number]) => (
+              <span class="shift-option" data-branch={o.branchId}>
+                <span>{o.label}</span>
+                <span class="shift-hours num">{o.hours}</span>
+              </span>
+            )}
+          </SelectMenu>
+        </div>
   </Modal>
 
   <section id="pedidos" class="requests" data-region="join-requests" aria-labelledby="requests-title" hidden={requests.length === 0}>
@@ -148,15 +160,16 @@ const rows = employees.map((e) => {
           >
             <FormInput form={`join-${r.id}-form`} name="jobTitle" label="Puesto" placeholder="Ej.: Cajera" required maxlength={60} />
             <div class="field-row-2">
-              <FormInput
-                form={`join-${r.id}-form`}
-                name="branchId"
-                label="Sucursal"
-                required
-                options={branches.map((b) => ({ value: b.id, label: b.name, selected: b.id === r.branchId }))}
-              />
-              <FormInput form={`join-${r.id}-form`} name="shiftId" label="Turno" required options={shiftOptions} />
-            </div>
+          <SelectMenu form={`join-${r.id}-form`} name="branchId" label="Sucursal" options={branchOptions} value={r.branchId ?? undefined} placeholder="Elige una sucursal" searchPlaceholder="Buscar sucursal" noun="sucursales" required requiredMessage="Elige una sucursal." />
+          <SelectMenu form={`join-${r.id}-form`} name="shiftId" label="Turno" options={shiftOptions} placeholder="Elige un turno" searchPlaceholder="Nombre u hora" noun="turnos" required requiredMessage="Elige un turno.">
+            {(o: (typeof shiftOptions)[number]) => (
+              <span class="shift-option" data-branch={o.branchId}>
+                <span>{o.label}</span>
+                <span class="shift-hours num">{o.hours}</span>
+              </span>
+            )}
+          </SelectMenu>
+        </div>
           </Modal>
         </li>
       ))}
@@ -185,9 +198,44 @@ const rows = employees.map((e) => {
     const personId = document.querySelector<HTMLInputElement>("[data-person-id]");
     if (input && personId) peopleSearch(input, personId, input.dataset.peopleSearch);
   });
+
+  // Sucursal y Turno van juntos: el turno elegido fija su sucursal; otra sucursal borra un turno que no es de ella.
+  // Delegado en document (una vez por sesión): los formularios entran y salen con las regiones.
+  const branchOfShift = (form: Element, shiftId: string) =>
+    form.querySelector<HTMLElement>(`[name="shiftId"] ~ .select-panel [role="option"][data-value="${CSS.escape(shiftId)}"] [data-branch]`)?.dataset.branch;
+  document.addEventListener("change", (event) => {
+    const input = event.target as HTMLInputElement;
+    if (!input.matches?.("[data-select-value]") || (input.name !== "shiftId" && input.name !== "branchId")) return;
+    const form = input.closest("dialog") ?? input.form ?? input.closest("form");
+    if (!form) return;
+    const branch = form.querySelector<HTMLInputElement>('[data-select-value][name="branchId"]');
+    const shift = form.querySelector<HTMLInputElement>('[data-select-value][name="shiftId"]');
+    if (!branch || !shift) return;
+    if (input === shift && shift.value) {
+      const owner = branchOfShift(form, shift.value);
+      if (owner && owner !== branch.value) branch.dispatchEvent(new CustomEvent("select:set", { detail: owner, bubbles: true }));
+    } else if (input === branch && shift.value && branchOfShift(form, shift.value) !== branch.value) {
+      shift.dispatchEvent(new CustomEvent("select:set", { detail: "", bubbles: true }));
+    }
+  });
 </script>
 
 <style>
+  /* Turno en el menú: nombre y, a la derecha, su horario. */
+  .shift-option {
+    display: flex;
+    flex: 1;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .shift-hours {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
   .requests {
     display: grid;
     gap: 0.75rem;

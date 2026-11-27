@@ -56,7 +56,7 @@ export const employees = {
     // Sin businessId: al crear el primer negocio, para invitar al equipo (la base lo acota a quien no tiene ninguno).
     input: z.object({ businessId: uuid.optional(), query: z.string().trim().max(120), page: z.number().int().min(1).max(1000).default(1) }),
     handler: async ({ businessId, query, page }, context) => {
-      if (query.length < 3) return { people: [], total: 0, page };
+      if (!query) return { people: [], total: 0, page };
       // El límite evita recorrer las cuentas de todos a fuerza de búsquedas.
       await limit(context, "search", 30, 60);
       // El tipo generado no admite null en p_business, pero la función sí (20261110160000_search_people_first_business.sql).
