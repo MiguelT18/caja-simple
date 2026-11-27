@@ -1,6 +1,6 @@
 import { actions } from "astro:actions";
 import { useEffect, useRef, useState } from "react";
-import { CircleCheck, CircleDot, Copy, ImagePlus, Layers, Lock, Package, Shirt, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { CircleCheck, CircleDot, Copy, ImagePlus, Layers, Lock, Package, Shirt, Trash2, UtensilsCrossed } from "lucide-react";
 import type { BusinessKind, Category, ProductFormConfig, ProductSection, SaleMode } from "@/data/types";
 import type { CatalogEntry } from "@/data/queries";
 import type { PlanLimits } from "@/data/plans";
@@ -295,7 +295,7 @@ export default function ProductEditor({
   return (
     <form
       ref={formRef}
-      className="grid min-w-0 gap-8 pb-4"
+      className="grid min-w-0 gap-8 [&_*]:scroll-mb-24"
       onInput={sync}
       onChange={sync}
       onSubmit={(e) => {
@@ -674,52 +674,25 @@ export default function ProductEditor({
             </p>
           )}
 
-          {/* Al final de todo, después de la última sección. Con cambios sin guardar, dice en qué secciones están (cada
-              una lleva además su etiqueta «Sin guardar» y un contorno) y lleva a cada una. Una sola fila: en el
-              celular, Cancelar y Borrar quedan como íconos. */}
-          <div className="grid min-w-0 gap-3">
-            {dirty.length > 0 && (
-              <p className="notice m-0 flex flex-wrap items-center gap-x-2 gap-y-1 bg-[var(--color-warning-soft)] text-[var(--color-warning)]" role="status">
-                <CircleDot className="size-4 shrink-0" aria-hidden="true" />
-                <span>
-                  {creating ? "Sin guardar todavía:" : "Cambios sin guardar en"}{" "}
-                  {dirty.map((d, i) => (
-                    <span key={d.id}>
-                      {i > 0 && (i === dirty.length - 1 ? " y " : ", ")}
-                      <a href={`#section-${d.id}`} className="font-semibold text-inherit underline underline-offset-2">
-                        {d.title}
-                      </a>
-                    </span>
-                  ))}
-                  .
-                </span>
-              </p>
-            )}
-            <div className="ml-auto flex w-fit max-w-full items-center gap-1.5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1.5 shadow-[var(--shadow-md)] max-sm:w-full">
-              {product && (
-                <>
-                  <Button type="button" variant="ghost" className="h-11 text-destructive max-sm:w-11 max-sm:px-0" onClick={remove} aria-label="Borrar producto">
-                    <Trash2 />
-                    <span className="max-sm:hidden">Borrar</span>
-                  </Button>
-                  <span className="mx-1 h-6 w-px shrink-0 bg-[var(--color-border)] max-sm:hidden" aria-hidden="true" />
-                </>
-              )}
-              <Button type="button" variant="ghost" className="h-11 max-sm:w-11 max-sm:px-0" onClick={cancel} aria-label="Cancelar">
-                <X className="sm:hidden" />
-                <span className="max-sm:hidden">Cancelar</span>
-              </Button>
-              {creating && !isCombo && (
-                <Button type="submit" variant="outline" className="h-11 max-sm:flex-1" data-another {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
-                  <span className="sm:hidden">Guardar y otro</span>
-                  <span className="max-sm:hidden">Guardar y agregar otro</span>
-                </Button>
-              )}
-              <Button type="submit" className="h-11 max-sm:flex-1" {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
-                {save.busy ? "Guardando…" : product ? "Guardar cambios" : isCombo ? "Armar combo" : "Guardar"}
-              </Button>
-            </div>
-          </div>
+          {/* Con cambios sin guardar, dice en qué secciones están (cada una lleva además su etiqueta «Sin guardar» y
+              un contorno) y lleva a cada una. */}
+          {dirty.length > 0 && (
+            <p className="notice m-0 flex flex-wrap items-center gap-x-2 gap-y-1 bg-[var(--color-warning-soft)] text-[var(--color-warning)]" role="status">
+              <CircleDot className="size-4 shrink-0" aria-hidden="true" />
+              <span>
+                {creating ? "Sin guardar todavía:" : "Cambios sin guardar en"}{" "}
+                {dirty.map((d, i) => (
+                  <span key={d.id}>
+                    {i > 0 && (i === dirty.length - 1 ? " y " : ", ")}
+                    <a href={`#section-${d.id}`} className="font-semibold text-inherit underline underline-offset-2">
+                      {d.title}
+                    </a>
+                  </span>
+                ))}
+                .
+              </span>
+            </p>
+          )}
         </div>
 
         {/* Escritorio: la tarjeta del catálogo tal como queda, en vivo, al lado de lo que se escribe. */}
@@ -738,6 +711,32 @@ export default function ProductEditor({
         </aside>
       </div>
 
+      {/* Barra de acciones de la página: de borde a borde del panel, pegada abajo mientras se baja (Guardar siempre a
+          mano en el celular) y, al final, en su lugar. El margen negativo de abajo se come el padding de <main>
+          (3rem; 2rem a ≤768px) para que quede al ras del borde; en escritorio <main> es el que desplaza y sticky
+          respeta su padding, así que bottom también lo descuenta. Borrar va aparte, a la izquierda. */}
+      <div className="sticky bottom-0 z-10 min-[769px]:-bottom-12 -mx-[var(--main-pad)] -mb-12 flex min-w-0 items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-[var(--main-pad)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-[769px]:-mb-8">
+        {product && (
+          <Button type="button" variant="ghost" className="h-11 text-destructive hover:text-destructive max-sm:w-11 max-sm:px-0" onClick={remove}>
+            <Trash2 strokeWidth={1.75} aria-hidden="true" />
+            <span className="max-sm:sr-only">Borrar producto</span>
+          </Button>
+        )}
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          <Button type="button" variant="outline" className="h-11" onClick={cancel}>
+            Cancelar
+          </Button>
+          {creating && !isCombo && (
+            <Button type="submit" variant="outline" className="h-11" data-another {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
+              <span className="sm:hidden">Guardar y otro</span>
+              <span className="max-sm:hidden">Guardar y agregar otro</span>
+            </Button>
+          )}
+          <Button type="submit" className="h-11" {...save.submitProps} {...(shrinking && { "aria-disabled": true, "aria-busy": true })}>
+            {save.busy ? "Guardando…" : product ? "Guardar cambios" : isCombo ? "Armar combo" : "Guardar"}
+          </Button>
+        </div>
+      </div>
     </form>
   );
 }
