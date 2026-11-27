@@ -1,5 +1,5 @@
 ---
-import { ArrowRight, ChevronRight, CircleCheck, CircleMinus, Gem, MapPin, Pencil, Plus, Store, Trash, TriangleAlert, Users, Clock } from "@lucide/astro";
+import { ArrowRight, ChevronRight, CircleCheck, CircleMinus, Gem, MapPin, Pencil, Plus, Shirt, Store, Trash, TriangleAlert, Users, UtensilsCrossed, Clock } from "@lucide/astro";
 import Avatar from "@/components/Avatar.astro";
 import PageHeader from "@/components/PageHeader.astro";
 import BranchDialogs from "@/components/app/BranchDialogs.astro";
@@ -8,8 +8,9 @@ import BusinessProfileFields from "@/components/app/BusinessProfileFields.astro"
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import PhotoField from "@/components/app/PhotoField.astro";
+import SelectMenu from "@/components/app/SelectMenu.astro";
 import Layout from "@/layouts/Layout.astro";
-import { businessKinds, catalogLabel, kindOptions } from "@/data/kinds";
+import { businessKinds, catalogLabel } from "@/data/kinds";
 import { branchColor, businessContext, businessHref, businessImages, currentUser } from "@/data/queries";
 import { planLimits, untilLabel } from "@/data/plans";
 import { today } from "@/lib/dates";
@@ -47,6 +48,8 @@ const sections = [
 const user = currentUser(Astro.locals);
 const logo = (await businessImages(Astro.locals, [business])).get(business.id);
 // Lo único que cambia el rubro en la app: cómo se llama el catálogo (ver docs/modelo-de-datos.md › Rubros).
+const kindIcons = { tienda: Store, ropa: Shirt, restaurante: UtensilsCrossed };
+const kindChoices = businessKinds.map((k) => ({ ...k, keywords: k.hint }));
 const catalogLabels = JSON.stringify(Object.fromEntries(businessKinds.map((k) => [k.value, catalogLabel(k.value)])));
 const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleados asignados";
 ---
@@ -120,7 +123,23 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
             </div>
             <div class="business-fields">
               <FormInput form="business-form" name="name" label="Nombre del negocio" value={business.name} required maxlength={80} />
-              <FormInput form="business-form" name="kind" label="Rubro" options={kindOptions(business.kind)} hint="Solo cambia cómo se llaman algunas secciones. Tus productos, precios, stock y ventas no cambian." />
+              <div class="kind-field">
+                <SelectMenu form="business-form" name="kind" label="Rubro" options={kindChoices} value={business.kind} searchPlaceholder="Buscar rubro" noun="rubros" required requiredMessage="Elige el rubro.">
+                  {(o: (typeof kindChoices)[number]) => {
+                    const Icon = kindIcons[o.value];
+                    return (
+                      <span class="kind-option">
+                        <Icon size={18} stroke-width={1.75} aria-hidden="true" />
+                        <span class="kind-text">
+                          <span class="kind-name">{o.label}</span>
+                          <span class="kind-hint">{o.hint}</span>
+                        </span>
+                      </span>
+                    );
+                  }}
+                </SelectMenu>
+                <p class="field-hint">Solo cambia cómo se llaman algunas secciones. Tus productos, precios, stock y ventas no cambian.</p>
+              </div>
               <p class="notice kind-effect" aria-live="polite" data-kind-effect></p>
             </div>
           </div>
@@ -356,7 +375,7 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     // Qué pasa al cambiar el rubro: se dice antes de guardar, y solo si de verdad cambia algo.
     const form = document.querySelector<HTMLFormElement>("#business-form");
     const effect = form?.querySelector<HTMLElement>("[data-kind-effect]");
-    const kind = form?.querySelector<HTMLSelectElement>("[name=kind]");
+    const kind = form?.querySelector<HTMLInputElement>("[name=kind]");
     if (form && effect && kind) {
       const from = form.dataset.kindFrom!;
       const labels: Record<string, string> = JSON.parse(form.dataset.catalogLabels!);
@@ -776,6 +795,39 @@ const lost = "sus ventas, gastos, cierres de caja, turnos, inventario y empleado
     height: 0.5rem;
     border-radius: 50%;
     background: var(--color-primary);
+  }
+
+  .kind-field {
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  .kind-option {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-width: 0;
+  }
+
+  .kind-option :global(svg) {
+    flex: none;
+    color: var(--color-text-muted);
+  }
+
+  .kind-text {
+    display: grid;
+    min-width: 0;
+  }
+
+  .kind-hint {
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    color: var(--color-text-muted);
+  }
+
+  /* En el campo basta el nombre: la descripción se lee en la lista. */
+  :global(.select-trigger) .kind-hint {
+    display: none;
   }
 
   .kind-effect:not(:empty) {
