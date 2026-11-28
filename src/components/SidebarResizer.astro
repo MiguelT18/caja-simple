@@ -106,7 +106,16 @@ const { width } = Astro.props;
 </script>
 
 <style is:global>
-  /* El ancho del menú (--sidebar-w) lo usa la grilla del body en Layout.astro. */
+  /* El ancho del menú (--sidebar-w) lo usa la grilla del body en Layout.astro. El botón para mostrar el menú va
+     siempre fijo (nunca ocupa una celda de la grilla) y con .icon-btn en el selector: .icon-btn { display: grid }
+     de global.css puede cargar después en producción y, con la misma especificidad, lo mostraba siempre. */
+  .icon-btn.sidebar-expand {
+    display: none;
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+  }
+
   @media (min-width: 769px) {
     /* El separador vive en el hueco entre los dos paneles (el gap del body, 0.5rem). */
     .sidebar-resizer {
@@ -138,10 +147,6 @@ const { width } = Astro.props;
       color: var(--color-on-primary);
     }
 
-    .sidebar-expand {
-      display: none;
-    }
-
     /* Oculto: queda una franja con el botón para volver a mostrarlo. */
     html[data-menu="oculto"] body.app-surface {
       grid-template-columns: 2.75rem minmax(0, 1fr);
@@ -156,18 +161,14 @@ const { width } = Astro.props;
       grid-column: 2;
     }
 
-    html[data-menu="oculto"] .sidebar-expand {
+    html[data-menu="oculto"] .icon-btn.sidebar-expand {
       display: inline-grid;
-      position: fixed;
-      top: 0.5rem;
-      left: 0.5rem;
       background: var(--color-surface);
     }
   }
 
   @media (max-width: 768px) {
-    .sidebar-resizer,
-    .sidebar-expand {
+    .sidebar-resizer {
       display: none;
     }
   }
