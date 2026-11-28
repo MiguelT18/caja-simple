@@ -54,7 +54,7 @@ function describe({ kind, data }: Notice) {
         data.kind === "entrada" ? (data.pending ? (data.self ? "Enviaste" : "envió") : data.self ? "Sumaste" : "sumó")
         : data.kind === "merma" ? (data.self ? "Restaste" : "restó")
         : data.self ? "Ajustaste" : "ajustó";
-      const what = data.kind === "ajuste" ? `${data.product}: ${data.qty > 0 ? "+" : "−"}${n}` : `${n} de ${data.product}${data.kind === "merma" ? " (merma)" : ""}`;
+      const what = data.kind === "ajuste" ? `${data.product}: ${data.qty > 0 ? "+" : "−"}${n}` : `${n} de ${data.product}${data.kind === "merma" ? ` (${data.loss ?? "merma"})` : ""}`;
       return {
         title: data.self ? `${verb} ${what}` : `${data.person} ${verb} ${what}`,
         body: [data.branch, data.reason && `«${data.reason}»`, data.pending && "La sucursal confirma cuánto llegó"].filter(Boolean).join(" · "),

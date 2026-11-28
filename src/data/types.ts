@@ -79,8 +79,11 @@ export interface CatalogProduct {
   id: string;
   businessId: string;
   name: string;
+  /** La categoría principal: la de los gráficos y reportes. */
   categoryId?: string;
   category?: string;
+  /** Otras categorías donde también aparece (filtros y búsqueda); nunca incluye la principal. */
+  extraCategoryIds: string[];
   // EAN-13 del envase; los productos a granel o por peso no tienen.
   barcode?: string;
   /** Texto libre de la dueña (hasta 500 caracteres): se ve en el detalle del producto. */
@@ -194,12 +197,24 @@ export interface ClosedShift {
   reopened: boolean;
 }
 
+/** Tipo de una merma (public.loss_kind). */
+export type LossKind = "perdido" | "roto" | "defectuoso" | "vencido" | "otro";
+export const LOSS_KINDS: { value: LossKind; label: string }[] = [
+  { value: "perdido", label: "Perdido" },
+  { value: "roto", label: "Roto" },
+  { value: "defectuoso", label: "Defectuoso" },
+  { value: "vencido", label: "Vencido" },
+  { value: "otro", label: "Otro" },
+];
+
 export interface StockMove {
   id: string;
   kind: "entrada" | "merma" | "ajuste";
   /** Con signo: lo que sumó o restó al stock. */
   qty: number;
   reason: string | null;
+  /** Qué pasó en una merma (perdido, roto…); null en entradas y ajustes. */
+  lossKind: LossKind | null;
   /** Lo que anotó quien recibió el envío. */
   note: string | null;
   product: string;
@@ -249,6 +264,17 @@ export interface Expense {
 }
 
 /** Efectivo que se lleva la dueña de la caja de un turno: baja el esperado, pero no es un gasto. */
+/** Un movimiento de adelanto de un encargo (order_deposits): + al recibirlo, − al cobrar el pedido o devolverlo. */
+export interface Deposit {
+  orderId: string | null;
+  branchId: string;
+  date: string;
+  shiftId: string;
+  kind: "adelanto" | "aplicado" | "devuelto";
+  amount: number;
+  payment: PaymentMethod;
+}
+
 export interface Withdrawal {
   id: string;
   branchId: string;
@@ -325,7 +351,7 @@ export type Notification = {
   | {
       /** Una entrada, merma o ajuste de la sucursal; `self`: lo registró quien recibe el aviso. `pending`: envío por confirmar. */
       kind: "stock_move";
-      data: { person: string; self: boolean; product: string; kind: "entrada" | "merma" | "ajuste"; qty: number; branch: string; reason: string | null; pending: boolean };
+      data: { person: string; self: boolean; product: string; kind: "entrada" | "merma" | "ajuste"; qty: number; branch: string; reason: string | null; loss?: LossKind | null; pending: boolean };
     }
   | { kind: "reopen_answer"; data: { accepted: boolean; person: string; branch: string; shift: string; date: string } }
   | { kind: "ownership"; data: { business: string; person: string } }
@@ -360,6 +386,12 @@ export interface Order {
   id: string;
   label: string;
   items: { productId: string; qty: number; price?: number }[];
+  /** Encargo: teléfono del cliente, para qué día y cómo se entrega (envío, encomienda). */
+  phone?: string | null;
+  dueOn?: string | null;
+  delivery?: string | null;
+  /** Adelanto que queda (lo recibido menos lo devuelto): al cobrar, se descuenta de lo que entra a la caja. */
+  deposit?: number;
 }
 
 /** Cobro de un plan (docs/planes-de-suscripcion.md): el monto en Bs queda fijo hasta `expiresAt`. */

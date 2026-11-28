@@ -19,10 +19,18 @@ export interface Payable {
   balance: number;
   /** Viene de un gasto fijo (lo generó la base). */
   fixed: boolean;
+  /** El gasto fijo que lo generó (sus períodos sin pagar se ven en Gastos fijos). */
+  fixedId: string | null;
   createdById: string | null;
   /** Es el sueldo de esta ficha: esa persona confirma que se lo pagaron. */
   employeeId: string | null;
+  /** Quién lo paga: la sucursal (de la caja) o solo la dueña. Lo decide ella. */
+  payer: Payer;
+  /** Es el reembolso de un pago de bolsillo (a employeeId). */
+  reimbursement: boolean;
 }
+
+export type Payer = "sucursal" | "dueña";
 
 export interface FixedExpense {
   id: string;
@@ -34,6 +42,7 @@ export interface FixedExpense {
   startsOn: string;
   graceDays: number | null;
   employeeId: string | null;
+  payer: Payer;
   next: string;
 }
 
@@ -101,8 +110,11 @@ export async function payables(sb: Supabase, branchIds: string[], today: string,
       paid: Number(p.paid ?? 0),
       balance: Number(p.balance ?? p.amount),
       fixed: p.fixed_expense_id !== null,
+      fixedId: p.fixed_expense_id,
       createdById: p.created_by,
       employeeId: p.employee_id,
+      payer: p.payer === "dueña" ? "dueña" : "sucursal",
+      reimbursement: !!p.reimbursement,
     });
   const pending = (open.data ?? []).map(toPayable).sort(payableOrder);
 
@@ -116,6 +128,7 @@ export async function payables(sb: Supabase, branchIds: string[], today: string,
     startsOn: f.starts_on,
     graceDays: f.grace_days,
     employeeId: f.employee_id,
+    payer: f.payer === "dueña" ? "dueña" : "sucursal",
     next: nextOccurrence(f.starts_on, f.frequency, today),
   }));
 

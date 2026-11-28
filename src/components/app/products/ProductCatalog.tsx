@@ -161,11 +161,20 @@ export default function ProductCatalog({
 
   const categoryOf = (p: Item) => (p.categoryId && categories.some((c) => c.id === p.categoryId) ? p.categoryId : null);
 
-  const withCategory = useMemo(() => products.map((p) => ({ product: p, categoryId: categoryOf(p) })), [products, categories]);
+  // `inAll`: la principal (o NONE) y las otras categorías que siguen existiendo; con ellas se filtra y se cuenta.
+  const withCategory = useMemo(
+    () =>
+      products.map((p) => {
+        const categoryId = categoryOf(p);
+        const extras = (p.extraCategoryIds ?? []).filter((id) => id !== categoryId && categories.some((c) => c.id === id));
+        return { product: p, categoryId, inAll: [categoryId ?? NONE, ...extras] };
+      }),
+    [products, categories],
+  );
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
-    for (const { categoryId } of withCategory) map.set(categoryId ?? NONE, (map.get(categoryId ?? NONE) ?? 0) + 1);
+    for (const { inAll } of withCategory) for (const id of inAll) map.set(id, (map.get(id) ?? 0) + 1);
     return map;
   }, [withCategory]);
 
@@ -188,10 +197,10 @@ export default function ProductCatalog({
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return withCategory.filter(({ product, categoryId }) => {
-      if (active.length > 0 && !picked.has(categoryId ?? NONE)) return false;
+    return withCategory.filter(({ product, inAll }) => {
+      if (active.length > 0 && !inAll.some((id) => picked.has(id))) return false;
       if (lowOnly && !isLow(product)) return false;
-      return !q || product.name.toLowerCase().includes(q) || product.barcode?.includes(q);
+      return !q || product.name.toLowerCase().includes(q) || product.barcode?.includes(q) || product.description?.toLowerCase().includes(q);
     });
   }, [withCategory, activeKey, lowOnly, query]);
 
@@ -220,7 +229,7 @@ export default function ProductCatalog({
       <div className="mb-5 flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
           <label className="relative min-w-0 flex-1 basis-72">
-            <span className="sr-only">Buscar por nombre o código de barras</span>
+            <span className="sr-only">Buscar por nombre, código o descripción</span>
             <Search
               className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden="true"
@@ -229,7 +238,7 @@ export default function ProductCatalog({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nombre o código de barras"
+              placeholder="Buscar por nombre, código o descripción"
               className="h-11 bg-card pl-9 text-base"
               autoComplete="off"
             />

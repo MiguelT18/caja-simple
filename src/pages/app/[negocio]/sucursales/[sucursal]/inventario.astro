@@ -1,5 +1,5 @@
 ---
-import { CircleSlash, ClipboardCheck, Clock, PackageMinus, PackagePlus, Package, TriangleAlert } from "@lucide/astro";
+import { Check, CircleSlash, ClipboardCheck, Clock, PackageMinus, PackagePlus, Package, TriangleAlert } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
@@ -10,6 +10,7 @@ import { formatBs, plural } from "@/lib/format";
 import { stamp } from "@/lib/dates";
 import { branchContext, shiftBarData, businessHref, isLowStock, stockDeliveries, stockMoves, stockRequests } from "@/data/queries";
 import { planLimits } from "@/data/plans";
+import { LOSS_KINDS, type LossKind } from "@/data/types";
 
 const { negocio, sucursal } = Astro.params;
 const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
@@ -45,6 +46,22 @@ const kinds = [
   { value: "ajuste", label: "Ajuste", hint: "Corrige con lo que contaste. Suma o resta.", Icon: ClipboardCheck },
 ];
 const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
+const lossLabel = Object.fromEntries(LOSS_KINDS.map((l) => [l.value, l.label])) as Record<LossKind, string>;
+// Filtro del historial por tipo de merma (?retiro=roto), con las unidades retiradas de cada tipo en estos movimientos.
+const askedLoss = Astro.url.searchParams.get("retiro");
+const lossFilter = LOSS_KINDS.some((l) => l.value === askedLoss) ? (askedLoss as LossKind) : null;
+const lossTotals = LOSS_KINDS.map((l) => ({
+  ...l,
+  units: moves.filter((m) => m.lossKind === l.value).reduce((n, m) => n + Math.abs(m.qty), 0),
+})).filter((l) => l.units > 0);
+const shownMoves = lossFilter ? moves.filter((m) => m.lossKind === lossFilter) : moves;
+const lossHref = (value: LossKind | null) => {
+  const next = new URLSearchParams(Astro.url.searchParams);
+  if (value) next.set("retiro", value);
+  else next.delete("retiro");
+  const s = next.toString();
+  return `${Astro.url.pathname}${s ? `?${s}` : ""}#moves-title`;
+};
 ---
 
 <Layout title={`Inventario · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
@@ -221,6 +238,22 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
   <section class="moves" aria-labelledby="moves-title" data-region="moves">
     <h2 class="section-title" id="moves-title">Movimientos de stock</h2>
     {
+      lossTotals.length > 0 && (
+        <nav class="loss-filter" aria-label="Filtrar mermas por tipo">
+          <a class="pill" href={lossHref(null)} aria-current={lossFilter ? undefined : "page"}>
+            {!lossFilter && <Check size={14} stroke-width={2} aria-hidden="true" />}
+            Todos
+          </a>
+          {lossTotals.map((l) => (
+            <a class="pill" href={lossHref(l.value)} aria-current={lossFilter === l.value ? "page" : undefined}>
+              {lossFilter === l.value && <Check size={14} stroke-width={2} aria-hidden="true" />}
+              {l.label} <span class="num">· {plural(l.units, "unidad", "unidades")}</span>
+            </a>
+          ))}
+        </nav>
+      )
+    }
+    {
       moves.length === 0 ? (
         <p class="card empty-state">
           {limits.stock ? "Todavía no hay entradas, mermas ni ajustes. Las ventas descuentan el stock solas." : "Las entradas, mermas y ajustes de stock son del plan Negocio."}
@@ -240,11 +273,11 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
               </tr>
             </thead>
             <tbody>
-              {moves.map((m) => (
+              {shownMoves.map((m) => (
                 <tr>
                   <td class="muted num">{stamp(m.at)}</td>
                   <td>{m.product}</td>
-                  <td>{kindLabel[m.kind]}</td>
+                  <td>{m.lossKind ? `${kindLabel[m.kind]} · ${lossLabel[m.lossKind]}` : kindLabel[m.kind]}</td>
                   <td class:list={["right num", m.qty > 0 ? "amount-income" : "amount-expense"]}>{m.qty > 0 ? `+${m.qty}` : `−${Math.abs(m.qty)}`}</td>
                   <td class="muted">{[m.reason, m.note && `Nota: «${m.note}»`].filter(Boolean).join(" · ") || "—"}</td>
                   <td class="muted">{m.approvedBy ? `${m.by} · aceptó ${m.approvedBy}` : m.by}</td>
@@ -275,11 +308,11 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
           name="productId"
           label="Producto"
           placeholder="Elige un producto"
-          searchPlaceholder="Nombre, categoría o código"
+          searchPlaceholder="Nombre, categoría, código o descripción"
           noun="productos"
           required
           requiredMessage="Elige un producto."
-          options={tracked.map((p) => ({ value: p.id, label: p.name, keywords: [p.category, p.barcode].filter(Boolean).join(" "), product: p }))}
+          options={tracked.map((p) => ({ value: p.id, label: p.name, keywords: [p.category, p.barcode, p.description].filter(Boolean).join(" "), product: p }))}
         >
           {({ product: p }: { product: (typeof tracked)[number] }) => {
             // Como en la tabla de productos: el estado va escrito y con ícono, no solo con color.
@@ -319,6 +352,23 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
                 ))}
               </div>
               <p class="field-error" id="stock-move-form-kind-error"></p>
+            </fieldset>
+          )
+        }
+        {
+          // Solo en una merma (CSS: .modal-form:has(merma marcada)); la base lo exige ahí (record_stock_move).
+          isOwner && (
+            <fieldset class="choice-field loss-field">
+              <legend class="field-label">¿Qué pasó?</legend>
+              <div class="loss-options">
+                {LOSS_KINDS.map(({ value, label }) => (
+                  <label class="loss">
+                    <input type="radio" name="lossKind" value={value} aria-describedby="stock-move-form-lossKind-error" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <p class="field-error" id="stock-move-form-lossKind-error"></p>
             </fieldset>
           )
         }
@@ -467,6 +517,79 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
 
   .frozen {
     margin-top: 1.25rem;
+  }
+
+  /* El tipo de merma aparece solo con «Merma» marcada. */
+  .loss-field {
+    display: none;
+  }
+
+  :global(form):has(input[name="kind"][value="merma"]:checked) .loss-field {
+    display: grid;
+  }
+
+  .loss-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .loss {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 0.875rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 999px;
+    background: var(--color-surface);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    cursor: pointer;
+  }
+
+  .loss input {
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0;
+    accent-color: var(--color-primary);
+  }
+
+  .loss:has(input:checked) {
+    border-color: var(--color-text);
+    box-shadow: inset 0 0 0 1px var(--color-text);
+  }
+
+  .loss-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 2.75rem;
+    padding: 0 0.875rem;
+    border-radius: 999px;
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .pill:hover {
+    background: var(--color-surface-hover);
+  }
+
+  /* Activo: en el color del negocio, con ✓ y aria-current (no solo el color). */
+  .pill[aria-current="page"] {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
   }
 
   .frozen a {

@@ -56,6 +56,8 @@ export const products = {
       id: uuid.optional(),
       name: name(80, "Ingresa el nombre del producto"),
       categoryId: uuid.nullish().transform((v) => v ?? undefined),
+      // Otras categorías donde también aparece (la base quita la principal y exige que sean del negocio).
+      extraCategoryIds: z.array(uuid).max(30).default([]),
       barcode: optional.pipe(z.string().regex(/^\d{6,14}$/, "El código de barras solo lleva números (6 a 14)").optional()),
       description: optional.pipe(z.string().trim().max(500, "Máximo 500 caracteres").optional()),
       image: imageFile,
@@ -82,7 +84,7 @@ export const products = {
       .refine((v) => v.componentId.length === v.componentQty.length, { message: "Revisa las cantidades", path: ["components"] })
       .refine((v) => new Set(v.componentId).size === v.componentId.length, { message: "Hay un producto repetido", path: ["components"] })
       .refine((v) => !v.combo || v.componentQty.reduce((a, b) => a + b, 0) >= 2, { message: "Un combo lleva al menos dos productos", path: ["components"] }),
-    handler: async ({ businessId, id, name, categoryId, barcode, description, image, removeImage, priceBranch, price, stock, minStock, attrId, attrValue, combo, componentId, componentQty }, context) => {
+    handler: async ({ businessId, id, name, categoryId, extraCategoryIds, barcode, description, image, removeImage, priceBranch, price, stock, minStock, attrId, attrValue, combo, componentId, componentQty }, context) => {
       await uploadLimit(context, image);
       const sb = db(context);
       // Solo los campos que el negocio tiene hoy: uno quitado de la configuración no deja valores sueltos.
@@ -90,7 +92,7 @@ export const products = {
       check(config.error);
       const known = new Set(((config.data!.product_form as { fields?: { id: string }[] }).fields ?? []).map((f) => f.id));
       const attributes = Object.fromEntries(attrId.flatMap((key, i) => (known.has(key) && attrValue[i] ? [[key, attrValue[i]]] : [])));
-      const fields = { name, category_id: categoryId ?? null, barcode: barcode ?? null, description: description || null, attributes };
+      const fields = { name, category_id: categoryId ?? null, extra_category_ids: extraCategoryIds, barcode: barcode ?? null, description: description || null, attributes };
       const duplicate = "Ya tienes otro producto con ese código de barras.";
       const saved = id
         ? await sb.from("products").update(fields).eq("id", id).select("id, image_path").single()
@@ -370,11 +372,13 @@ export const products = {
         kind: z.enum(["entrada", "merma", "ajuste"]),
         qty: z.coerce.number({ error: "Ingresa un número" }).int("Usa un número entero").min(-100_000).max(100_000),
         reason: optional.pipe(z.string().max(120, "Máximo 120 caracteres").optional()),
+        lossKind: z.enum(["perdido", "roto", "defectuoso", "vencido", "otro"]).optional(),
       })
       .refine((v) => v.qty !== 0, { message: "La cantidad no puede ser 0", path: ["qty"] })
+      .refine((v) => v.kind !== "merma" || v.lossKind, { message: "Elige qué pasó", path: ["lossKind"] })
       .refine((v) => v.kind === "ajuste" || v.qty > 0, { message: "Usa un número mayor que 0", path: ["qty"] })
       .refine((v) => v.kind === "entrada" || v.reason, { message: "Escribe el motivo", path: ["reason"] }),
-    handler: async ({ branchId, productId, kind, qty, reason }, context) => {
+    handler: async ({ branchId, productId, kind, qty, reason, lossKind }, context) => {
       if (kind === "entrada") {
         const { data: held, error } = await db(context).rpc("send_stock", { p_branch: branchId, p_product: productId, p_qty: qty, p_reason: reason });
         check(error);
@@ -386,6 +390,7 @@ export const products = {
         p_kind: kind,
         p_qty: qty,
         p_reason: reason ?? "",
+        p_loss_kind: kind === "merma" ? lossKind : undefined,
       });
       check(error);
       return { ok: true };

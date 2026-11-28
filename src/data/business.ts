@@ -62,6 +62,7 @@ export async function businessContext(locals: App.Locals, businessSlug: string) 
       sales: moves.sales.filter((s) => s.branchId === branch.id),
       expenses: moves.expenses.filter((g) => g.branchId === branch.id),
       withdrawals: moves.withdrawals.filter((w) => w.branchId === branch.id),
+      deposits: moves.deposits.filter((d) => d.branchId === branch.id),
     };
     const sales = branchMoves.sales.filter((s) => s.date === day);
     const expenses = branchMoves.expenses.filter((g) => g.date === day);

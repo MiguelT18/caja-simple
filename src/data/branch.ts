@@ -121,6 +121,7 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
       cash: cash.cash,
       expenses: cash.expenses,
       withdrawals: cash.withdrawals,
+      deposits: cash.deposits,
       expected: cash.expected,
     };
   };
@@ -248,6 +249,7 @@ export function shiftBarData(ctx: NonNullable<Awaited<ReturnType<typeof branchCo
     cash: totals.cash,
     expenses: totals.expenses,
     withdrawals: totals.withdrawals,
+    deposits: totals.deposits,
     expected: totals.expected,
   };
 }

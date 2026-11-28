@@ -1,6 +1,6 @@
 // Cuentas de la caja: funciones puras sobre movimientos y cierres ya cargados (sin consultas).
 import type { Row } from "./mappers";
-import type { Expense, Sale, Withdrawal } from "./types";
+import type { Deposit, Expense, Sale, Withdrawal } from "./types";
 import { periodStart, type Period } from "@/lib/dates";
 
 export const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
@@ -40,7 +40,12 @@ type CloseRow = Row<"shift_closes">;
  * con los movimientos de su día, lo vendido (todo y en efectivo), lo gastado y lo esperado en caja.
  * Mismo cálculo que private.on_shift_closed_notify() en la base.
  */
-export function shiftCash(closes: CloseRow[], moves: { sales: Sale[]; expenses: Expense[]; withdrawals: Withdrawal[] }, shiftId: string, day: string) {
+export function shiftCash(
+  closes: CloseRow[],
+  moves: { sales: Sale[]; expenses: Expense[]; withdrawals: Withdrawal[]; deposits?: Deposit[] },
+  shiftId: string,
+  day: string,
+) {
   const row =
     closes.find((c) => c.shift_id === shiftId && c.status === "en-curso") ?? closes.find((c) => c.shift_id === shiftId && c.business_date === day);
   const date = row?.business_date ?? day;
@@ -51,8 +56,10 @@ export function shiftCash(closes: CloseRow[], moves: { sales: Sale[]; expenses: 
   const expenses = sum(moves.expenses.filter((g) => g.shiftId === shiftId && g.date === date).map((g) => g.amount));
   // Los retiros de la dueña salen del cajón, pero no son gastos.
   const withdrawals = sum(moves.withdrawals.filter((w) => w.shiftId === shiftId && w.date === date).map((w) => w.amount));
+  // Adelantos de encargos en efectivo: entran el día que se reciben y se restan al cobrar el pedido o devolverlos.
+  const deposits = sum((moves.deposits ?? []).filter((d) => d.shiftId === shiftId && d.date === date && d.payment === "efectivo").map((d) => d.amount));
   const opening = Number(row?.opening ?? 0);
-  return { row, date, opening, sales, cash, expenses, withdrawals, expected: cents(opening + cash - expenses - withdrawals) };
+  return { row, date, opening, sales, cash, expenses, withdrawals, deposits, expected: cents(opening + cash + deposits - expenses - withdrawals) };
 }
 
 /** Estado de la caja de una sucursal hoy, a partir de sus cierres. */

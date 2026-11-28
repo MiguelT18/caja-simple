@@ -1,0 +1,174 @@
+---
+// Separador entre el menú lateral y el contenido (solo escritorio): se arrastra para cambiar el ancho del menú y, por
+// debajo de un umbral, el menú se oculta y queda un botón para volver a mostrarlo. El ancho y si está oculto van en
+// cookies (MENU_WIDTH_COOKIE, MENU_HIDDEN_COOKIE) para que Layout ya los pinte en <html> sin parpadeo.
+import { EllipsisVertical, PanelLeftOpen } from "@lucide/astro";
+import { MENU_MAX, MENU_MIN } from "@/lib/sidebar";
+
+interface Props {
+  /** Ancho guardado en px, o undefined (el de siempre: 18.5rem). */
+  width?: number;
+}
+
+const { width } = Astro.props;
+---
+
+<div
+  class="sidebar-resizer"
+  role="separator"
+  tabindex="0"
+  aria-orientation="vertical"
+  aria-label="Ancho del menú lateral"
+  aria-valuemin={MENU_MIN}
+  aria-valuemax={MENU_MAX}
+  aria-valuenow={width ?? 278}
+  aria-describedby="sidebar-resizer-hint"
+  title="Arrastra para cambiar el ancho del menú. Muy angosto, se oculta."
+  data-sidebar-resizer
+>
+  <EllipsisVertical size={16} stroke-width={1.75} aria-hidden="true" />
+</div>
+<p id="sidebar-resizer-hint" class="sr-only">Usa las flechas izquierda y derecha para cambiar el ancho, y Enter para ocultar el menú.</p>
+<button type="button" class="icon-btn sidebar-expand" aria-label="Mostrar el menú lateral" title="Mostrar el menú" data-sidebar-expand>
+  <PanelLeftOpen size={20} stroke-width={1.75} />
+</button>
+
+<script>
+  import { MENU_COLLAPSE_AT, MENU_HIDDEN_COOKIE, MENU_MAX, MENU_MIN, MENU_WIDTH_COOKIE } from "../lib/sidebar";
+
+  // Una sola vez por sesión: delegado en document, así sirve para el separador de cada página.
+  const root = document.documentElement;
+  const year = "path=/; max-age=31536000; samesite=lax";
+  const clamp = (px: number) => Math.round(Math.min(MENU_MAX, Math.max(MENU_MIN, px)));
+  const resizer = () => document.querySelector<HTMLElement>("[data-sidebar-resizer]");
+
+  function setWidth(px: number, save = true) {
+    root.style.setProperty("--sidebar-w", `${px}px`);
+    resizer()?.setAttribute("aria-valuenow", String(px));
+    if (save) document.cookie = `${MENU_WIDTH_COOKIE}=${px}; ${year}`;
+  }
+
+  function setHidden(hidden: boolean) {
+    if (hidden) root.dataset.menu = "oculto";
+    else delete root.dataset.menu;
+    document.cookie = hidden ? `${MENU_HIDDEN_COOKIE}=1; ${year}` : `${MENU_HIDDEN_COOKIE}=; path=/; max-age=0; samesite=lax`;
+    // El foco pasa al control que queda a la vista.
+    (hidden ? document.querySelector<HTMLElement>("[data-sidebar-expand]") : resizer())?.focus();
+  }
+
+  document.addEventListener("pointerdown", (event) => {
+    const handle = (event.target as Element).closest<HTMLElement>("[data-sidebar-resizer]");
+    if (!handle || event.button !== 0) return;
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    handle.dataset.dragging = "";
+    // El borde izquierdo del menú: el padding del body.
+    const left = document.querySelector(".sidebar")?.getBoundingClientRect().left ?? 0;
+    let last = clamp(event.clientX - left);
+    let collapse = false;
+    const move = (e: PointerEvent) => {
+      const x = e.clientX - left;
+      collapse = x < MENU_COLLAPSE_AT;
+      handle.toggleAttribute("data-collapsing", collapse);
+      if (!collapse) setWidth((last = clamp(x)), false);
+    };
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      delete handle.dataset.dragging;
+      handle.removeAttribute("data-collapsing");
+      if (collapse) setHidden(true);
+      else setWidth(last);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up, { once: true });
+    handle.addEventListener("pointercancel", up, { once: true });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const handle = (event.target as Element).closest?.<HTMLElement>("[data-sidebar-resizer]");
+    if (!handle) return;
+    const now = Number(handle.getAttribute("aria-valuenow")) || 278;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      const next = now + (event.key === "ArrowRight" ? 16 : -16);
+      // Más angosto que el mínimo con el teclado: también se oculta.
+      if (next < MENU_MIN) setHidden(true);
+      else setWidth(clamp(next));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      setHidden(true);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if ((event.target as Element).closest("[data-sidebar-expand]")) setHidden(false);
+  });
+</script>
+
+<style is:global>
+  /* El ancho del menú (--sidebar-w) lo usa la grilla del body en Layout.astro. */
+  @media (min-width: 769px) {
+    /* El separador vive en el hueco entre los dos paneles (el gap del body, 0.5rem). */
+    .sidebar-resizer {
+      position: fixed;
+      z-index: 5;
+      top: 50%;
+      left: calc(0.5rem + var(--sidebar-w, 18.5rem));
+      display: grid;
+      width: 0.5rem;
+      height: 3rem;
+      place-items: center;
+      border-radius: 999px;
+      color: var(--color-text-muted);
+      cursor: col-resize;
+      touch-action: none;
+      translate: 0 -50%;
+    }
+
+    .sidebar-resizer:hover,
+    .sidebar-resizer:focus-visible,
+    .sidebar-resizer[data-dragging] {
+      background: var(--color-surface-hover);
+      color: var(--color-text);
+    }
+
+    /* Al pasar el umbral: el menú se ocultará al soltar. */
+    .sidebar-resizer[data-collapsing] {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+    }
+
+    .sidebar-expand {
+      display: none;
+    }
+
+    /* Oculto: queda una franja con el botón para volver a mostrarlo. */
+    html[data-menu="oculto"] body.app-surface {
+      grid-template-columns: 2.75rem minmax(0, 1fr);
+    }
+
+    html[data-menu="oculto"] .sidebar,
+    html[data-menu="oculto"] .sidebar-resizer {
+      display: none;
+    }
+
+    html[data-menu="oculto"] main {
+      grid-column: 2;
+    }
+
+    html[data-menu="oculto"] .sidebar-expand {
+      display: inline-grid;
+      position: fixed;
+      top: 0.5rem;
+      left: 0.5rem;
+      background: var(--color-surface);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .sidebar-resizer,
+    .sidebar-expand {
+      display: none;
+    }
+  }
+</style>

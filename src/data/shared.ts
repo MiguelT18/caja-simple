@@ -5,7 +5,7 @@ import type { Supabase } from "@/lib/supabase";
 import { fail } from "./mappers";
 import type { Membership } from "./session";
 import { cents, shiftCash } from "./cash";
-import type { Branch, Business, ClosedShift, Expense, Order, Withdrawal, Recorder, Sale, SaleLine, StockDelivery, StockMove, StockRequest } from "./types";
+import type { Branch, Business, ClosedShift, Deposit, Expense, Order, Withdrawal, Recorder, Sale, SaleLine, StockDelivery, StockMove, StockRequest } from "./types";
 
 /** Nombres de quienes registraron movimientos. RLS solo deja ver a quien comparte negocio. */
 export async function recorders(sb: Supabase, ids: (string | null)[]) {
@@ -75,11 +75,13 @@ export const receiptUrls = (sb: Supabase, sales: Sale[]) => imageUrls(sb, sales.
 export async function movements(sb: Supabase, branchIds: string[], from: string, to?: string) {
   // Sin `to`, hasta hoy: ningún movimiento tiene un día del negocio futuro.
   const until = to ?? "9999-12-31";
-  const [sales, expenses, withdrawals] = await Promise.all([
+  const [sales, expenses, withdrawals, deposits] = await Promise.all([
     sb.from("sale_totals").select("*").in("branch_id", branchIds).gte("business_date", from).lte("business_date", until).order("occurred_at", { ascending: false }),
     sb.from("expenses").select("*").in("branch_id", branchIds).gte("business_date", from).lte("business_date", until).order("occurred_at", { ascending: false }),
     sb.from("cash_withdrawals").select("*").in("branch_id", branchIds).gte("business_date", from).lte("business_date", until).order("occurred_at", { ascending: false }),
+    sb.from("order_deposits").select("order_id, branch_id, business_date, shift_id, kind, amount, payment_method").in("branch_id", branchIds).gte("business_date", from).lte("business_date", until),
   ]);
+  fail(deposits.error);
   fail(sales.error);
   fail(expenses.error);
   fail(withdrawals.error);
@@ -128,7 +130,16 @@ export async function movements(sb: Supabase, branchIds: string[], from: string,
     amount: w.voided_at ? 0 : Number(w.amount),
     voided: w.voided_at ? Number(w.amount) : null,
   }));
-  return { sales: saleList, expenses: expenseList, withdrawals: withdrawalList };
+  const depositList: Deposit[] = (deposits.data ?? []).map((d) => ({
+    orderId: d.order_id,
+    branchId: d.branch_id,
+    date: d.business_date,
+    shiftId: d.shift_id,
+    kind: d.kind as Deposit["kind"],
+    amount: Number(d.amount),
+    payment: d.payment_method,
+  }));
+  return { sales: saleList, expenses: expenseList, withdrawals: withdrawalList, deposits: depositList };
 }
 
 /** Cierres de hoy y los que siguen abiertos de otro día (un turno nocturno abierto ayer). */
@@ -206,7 +217,7 @@ export async function closesBetween(sb: Supabase, branchId: string, from: string
 export async function stockMoves(sb: Supabase, branchId: string) {
   const { data, error } = await sb
     .from("stock_movements")
-    .select("id, kind, qty, reason, note, recorded_by, approved_by, occurred_at, products(name)")
+    .select("id, kind, qty, reason, loss_kind, note, recorded_by, approved_by, occurred_at, products(name)")
     .eq("branch_id", branchId)
     .order("occurred_at", { ascending: false })
     .limit(200);
@@ -218,6 +229,7 @@ export async function stockMoves(sb: Supabase, branchId: string) {
       kind: m.kind,
       qty: m.qty,
       reason: m.reason,
+      lossKind: m.loss_kind,
       note: m.note,
       product: m.products?.name ?? "Producto quitado",
       by: (m.recorded_by && people.get(m.recorded_by)?.firstName) || "—",
@@ -288,9 +300,22 @@ export async function lastCount(sb: Supabase, branchId: string) {
 
 /** Pedidos abiertos de la sucursal (sin cobrar), los más antiguos primero. Nunca van a la caché. */
 export async function openOrders(sb: Supabase, branchId: string): Promise<Order[]> {
-  const { data, error } = await sb.from("orders").select("id, label, items").eq("branch_id", branchId).is("sale_id", null).order("created_at");
+  const { data, error } = await sb
+    .from("orders")
+    .select("id, label, items, phone, due_on, delivery, order_deposits(amount)")
+    .eq("branch_id", branchId)
+    .is("sale_id", null)
+    .order("created_at");
   fail(error);
-  return (data ?? []).map((o) => ({ id: o.id, label: o.label, items: o.items as Order["items"] }));
+  return (data ?? []).map((o) => ({
+    id: o.id,
+    label: o.label,
+    items: o.items as Order["items"],
+    phone: o.phone,
+    dueOn: o.due_on,
+    delivery: o.delivery,
+    deposit: cents(o.order_deposits.reduce((s, d) => s + Number(d.amount), 0)),
+  }));
 }
 
 /** Nombre del pedido de cada venta cobrada como pedido, por id de venta, entre `from` y `to` (fecha de caja). */

@@ -36,7 +36,8 @@ const bar = shiftBarData(ctx);
 // Cada categoría con un color de la paleta (el arte de los productos sin foto); el filtro solo con 2 grupos o más.
 const NONE = "none";
 const groups = [
-  ...categories.filter((c) => products.some((p) => p.categoryId === c.id)).map((c) => ({ id: c.id, name: c.name })),
+  // Con sus otras categorías: un producto aparece al filtrar por cualquiera de ellas.
+  ...categories.filter((c) => products.some((p) => p.categoryId === c.id || p.extraCategoryIds.includes(c.id))).map((c) => ({ id: c.id, name: c.name })),
   ...(products.some((p) => !p.categoryId) ? [{ id: NONE, name: "Sin categoría" }] : []),
 ];
 const colorOf = (categoryId?: string) => {
@@ -172,7 +173,7 @@ const colorOf = (categoryId?: string) => {
             const price = p.price === null ? "precio al vender" : formatBs(p.price);
             const promo = promoOf(p.id, p.price);
             return (
-              <li data-name={p.name.toLowerCase()} data-barcode={p.barcode ?? ""} data-category={p.categoryId ?? NONE}>
+              <li data-name={p.name.toLowerCase()} data-barcode={p.barcode ?? ""} data-category={[p.categoryId ?? NONE, ...p.extraCategoryIds].join(" ")}>
                 <div
                   class:list={["product", { "sold-out": p.stock === 0 }]}
                   data-product
@@ -318,6 +319,8 @@ const colorOf = (categoryId?: string) => {
           <span>Total</span>
           <span class="num" data-total aria-live="polite">{formatBs(0)}</span>
         </p>
+        <!-- Encargo con adelanto: ya entró a la caja el día que se recibió; ahora se cobra solo lo que falta. -->
+        <p class="cart-deposit num" data-deposit hidden></p>
         <p class="notice cart-notice" data-notice role="status"></p>
         <button type="button" class="btn btn-primary btn-block cart-confirm" data-charge data-branch={branch.id} data-shift={shift?.id} disabled>
           <span>Cobrar<span class="confirm-rest"> <span data-confirm-total>{formatBs(0)}</span></span></span>
@@ -334,6 +337,19 @@ const colorOf = (categoryId?: string) => {
         <div class="field">
           <label class="field-label" for="order-label">Nombre del pedido</label>
           <input id="order-label" class="input" name="label" maxlength="40" placeholder="Ej.: Mesa 3, Juan" autocomplete="off" required />
+        </div>
+        <!-- Encargo: todo opcional. El adelanto se recibe en Pedidos. -->
+        <div class="field">
+          <label class="field-label" for="order-phone">Teléfono del cliente (opcional)</label>
+          <input id="order-phone" class="input" name="phone" type="tel" maxlength="30" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="order-due">Para el día (opcional)</label>
+          <input id="order-due" class="input" name="dueOn" type="date" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="order-delivery">Entrega (opcional)</label>
+          <input id="order-delivery" class="input" name="delivery" maxlength="120" placeholder="Ej.: Encomienda a Oruro, la recoge el sábado" autocomplete="off" />
         </div>
         <p class="notice notice-error" role="alert" data-order-notice></p>
         <div class="modal-actions">
@@ -406,6 +422,7 @@ const colorOf = (categoryId?: string) => {
   const cartBody = $("#cart-body");
   const toggle = $<HTMLButtonElement>("[data-cart-toggle]");
   const totalMini = $("[data-total-mini]");
+  const depositLine = $("[data-deposit]");
   const count = $("[data-count]");
   const cards = document.querySelectorAll<HTMLElement>("[data-product]");
   const cardById = new Map([...cards].map((card) => [card.dataset.id!, card]));
@@ -563,8 +580,14 @@ const colorOf = (categoryId?: string) => {
   paymentBox.addEventListener("change", showChange);
 
   function showTotal() {
-    totalValue = Math.round([...cart.values()].reduce((a, l) => a + lineAmount(l), 0) * 100) / 100;
-    total.textContent = totalMini.textContent = confirmTotal.textContent = formatBs(totalValue);
+    const sum = Math.round([...cart.values()].reduce((a, l) => a + lineAmount(l), 0) * 100) / 100;
+    // Con adelanto, se cobra (y se da cambio de) lo que falta; la venta queda por el total.
+    const deposit = current?.deposit ?? 0;
+    totalValue = Math.max(Math.round((sum - deposit) * 100) / 100, 0);
+    total.textContent = formatBs(sum);
+    totalMini.textContent = confirmTotal.textContent = formatBs(totalValue);
+    depositLine.hidden = deposit <= 0;
+    depositLine.textContent = deposit > 0 ? `Adelanto: −${formatBs(deposit)} · A cobrar: ${formatBs(totalValue)}` : "";
     showChange();
   }
 
@@ -837,7 +860,7 @@ const colorOf = (categoryId?: string) => {
 
   // Pedidos abiertos ---------------------------------------------------------------------------------------
   // Un pedido es un carro con nombre guardado en la base. Cargarlo llena el carro; cobrarlo registra la venta y lo cierra.
-  type Order = { id: string; label: string; items: { productId: string; qty: number; price?: number }[] };
+  type Order = { id: string; label: string; items: { productId: string; qty: number; price?: number }[]; deposit?: number };
   const orders: Order[] = JSON.parse($("[data-orders]").textContent || "[]");
   const ordersBox = $("[data-orders-box]");
   const ordersList = $("[data-orders-list]");
@@ -881,6 +904,9 @@ const colorOf = (categoryId?: string) => {
     ordersBox.hidden = orders.length === 0;
   }
   renderOrders();
+  // Desde Pedidos («Cobrar en Vender»): abre ese pedido.
+  const askedOrder = new URLSearchParams(location.search).get("pedido");
+  if (askedOrder && orders.some((o) => o.id === askedOrder)) queueMicrotask(() => loadOrder(askedOrder, true));
 
   /** `force`: vuelve a la venta nueva tras guardar, cobrar o descartar (sin preguntar ni salir antes). */
   async function loadOrder(id: string, force = false) {
@@ -914,12 +940,12 @@ const colorOf = (categoryId?: string) => {
   });
 
   /** Guarda el carro como pedido y vuelve a una venta nueva, sin recargar. Devuelve el error, si lo hubo. */
-  async function saveOrder(orderId: string, label: string, button: HTMLButtonElement) {
+  async function saveOrder(orderId: string, label: string, button: HTMLButtonElement, details?: { phone: string; dueOn: string; delivery: string }) {
     if (isBusy(button)) return;
     setBusy(button, true, "Guardando pedido…");
     let error: { message: string } | undefined;
     try {
-      ({ error } = await actions.saveOrder({ orderId, branchId: confirm.dataset.branch!, label, items: cartItems() }));
+      ({ error } = await actions.saveOrder({ orderId, branchId: confirm.dataset.branch!, label, items: cartItems(), details }));
     } catch {
       error = { message: "No hay conexión. El pedido no se guardó: intenta de nuevo." };
     }
@@ -927,8 +953,9 @@ const colorOf = (categoryId?: string) => {
       setBusy(button, false);
       return error.message;
     }
-    const saved = { id: orderId, label, items: cartItems() };
     const index = orders.findIndex((o) => o.id === orderId);
+    // Conserva el adelanto y los datos del encargo que ya tenía.
+    const saved = { ...orders[index], id: orderId, label, items: cartItems() };
     if (index >= 0) orders[index] = saved;
     else orders.push(saved);
     if (orderId === draftId) draftId = crypto.randomUUID();
@@ -964,7 +991,9 @@ const colorOf = (categoryId?: string) => {
       return;
     }
     input.removeAttribute("aria-invalid");
-    const message = await saveOrder(draftId, label, orderForm.querySelector<HTMLButtonElement>("[type=submit]")!);
+    const field = (name: string) => orderForm.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value.trim();
+    const details = { phone: field("phone"), dueOn: field("dueOn"), delivery: field("delivery") };
+    const message = await saveOrder(draftId, label, orderForm.querySelector<HTMLButtonElement>("[type=submit]")!, details);
     if (message) orderNotice.textContent = message;
   });
 
@@ -1002,7 +1031,7 @@ const colorOf = (categoryId?: string) => {
     let visible = 0;
     for (const li of items) {
       const match = li.dataset.name!.includes(query) || (query !== "" && li.dataset.barcode!.startsWith(query));
-      li.hidden = !match || (category !== "" && li.dataset.category !== category);
+      li.hidden = !match || (category !== "" && !li.dataset.category!.split(" ").includes(category));
       if (!li.hidden) visible++;
     }
     empty.hidden = visible > 0 || items.length === 0;
@@ -1782,6 +1811,13 @@ const colorOf = (categoryId?: string) => {
     gap: 0.75rem;
     padding-top: 1rem;
     border-top: 1px solid var(--color-border);
+  }
+
+  .cart-deposit {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    text-align: right;
   }
 
   .cart-total {

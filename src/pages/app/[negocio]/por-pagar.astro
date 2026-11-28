@@ -9,9 +9,11 @@ import { today as todayOf } from "@/lib/dates";
 import { formatBs, plural } from "@/lib/format";
 import { dueState } from "@/lib/payables";
 
-// Vista general de la dueña: lo que falta pagar en cada sucursal y sus gastos fijos.
+// Lo que falta pagar en cada sucursal y, para la dueña, sus gastos fijos. La empleada ve la suya (m.branches y RLS):
+// lo que le toca saldar, lo que paga la dueña y sus reembolsos.
 const m = membership(Astro.locals, Astro.params.negocio!);
-if (!m || m.role !== "dueño") return Astro.rewrite("/404");
+if (!m) return Astro.rewrite("/404");
+const isOwner = m.role === "dueño";
 const today = todayOf();
 const branchIds = m.branches.map((b) => b.id);
 const [owed, paidThisMonth, backdrop] = await Promise.all([
@@ -26,7 +28,7 @@ const many = m.branches.length > 1;
 ---
 
 <Layout title={`Por pagar · ${m.business.name}`} context={{ membership: m }}>
-  <PageHeader {...backdrop} title="Por pagar" live description="Gastos fijos y pendientes de todas tus sucursales. Al pagarlos, quedan con el día que tocaba." />
+  <PageHeader {...backdrop} title="Por pagar" live description={isOwner ? "Gastos fijos y pendientes de todas tus sucursales. Al pagarlos, quedan con el día que tocaba." : `Lo que falta pagar en ${m.branches[0]?.name ?? "tu sucursal"}. Lo que pagues de tu bolsillo queda como reembolso que te paga la dueña.`} />
 
   <section class="kpis" aria-label="Totales de todas las sucursales" data-region="payables-totals">
     <div class="kpi">
@@ -66,9 +68,10 @@ const many = m.branches.length > 1;
             fixed={owed.fixed.filter((f) => f.branchId === b.id)}
             today={today}
             userId={Astro.locals.userId!}
-            isOwner
+            isOwner={isOwner}
             canAdd
             cashShift={null}
+            myEmployeeId={m.employee?.branchId === b.id ? m.employee.id : null}
           />
         </section>
       ))

@@ -6,6 +6,8 @@ import { amount, expenseFields } from "./sales";
 import { check, db, optional, uuid } from "./shared";
 
 const dueOn = optional.pipe(z.iso.date({ error: "Usa una fecha válida" }).optional());
+// Quién paga: solo lo decide la dueña (la base ignora lo que mande otra persona, private.keep_payer).
+const payer = z.enum(["sucursal", "dueña"]).optional();
 const fixedFields = {
   ...expenseFields,
   frequency: z.enum(["diario", "semanal", "quincenal", "mensual"], { error: "Elige cada cuánto se paga" }),
@@ -14,6 +16,7 @@ const fixedFields = {
   graceDays: optional.pipe(z.coerce.number<string | undefined>().int("Usa un número entero").min(0, "No puede ser negativo").max(365).optional()),
   // Vacío: no es el sueldo de nadie.
   employeeId: optional.pipe(uuid.optional()),
+  payer,
 };
 const fixedRow = ({ startsOn, graceDays, employeeId, ...rest }: z.infer<z.ZodObject<typeof fixedFields>>) => ({
   ...rest,
@@ -56,7 +59,7 @@ export const payables = {
 
   createPendingExpense: defineAction({
     accept: "form",
-    input: z.object({ pendingId: uuid, branchId: uuid, dueOn, ...expenseFields }),
+    input: z.object({ pendingId: uuid, branchId: uuid, dueOn, payer, ...expenseFields }),
     handler: async ({ pendingId, branchId, dueOn, ...fields }, context) => {
       const { error } = await db(context)
         .from("pending_expenses")
@@ -70,9 +73,9 @@ export const payables = {
   /** Solo la dueña: el monto de este período (la factura llegó distinta) y el vencimiento. */
   updatePendingExpense: defineAction({
     accept: "form",
-    input: z.object({ pendingId: uuid, amount, dueOn }),
-    handler: async ({ pendingId, amount, dueOn }, context) => {
-      check((await db(context).from("pending_expenses").update({ amount, due_on: dueOn ?? null }).eq("id", pendingId).select("id").single()).error);
+    input: z.object({ pendingId: uuid, amount, dueOn, payer }),
+    handler: async ({ pendingId, amount, dueOn, payer }, context) => {
+      check((await db(context).from("pending_expenses").update({ amount, due_on: dueOn ?? null, payer }).eq("id", pendingId).select("id").single()).error);
       return { ok: true };
     },
   }),
@@ -82,6 +85,16 @@ export const payables = {
     input: z.object({ pendingId: uuid }),
     handler: async ({ pendingId }, context) => {
       check((await db(context).from("pending_expenses").update({ canceled_at: new Date().toISOString() }).eq("id", pendingId).select("id").single()).error);
+      return { ok: true };
+    },
+  }),
+
+  /** Quien trabaja en la sucursal pagó todo o parte con su plata: queda pagado fuera de la caja y nace su reembolso. */
+  payFromPocket: defineAction({
+    accept: "form",
+    input: z.object({ paymentId: uuid, pendingId: uuid, amount }),
+    handler: async ({ paymentId, pendingId, amount }, context) => {
+      check((await db(context).rpc("pay_pending_from_pocket", { p_payment: paymentId, p_pending: pendingId, p_amount: amount })).error);
       return { ok: true };
     },
   }),

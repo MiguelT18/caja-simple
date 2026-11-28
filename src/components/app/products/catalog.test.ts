@@ -5,6 +5,7 @@ import { saleMode } from "./catalog";
 const entry = (soldIn: { price: number | null; stock: number | null }[], components?: CatalogEntry["components"]): CatalogEntry => ({
   id: "p",
   name: "P",
+  extraCategoryIds: [],
   attributes: {},
   components,
   soldIn: soldIn.map((s, i) => ({ branchId: `b${i}`, branch: `B${i}`, minStock: null, low: false, ...s })),

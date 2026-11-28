@@ -8,10 +8,10 @@ import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
 import RangeFilter from "@/components/app/RangeFilter.astro";
 import Layout from "@/layouts/Layout.astro";
-import { branchContext, businessHref, closesBetween, CLOSES_PAGE_SIZE, shiftBarData, fullName } from "@/data/queries";
+import { branchContext, branchOvertime, businessHref, closesBetween, CLOSES_PAGE_SIZE, OVERTIME_STATUSES, shiftBarData, fullName } from "@/data/queries";
 import { ArrowLeft, ArrowRight } from "@lucide/astro";
 import { pageList } from "@/components/app/Pager";
-import { differenceLabel, formatBs, overnight, shiftHours } from "@/lib/format";
+import { differenceLabel, formatBs, hoursLabel, overnight, shiftHours } from "@/lib/format";
 import { addDays, inShiftWindow, longDate, openFrom, parseRange, shortDate, stamp } from "@/lib/dates";
 import { closedReason, DAY_NAMES, isoDow } from "@/lib/schedule";
 
@@ -26,6 +26,9 @@ const myShiftId = ctx.works ? ctx.membership.employee?.shiftId : undefined;
 const range = parseRange(Astro.url.searchParams, today);
 const askedPage = Math.min(Math.max(Number.parseInt(Astro.url.searchParams.get("pagina") ?? "1", 10) || 1, 1), 1000);
 const { closes: history, total: historyTotal, page: historyPage } = await closesBetween(Astro.locals.supabase, branch.id, range.from, range.to, askedPage);
+// Horas extra (fuera del horario del turno): la dueña las decide; la empleada ve las suyas.
+const overtime = await branchOvertime(Astro.locals.supabase, branch.id);
+const overtimeStatus = (s: string) => OVERTIME_STATUSES.find((o) => o.value === s)?.label ?? "Pendiente";
 const historyPages = Math.max(Math.ceil(historyTotal / CLOSES_PAGE_SIZE), 1);
 const historyFirst = (historyPage - 1) * CLOSES_PAGE_SIZE + 1;
 // Conserva el rango (?desde=&hasta=…) al cambiar de página; el formulario del rango no manda «pagina», así que vuelve a la 1.
@@ -159,6 +162,12 @@ const daysLabel = (weekdays: number[] | null) =>
                   <dt>Gastos</dt>
                   <dd class="num amount-expense">{formatBs(t.expenses, "−")}</dd>
                 </div>
+                {!!t.deposits && (
+                  <div>
+                    <dt>Adelantos de pedidos</dt>
+                    <dd class:list={["num", t.deposits > 0 && "amount-income"]}>{formatBs(Math.abs(t.deposits), t.deposits > 0 ? "+" : "−")}</dd>
+                  </div>
+                )}
                 <div class="strong">
                   <dt>Esperado en caja</dt>
                   <dd class="num">{formatBs(t.expected)}</dd>
@@ -385,6 +394,67 @@ const daysLabel = (weekdays: number[] | null) =>
     <ClosuresCalendar client:load branchId={branch.id} today={today} isOwner={isOwner} shifts={shifts} hours={hours} closures={closures} />
   </section>
   </div>
+
+  {
+    (overtime.pending.length > 0 || overtime.decided.length > 0) && (
+      <section class="overtime" aria-labelledby="overtime-title" data-region="overtime">
+        <h2 class="section-title" id="overtime-title">Horas extra</h2>
+        <p class="muted">
+          El tiempo que un turno estuvo abierto antes o después de su horario.
+          {isOwner ? " Decide si cada una se paga, se descuenta o se repone." : " Quien administra el negocio decide si se pagan, se descuentan o se reponen."}
+        </p>
+        {overtime.owed.length > 0 && (
+          <ul class="overtime-owed" role="list">
+            {overtime.owed.map((o) => (
+              <li class="card">
+                <span>{o.person}</span>
+                <strong class="num">{hoursLabel(o.minutes)}</strong>
+                <span class="muted">pendientes</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <ul class="close-list" role="list">
+          {[...overtime.pending, ...overtime.decided].map((o) => (
+            <li class="card overtime-row">
+              <div class="close-head">
+                <Hourglass size={16} stroke-width={1.75} aria-hidden="true" />
+                <strong class="num">{hoursLabel(o.minutes)}</strong>
+                <span>{o.person}</span>
+                <span class="close-date">{o.date === today ? "Hoy" : longDate(o.date)}</span>
+                <span class={o.status === "pendiente" ? "status chip-warning" : "status chip-income"}>{overtimeStatus(o.status)}</span>
+              </div>
+              {o.note && <p class="close-note">«{o.note}»</p>}
+              {isOwner && (
+                <div class="close-actions">
+                  {o.status === "pendiente" ? (
+                    OVERTIME_STATUSES.map((choice) => (
+                      <form data-action="decideOvertime" data-success={`Horas extra de ${o.person}: ${choice.label.toLowerCase()}.`}>
+                        <input type="hidden" name="overtimeId" value={o.id} />
+                        <input type="hidden" name="status" value={choice.value} />
+                        <button type="submit" class="btn btn-secondary" aria-label={`Marcar como ${choice.label.toLowerCase()}: ${hoursLabel(o.minutes)} de ${o.person}, ${shortDate(o.date)}`}>
+                          {choice.label}
+                        </button>
+                      </form>
+                    ))
+                  ) : (
+                    <form data-action="decideOvertime" data-success="Volvió a pendientes.">
+                      <input type="hidden" name="overtimeId" value={o.id} />
+                      <input type="hidden" name="status" value="pendiente" />
+                      <button type="submit" class="btn btn-secondary" aria-label={`Deshacer: ${hoursLabel(o.minutes)} de ${o.person}, ${shortDate(o.date)}`}>
+                        <RotateCcw size={18} stroke-width={1.75} />
+                        Deshacer
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
 
   <section class="history" aria-labelledby="history-title" data-region="history">
     <h2 class="section-title" id="history-title">Historial de cierres</h2>
@@ -798,8 +868,24 @@ const daysLabel = (weekdays: number[] | null) =>
     font-weight: var(--font-semibold);
   }
 
-  .history {
+  .history,
+  .overtime {
     margin-top: 2rem;
+  }
+
+  .overtime-owed {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+    padding: 0;
+  }
+
+  .overtime-owed li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
   }
 
   .close-list {

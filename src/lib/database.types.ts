@@ -295,14 +295,14 @@ isOneToOne: false
                   ]
                 },"fixed_expenses": {
                   Row: {
-                    "amount": number,"archived_at": string | null,"branch_id": string,"category": string,"concept": string,"created_at": string,"employee_id": string | null,"frequency": Database["public"]['Enums']["expense_frequency"],"grace_days": number | null,"id": string,"starts_on": string
+                    "amount": number,"archived_at": string | null,"branch_id": string,"category": string,"concept": string,"created_at": string,"employee_id": string | null,"frequency": Database["public"]['Enums']["expense_frequency"],"grace_days": number | null,"id": string,"payer": string,"starts_on": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"archived_at"?: string | null,"branch_id": string,"category": string,"concept": string,"created_at"?: string,"employee_id"?: string | null,"frequency": Database["public"]['Enums']["expense_frequency"],"grace_days"?: number | null,"id"?: string,"starts_on": string
+                    "amount": number,"archived_at"?: string | null,"branch_id": string,"category": string,"concept": string,"created_at"?: string,"employee_id"?: string | null,"frequency": Database["public"]['Enums']["expense_frequency"],"grace_days"?: number | null,"id"?: string,"payer"?: string,"starts_on": string
                   }
                   Update: {
-                    "amount"?: number,"archived_at"?: string | null,"branch_id"?: string,"category"?: string,"concept"?: string,"created_at"?: string,"employee_id"?: string | null,"frequency"?: Database["public"]['Enums']["expense_frequency"],"grace_days"?: number | null,"id"?: string,"starts_on"?: string
+                    "amount"?: number,"archived_at"?: string | null,"branch_id"?: string,"category"?: string,"concept"?: string,"created_at"?: string,"employee_id"?: string | null,"frequency"?: Database["public"]['Enums']["expense_frequency"],"grace_days"?: number | null,"id"?: string,"payer"?: string,"starts_on"?: string
                   }
                   Relationships: [
                     {
@@ -439,16 +439,54 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"orders": {
+                },"order_deposits": {
                   Row: {
-                    "branch_id": string,"created_at": string,"created_by": string | null,"id": string,"items": NonNullable<Json>,"label": string,"sale_id": string | null
+                    "amount": number,"branch_id": string,"business_date": string,"id": string,"kind": string,"occurred_at": string,"order_id": string | null,"payment_method": Database["public"]['Enums']["payment_method"],"recorded_by": string | null,"shift_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "branch_id": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"items"?: NonNullable<Json>,"label": string,"sale_id"?: string | null
+                    "amount": number,"branch_id": string,"business_date": string,"id": string,"kind": string,"occurred_at"?: string,"order_id"?: string | null,"payment_method": Database["public"]['Enums']["payment_method"],"recorded_by"?: string | null,"shift_id": string
                   }
                   Update: {
-                    "branch_id"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"items"?: NonNullable<Json>,"label"?: string,"sale_id"?: string | null
+                    "amount"?: number,"branch_id"?: string,"business_date"?: string,"id"?: string,"kind"?: string,"occurred_at"?: string,"order_id"?: string | null,"payment_method"?: Database["public"]['Enums']["payment_method"],"recorded_by"?: string | null,"shift_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "order_deposits_branch_id_fkey"
+      columns: ["branch_id"]
+isOneToOne: false
+      referencedRelation: "branches"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_deposits_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_deposits_recorded_by_fkey"
+      columns: ["recorded_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_deposits_shift_id_fkey"
+      columns: ["shift_id"]
+isOneToOne: false
+      referencedRelation: "shifts"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"orders": {
+                  Row: {
+                    "branch_id": string,"created_at": string,"created_by": string | null,"delivery": string | null,"due_on": string | null,"id": string,"items": NonNullable<Json>,"label": string,"phone": string | null,"sale_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "branch_id": string,"created_at"?: string,"created_by"?: string | null,"delivery"?: string | null,"due_on"?: string | null,"id"?: string,"items"?: NonNullable<Json>,"label": string,"phone"?: string | null,"sale_id"?: string | null
+                  }
+                  Update: {
+                    "branch_id"?: string,"created_at"?: string,"created_by"?: string | null,"delivery"?: string | null,"due_on"?: string | null,"id"?: string,"items"?: NonNullable<Json>,"label"?: string,"phone"?: string | null,"sale_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -477,16 +515,60 @@ isOneToOne: true
       referencedColumns: ["id"]
     }
                   ]
-                },"pending_expenses": {
+                },"overtime": {
                   Row: {
-                    "amount": number,"branch_id": string,"canceled_at": string | null,"canceled_by": string | null,"category": string,"concept": string,"created_at": string,"created_by": string | null,"due_on": string | null,"employee_id": string | null,"fixed_expense_id": string | null,"id": string,"owed_on": string
+                    "branch_id": string,"business_date": string,"business_id": string,"close_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"id": string,"minutes": number,"note": string | null,"person_id": string | null,"status": Database["public"]['Enums']["overtime_status"]
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"branch_id": string,"canceled_at"?: string | null,"canceled_by"?: string | null,"category": string,"concept": string,"created_at"?: string,"created_by"?: string | null,"due_on"?: string | null,"employee_id"?: string | null,"fixed_expense_id"?: string | null,"id"?: string,"owed_on"?: string
+                    "branch_id": string,"business_date": string,"business_id": string,"close_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"id"?: string,"minutes": number,"note"?: string | null,"person_id"?: string | null,"status"?: Database["public"]['Enums']["overtime_status"]
                   }
                   Update: {
-                    "amount"?: number,"branch_id"?: string,"canceled_at"?: string | null,"canceled_by"?: string | null,"category"?: string,"concept"?: string,"created_at"?: string,"created_by"?: string | null,"due_on"?: string | null,"employee_id"?: string | null,"fixed_expense_id"?: string | null,"id"?: string,"owed_on"?: string
+                    "branch_id"?: string,"business_date"?: string,"business_id"?: string,"close_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"id"?: string,"minutes"?: number,"note"?: string | null,"person_id"?: string | null,"status"?: Database["public"]['Enums']["overtime_status"]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "overtime_branch_id_fkey"
+      columns: ["branch_id"]
+isOneToOne: false
+      referencedRelation: "branches"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "overtime_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "overtime_close_id_fkey"
+      columns: ["close_id"]
+isOneToOne: true
+      referencedRelation: "shift_closes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "overtime_decided_by_fkey"
+      columns: ["decided_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "overtime_person_id_fkey"
+      columns: ["person_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"pending_expenses": {
+                  Row: {
+                    "amount": number,"branch_id": string,"canceled_at": string | null,"canceled_by": string | null,"category": string,"concept": string,"created_at": string,"created_by": string | null,"due_on": string | null,"employee_id": string | null,"fixed_expense_id": string | null,"id": string,"owed_on": string,"payer": string,"reimbursement": boolean
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"branch_id": string,"canceled_at"?: string | null,"canceled_by"?: string | null,"category": string,"concept": string,"created_at"?: string,"created_by"?: string | null,"due_on"?: string | null,"employee_id"?: string | null,"fixed_expense_id"?: string | null,"id"?: string,"owed_on"?: string,"payer"?: string,"reimbursement"?: boolean
+                  }
+                  Update: {
+                    "amount"?: number,"branch_id"?: string,"canceled_at"?: string | null,"canceled_by"?: string | null,"category"?: string,"concept"?: string,"created_at"?: string,"created_by"?: string | null,"due_on"?: string | null,"employee_id"?: string | null,"fixed_expense_id"?: string | null,"id"?: string,"owed_on"?: string,"payer"?: string,"reimbursement"?: boolean
                   }
                   Relationships: [
                     {
@@ -631,14 +713,14 @@ isOneToOne: false
                   ]
                 },"products": {
                   Row: {
-                    "attributes": NonNullable<Json>,"barcode": string | null,"business_id": string,"category_id": string | null,"created_at": string,"description": string | null,"id": string,"image_path": string | null,"name": string
+                    "attributes": NonNullable<Json>,"barcode": string | null,"business_id": string,"category_id": string | null,"created_at": string,"description": string | null,"extra_category_ids": (string)[],"id": string,"image_path": string | null,"name": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "attributes"?: NonNullable<Json>,"barcode"?: string | null,"business_id": string,"category_id"?: string | null,"created_at"?: string,"description"?: string | null,"id"?: string,"image_path"?: string | null,"name": string
+                    "attributes"?: NonNullable<Json>,"barcode"?: string | null,"business_id": string,"category_id"?: string | null,"created_at"?: string,"description"?: string | null,"extra_category_ids"?: (string)[],"id"?: string,"image_path"?: string | null,"name": string
                   }
                   Update: {
-                    "attributes"?: NonNullable<Json>,"barcode"?: string | null,"business_id"?: string,"category_id"?: string | null,"created_at"?: string,"description"?: string | null,"id"?: string,"image_path"?: string | null,"name"?: string
+                    "attributes"?: NonNullable<Json>,"barcode"?: string | null,"business_id"?: string,"category_id"?: string | null,"created_at"?: string,"description"?: string | null,"extra_category_ids"?: (string)[],"id"?: string,"image_path"?: string | null,"name"?: string
                   }
                   Relationships: [
                     {
@@ -997,14 +1079,14 @@ isOneToOne: false
                   ]
                 },"stock_movements": {
                   Row: {
-                    "approved_by": string | null,"branch_id": string,"business_id": string,"id": string,"kind": Database["public"]['Enums']["stock_move_kind"],"note": string | null,"occurred_at": string,"product_id": string,"qty": number,"reason": string | null,"recorded_by": string | null
+                    "approved_by": string | null,"branch_id": string,"business_id": string,"id": string,"kind": Database["public"]['Enums']["stock_move_kind"],"loss_kind": Database["public"]['Enums']["loss_kind"] | null,"note": string | null,"occurred_at": string,"product_id": string,"qty": number,"reason": string | null,"recorded_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "approved_by"?: string | null,"branch_id": string,"business_id": string,"id"?: string,"kind": Database["public"]['Enums']["stock_move_kind"],"note"?: string | null,"occurred_at"?: string,"product_id": string,"qty": number,"reason"?: string | null,"recorded_by"?: string | null
+                    "approved_by"?: string | null,"branch_id": string,"business_id": string,"id"?: string,"kind": Database["public"]['Enums']["stock_move_kind"],"loss_kind"?: Database["public"]['Enums']["loss_kind"] | null,"note"?: string | null,"occurred_at"?: string,"product_id": string,"qty": number,"reason"?: string | null,"recorded_by"?: string | null
                   }
                   Update: {
-                    "approved_by"?: string | null,"branch_id"?: string,"business_id"?: string,"id"?: string,"kind"?: Database["public"]['Enums']["stock_move_kind"],"note"?: string | null,"occurred_at"?: string,"product_id"?: string,"qty"?: number,"reason"?: string | null,"recorded_by"?: string | null
+                    "approved_by"?: string | null,"branch_id"?: string,"business_id"?: string,"id"?: string,"kind"?: Database["public"]['Enums']["stock_move_kind"],"loss_kind"?: Database["public"]['Enums']["loss_kind"] | null,"note"?: string | null,"occurred_at"?: string,"product_id"?: string,"qty"?: number,"reason"?: string | null,"recorded_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -1088,7 +1170,7 @@ isOneToOne: false
           Views: {
             "pending_balances": {
                   Row: {
-                    "amount": number,"balance": number | null,"branch_id": string,"canceled_at": string | null,"canceled_by": string | null,"category": string,"concept": string,"created_at": string,"created_by": string | null,"due_on": string | null,"employee_id": string | null,"fixed_expense_id": string | null,"id": string,"owed_on": string,"paid": number | null
+                    "amount": number,"balance": number | null,"branch_id": string,"canceled_at": string | null,"canceled_by": string | null,"category": string,"concept": string,"created_at": string,"created_by": string | null,"due_on": string | null,"employee_id": string | null,"fixed_expense_id": string | null,"id": string,"owed_on": string,"paid": number | null,"payer": string,"reimbursement": boolean
                   }
                   ComputedFields: never
                   Relationships: [
@@ -1153,7 +1235,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "affiliate_referrals":
+            "add_order_deposit":
+{ Args: { "p_amount": number,"p_id": string,"p_order": string,"p_payment": Database["public"]['Enums']["payment_method"],"p_shift": string }; Returns: undefined
+                           },
+"affiliate_referrals":
 { Args: Record<PropertyKey, never>; Returns: {
               "businesses": number,"paying": number,"people": number
             }[]
@@ -1193,6 +1278,9 @@ isOneToOne: false
 "create_plan_charge":
 { Args: { "p_branches": number,"p_business": string,"p_method": Database["public"]['Enums']["charge_method"],"p_period": Database["public"]['Enums']["plan_period"] }; Returns: string
                            },
+"decide_overtime":
+{ Args: { "p_id": string,"p_note"?: string,"p_status": Database["public"]['Enums']["overtime_status"] }; Returns: undefined
+                           },
 "delete_my_account":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
@@ -1204,11 +1292,14 @@ isOneToOne: false
 "pay_pending_expense":
 { Args: { "p_amount": number,"p_payment": string,"p_pending": string,"p_shift"?: string }; Returns: undefined
                            },
+"pay_pending_from_pocket":
+{ Args: { "p_amount": number,"p_payment": string,"p_pending": string }; Returns: undefined
+                           },
 "receive_stock":
 { Args: { "p_delivery": string,"p_note"?: string,"p_qty": number }; Returns: undefined
                            },
 "record_stock_move":
-{ Args: { "p_branch": string,"p_kind": Database["public"]['Enums']["stock_move_kind"],"p_product": string,"p_qty": number,"p_reason": string }; Returns: undefined
+{ Args: { "p_branch": string,"p_kind": Database["public"]['Enums']["stock_move_kind"],"p_loss_kind"?: Database["public"]['Enums']["loss_kind"],"p_product": string,"p_qty": number,"p_reason": string }; Returns: undefined
                            },
 "referral_claimable":
 { Args: { "p_code": string }; Returns: string
@@ -1217,6 +1308,9 @@ isOneToOne: false
 { Args: { "p_code": string }; Returns: {
               "name": string
             }[]
+                           },
+"refund_order_deposit":
+{ Args: { "p_id": string,"p_order": string,"p_shift": string }; Returns: undefined
                            },
 "register_sale":
 { Args: { "p_branch": string,"p_items": Json,"p_payment": Database["public"]['Enums']["payment_method"],"p_sale": string,"p_shift": string,"p_sold_at"?: string }; Returns: string
@@ -1260,7 +1354,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
+            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","loss_kind": "perdido"|"roto"|"defectuoso"|"vencido"|"otro","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move","overtime_status": "pendiente"|"pagada"|"descontada"|"repuesta","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1376,7 +1470,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
+            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"loss_kind": ["perdido", "roto", "defectuoso", "vencido", "otro"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move"],"overtime_status": ["pendiente", "pagada", "descontada", "repuesta"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
           }
         }
 } as const

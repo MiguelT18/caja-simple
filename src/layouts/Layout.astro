@@ -4,6 +4,8 @@ import BaseHead from '../components/BaseHead.astro';
 import '../styles/app.css';
 import '../styles/app-surface.css';
 import Sidebar from '../components/Sidebar.astro';
+import SidebarResizer from '../components/SidebarResizer.astro';
+import { MENU_HIDDEN_COOKIE, MENU_WIDTH_COOKIE, menuWidth } from '../lib/sidebar';
 import PageSkeleton from '../components/app/PageSkeleton.astro';
 import ToastIcons from '../components/app/ToastIcons.astro';
 import ShiftBar from '../components/app/ShiftBar.astro';
@@ -18,9 +20,12 @@ interface Props {
 }
 
 const { title, context } = Astro.props;
+// Ancho del menú lateral y si está oculto (SidebarResizer): en <html>, así llega pintado y sin parpadeo.
+const menuW = menuWidth(Astro.cookies.get(MENU_WIDTH_COOKIE)?.value);
+const menuHidden = Astro.cookies.get(MENU_HIDDEN_COOKIE)?.value === '1';
 ---
 
-<html lang="es">
+<html lang="es" style={menuW ? `--sidebar-w: ${menuW}px` : undefined} data-menu={menuHidden ? 'oculto' : undefined}>
 	<head>
 		<BaseHead title={title} />
 		<!-- Navegar dentro de /app cambia solo el contenido: el menú lateral se conserva (Sidebar, transition:persist). -->
@@ -35,6 +40,7 @@ const { title, context } = Astro.props;
 		</script>
 		<a class="skip-link" href="#main">Saltar al contenido</a>
 		<Sidebar user={currentUser(Astro.locals)} context={context} />
+		<SidebarResizer width={menuW} />
 		<main id="main" tabindex="-1">
 			<slot />
 		</main>
@@ -64,7 +70,7 @@ const { title, context } = Astro.props;
 	/* Shell: el suelo con dos paneles (navegación y contenido) y, en una sucursal, la barra del turno abajo. */
 	body {
 		display: grid;
-		grid-template-columns: 18.5rem minmax(0, 1fr);
+		grid-template-columns: var(--sidebar-w, 18.5rem) minmax(0, 1fr);
 		grid-template-rows: minmax(0, 1fr);
 		height: 100dvh;
 		gap: 0.5rem;

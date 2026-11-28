@@ -211,4 +211,18 @@ export const shifts = {
       return { ok: true };
     },
   }),
+
+  /** La dueña decide unas horas extra: pagadas, descontadas, repuestas, o de vuelta a pendientes. */
+  decideOvertime: defineAction({
+    accept: "form",
+    input: z.object({
+      overtimeId: uuid,
+      status: z.enum(["pendiente", "pagada", "descontada", "repuesta"]),
+      note: z.string().trim().max(200, { error: "La nota no puede pasar de 200 caracteres." }).optional(),
+    }),
+    handler: async ({ overtimeId, status, note }, context) => {
+      check((await db(context).rpc("decide_overtime", { p_id: overtimeId, p_status: status, p_note: note || undefined })).error);
+      return { ok: true };
+    },
+  }),
 };

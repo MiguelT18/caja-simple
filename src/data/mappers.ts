@@ -83,6 +83,8 @@ export const toCatalogProduct = (
   name: p.name,
   categoryId: p.category_id ?? undefined,
   category: p.categories?.name,
+  // `?? []`: un catálogo cacheado de antes de las categorías extra no las trae.
+  extraCategoryIds: p.extra_category_ids ?? [],
   barcode: p.barcode ?? undefined,
   description: p.description ?? undefined,
   image: p.image_path ? images.get(p.image_path) : undefined,
