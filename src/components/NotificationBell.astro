@@ -1,5 +1,5 @@
 ---
-import { AlarmClock, ArrowLeftRight, HandCoins, Wallet, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CheckCheck, CircleX, Crown, Hourglass, ClipboardCheck, PackageCheck, PackageMinus, PackagePlus, PackageX, RotateCcw, Trash2, TriangleAlert, Truck, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
+import { MessageCircle, AlarmClock, ArrowLeftRight, HandCoins, Wallet, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CheckCheck, CircleX, Crown, Hourglass, ClipboardCheck, PackageCheck, PackageMinus, PackagePlus, PackageX, RotateCcw, Trash2, TriangleAlert, Truck, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
 import type { HTMLAttributes } from "astro/types";
 import { branchColor, branchImages, inbox, myBusinesses, notificationHref } from "@/data/queries";
 import type { Notification } from "@/data/types";
@@ -144,6 +144,8 @@ function describe(n: Notification) {
             tone: "warning",
           };
     }
+    case "wa_handoff":
+      return { icon: MessageCircle, title: `${n.data.customer} quiere hablar contigo por WhatsApp`, detail: n.data.reason ? `«${n.data.reason}» · El asistente dejó de responderle` : "El asistente dejó de responderle" };
     case "stock_move": {
       const d = n.data;
       const n2 = Math.abs(d.qty);

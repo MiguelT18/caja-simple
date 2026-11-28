@@ -1,0 +1,347 @@
+---
+import PageHeader from "@/components/PageHeader.astro";
+import Layout from "@/layouts/Layout.astro";
+import { Bot, BotOff, CircleAlert, MessageCircle, MoonStar, Play } from "@lucide/astro";
+import { headerBackdrop, membership, whatsappState, type WaConversation } from "@/data/queries";
+import { upgradeUrl } from "@/data/plans";
+import { clock, shortDate, stamp, today as todayOf } from "@/lib/dates";
+
+// Asistente de WhatsApp: estado del complemento, pausar o reactivar y las conversaciones (solo lectura: se responde
+// desde la app de WhatsApp Business). Ver supabase/functions/whatsapp.
+const m = membership(Astro.locals, Astro.params.negocio!);
+if (!m || m.role !== "dueño") return Astro.rewrite("/404");
+const today = todayOf();
+const [wa, backdrop] = await Promise.all([whatsappState(Astro.locals.supabase, m.business.id, today), headerBackdrop(Astro.locals, m)]);
+const now = Date.now();
+const connected = wa.phone !== null;
+const answering = wa.active && connected && !wa.paused;
+
+/** Qué hace el asistente en esa conversación, con el texto que lo dice (el color solo acompaña). */
+function stateOf(c: WaConversation) {
+  if (c.handoffAt) return { label: "Pidió una persona", chip: "chip-warning", icon: CircleAlert, resumable: true };
+  if (c.mutedUntil && new Date(c.mutedUntil).getTime() > now)
+    return { label: `Callado hasta las ${clock(c.mutedUntil)}: escribiste tú`, chip: "chip-neutral", icon: MoonStar, resumable: true };
+  if (!answering) return { label: "Asistente en pausa", chip: "chip-neutral", icon: BotOff, resumable: false };
+  return { label: "Responde el asistente", chip: "chip-income", icon: Bot, resumable: false };
+}
+const handoffs = wa.conversations.filter((c) => c.handoffAt).length;
+---
+
+<Layout title={`WhatsApp · ${m.business.name}`} context={{ membership: m }}>
+  <PageHeader
+    {...backdrop}
+    title="WhatsApp"
+    live
+    description="Un asistente responde a tus clientes con tus precios, stock, horarios y promociones. Tú sigues escribiendo desde tu app de WhatsApp Business."
+  />
+
+  {
+    !wa.active ? (
+      <section class="surface offer" aria-labelledby="offer-title">
+        <span class="offer-art" aria-hidden="true">
+          <MessageCircle size={28} stroke-width={1.75} />
+        </span>
+        <div>
+          <h2 id="offer-title">Asistente de WhatsApp</h2>
+          <p>
+            {wa.until
+              ? `Tu asistente estuvo activo hasta el ${shortDate(wa.until)}. Renuévalo para que vuelva a responder.`
+              : "Responde al instante, a cualquier hora, con lo que tienes en Caja Simple: nunca inventa un precio. Si el cliente pide una persona, te avisa y se calla. Es un complemento aparte de tu plan."}
+          </p>
+          <a class="btn btn-primary" href={upgradeUrl} target="_blank" rel="noopener">
+            {wa.until ? "Renovar el asistente" : "Quiero el asistente"}
+          </a>
+        </div>
+      </section>
+    ) : (
+      <section class="status" aria-label="Estado del asistente" data-region="wa-status">
+        <div class="kpis">
+          <div class="kpi">
+            <p class="kpi-label">Asistente</p>
+            <p class="kpi-value">{!connected ? "Sin número" : wa.paused ? "En pausa" : "Activo"}</p>
+            <p class="kpi-note">{!connected ? "Te escribimos para conectar tu número" : wa.paused ? "No responde a nadie" : "Responde a tus clientes"}</p>
+          </div>
+          <div class="kpi">
+            <p class="kpi-label">Número</p>
+            <p class="kpi-value num">{wa.phone ?? "—"}</p>
+            <p class="kpi-note">Contratado hasta el {shortDate(wa.until!)}</p>
+          </div>
+          <div class="kpi">
+            <p class="kpi-label">Piden una persona</p>
+            <p class:list={["kpi-value num", handoffs > 0 && "is-warning"]}>{handoffs}</p>
+            <p class="kpi-note">{handoffs > 0 ? "Respóndeles desde tu app y reactiva el asistente" : "Nadie espera respuesta"}</p>
+          </div>
+        </div>
+        {
+          connected && (
+            <form class="pause" data-action="setAssistantPaused" data-refresh="wa-status wa-chats" data-success={wa.paused ? "El asistente vuelve a responder." : "Asistente en pausa."}>
+              <input type="hidden" name="businessId" value={m.business.id} />
+              <input type="hidden" name="paused" value={String(!wa.paused)} />
+              <button type="submit" class:list={["btn", wa.paused ? "btn-primary" : "btn-secondary"]}>
+                {wa.paused ? <Play size={18} stroke-width={2} /> : <BotOff size={18} stroke-width={2} />}
+                {wa.paused ? "Reactivar el asistente" : "Pausar el asistente"}
+              </button>
+            </form>
+          )
+        }
+      </section>
+    )
+  }
+
+  <section class="chats" aria-labelledby="chats-title" data-region="wa-chats">
+    <div class="shelf-head">
+      <h2 id="chats-title">Conversaciones</h2>
+    </div>
+    {
+      wa.conversations.length === 0 ? (
+        <p class="empty">Aquí verás lo que te escriben tus clientes y lo que les responde el asistente.</p>
+      ) : (
+        <ul class="chat-list">
+          {wa.conversations.map((c) => {
+            const s = stateOf(c);
+            const last = c.messages.at(-1);
+            return (
+              <li>
+                <details class="chat">
+                  <summary>
+                    <span class="avatar" aria-hidden="true">{c.customer.replace(/^\+/, "").slice(0, 1).toUpperCase()}</span>
+                    <span class="who">
+                      <span class="name">{c.customer}</span>
+                      <span class="preview">{last ? `${last.sender === "cliente" ? "" : last.sender === "asistente" ? "Asistente: " : "Tú: "}${last.body}` : c.phone}</span>
+                    </span>
+                    <span class="meta">
+                      <span class:list={["chip", s.chip]}>
+                        <s.icon size={14} stroke-width={2} aria-hidden="true" />
+                        {s.label}
+                      </span>
+                      {c.lastAt && <time datetime={c.lastAt}>{stamp(c.lastAt)}</time>}
+                    </span>
+                  </summary>
+                  <div class="thread">
+                    {c.handoffReason && <p class="notice">Motivo: «{c.handoffReason}»</p>}
+                    <ol aria-label={`Mensajes con ${c.customer}`}>
+                      {c.messages.map((msg) => (
+                        <li class:list={["bubble", msg.sender === "cliente" ? "from-customer" : "from-business"]}>
+                          <span class="sr-only">{msg.sender === "cliente" ? c.customer : msg.sender === "asistente" ? "Asistente" : "Tú"}:</span>
+                          <p>{msg.body}</p>
+                          <span class="bubble-meta">
+                            {msg.sender === "asistente" && <Bot size={12} stroke-width={2} aria-hidden="true" />}
+                            {msg.sender === "asistente" ? "Asistente · " : msg.sender === "dueña" ? "Tú · " : ""}
+                            {clock(msg.at)}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                    {s.resumable && (
+                      <form data-action="resumeConversation" data-refresh="wa-status wa-chats" data-success="El asistente vuelve a responder en esta conversación.">
+                        <input type="hidden" name="conversationId" value={c.id} />
+                        <button type="submit" class="btn btn-secondary">
+                          <Bot size={18} stroke-width={2} />
+                          Reactivar el asistente aquí
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </details>
+              </li>
+            );
+          })}
+        </ul>
+      )
+    }
+  </section>
+</Layout>
+
+<style>
+  .offer {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+    padding: 1.5rem;
+    border-radius: var(--radius-panel);
+    background: var(--color-surface-muted);
+    margin-bottom: 2.5rem;
+  }
+
+  .offer h2 {
+    margin: 0 0 0.5rem;
+    font-size: var(--text-2xl);
+    font-weight: var(--font-extrabold);
+  }
+
+  .offer p {
+    margin: 0 0 1.25rem;
+    max-width: 60ch;
+    color: var(--color-text-muted);
+  }
+
+  .offer-art {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 4.5rem;
+    aspect-ratio: 1;
+    border-radius: 0.375rem;
+    background: var(--color-income-soft);
+    color: var(--color-income);
+  }
+
+  .status {
+    margin-bottom: 2.5rem;
+  }
+
+  .kpis {
+    margin: 0 0 1.25rem;
+  }
+
+  .kpi-value.is-warning {
+    color: var(--color-warning);
+  }
+
+  .chats h2 {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-extrabold);
+  }
+
+  .empty {
+    color: var(--color-text-muted);
+  }
+
+  .chat-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .chat summary {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.875rem;
+    align-items: center;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .chat summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .chat summary:hover,
+  .chat[open] summary {
+    background: var(--color-surface-hover);
+  }
+
+  .avatar {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: var(--color-income-soft);
+    color: var(--color-income);
+    font-weight: var(--font-bold);
+  }
+
+  .who {
+    display: grid;
+    min-width: 0;
+  }
+
+  .name {
+    font-weight: var(--font-bold);
+  }
+
+  .preview {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .meta {
+    display: grid;
+    justify-items: end;
+    gap: 0.25rem;
+  }
+
+  .meta time {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .thread {
+    padding: 1rem 0.75rem 1.25rem 4.125rem;
+    display: grid;
+    gap: 1rem;
+    justify-items: start;
+  }
+
+  .thread .notice {
+    margin: 0;
+  }
+
+  .thread ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 40rem;
+  }
+
+  .bubble {
+    max-width: 80%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.875rem;
+    background: var(--color-surface-muted);
+  }
+
+  .bubble.from-business {
+    justify-self: end;
+    background: var(--color-income-soft);
+  }
+
+  .bubble p {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .bubble-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    justify-content: flex-end;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  @media (max-width: 640px) {
+    .offer {
+      flex-direction: column;
+    }
+
+    .chat summary {
+      grid-template-columns: auto 1fr;
+    }
+
+    .meta {
+      grid-column: 2;
+      justify-items: start;
+    }
+
+    .thread {
+      padding-left: 0.75rem;
+    }
+
+    .bubble {
+      max-width: 90%;
+    }
+  }
+</style>

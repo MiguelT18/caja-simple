@@ -101,6 +101,7 @@ erDiagram
 | `/app/[negocio]/catalogo/nuevo` · `/catalogo/[producto]` | dueña: crear (`?tipo=combo&con=a,b` arma un combo) y editar un producto, con vista previa en vivo y borrador en este equipo al crear |
 | `/app/[negocio]/por-pagar` | dueña: pendientes y gastos fijos de todas las sucursales |
 | `/app/[negocio]/empleados` | dueña |
+| `/app/[negocio]/whatsapp` | dueña: asistente de WhatsApp (complemento), pausarlo y ver las conversaciones. Ver abajo › Asistente de WhatsApp |
 | `/app/[negocio]/configuracion` | dueña: nombre del negocio, sucursales, uso del plan y eliminar |
 | `/app/[negocio]/plan` | dueña: planes, precios y métodos de pago |
 | `/app/[negocio]/sucursales/[sucursal]` | dueña: resumen de la sucursal |
@@ -208,3 +209,19 @@ Todas las fotos (productos, fachadas, logo, avatar, comprobantes y capturas de a
 - Las capturas van al bucket privado `feedback-images`, en `<user_id>/<uuid>.<ext>`: cada quien sube solo a su carpeta y nadie las lee desde la app. Se ven en el panel de Supabase (Storage › feedback-images) y sus rutas llegan en el correo.
 - Si `RESEND_API_KEY` y `FEEDBACK_EMAIL` están en el entorno, además llega un correo (`src/lib/mail.ts`) con «Responder» dirigido al correo de quien escribió. Si el correo falla, el mensaje igual queda guardado y el error va a los logs (`source: "mail"`).
 - Para leerlos: `pnpm dlx supabase db query --db-url "$DB_URL" "select f.created_at, f.kind, p.first_name, f.page, f.message, f.images from feedback f left join profiles p on p.id = f.person_id order by f.created_at desc limit 50;"`
+
+## Asistente de WhatsApp
+
+Un modelo de IA (Claude Haiku 5.5) responde a los clientes en el WhatsApp del negocio con sus datos reales. Es un **complemento aparte** de los planes: vale hasta `businesses.assistant_until` (incluido), que carga el admin después del cobro (la dueña no puede escribir esa columna). Migración `20261127100000_whatsapp_assistant.sql`.
+
+- **Flujo:** Meta llama a la Edge Function `whatsapp` (`supabase/functions/whatsapp/`). Esta verifica la firma `X-Hub-Signature-256`, responde 200 al instante y sigue en segundo plano. El negocio sale de `phone_number_id` (`wa_account`), **nunca del modelo**. Guarda el mensaje (sin duplicar: `wa_message_id` es único y Meta reintenta), corre el ciclo con las herramientas, envía la respuesta por la Graph API y la guarda.
+- **Herramientas:** `wa_buscar_producto`, `wa_horarios`, `wa_promociones` y `wa_pasar_a_persona`. Son funciones security definer que reciben el negocio y solo puede ejecutar `service_role`. El precio sale de `inventory`: si la búsqueda no devuelve el producto, el asistente dice que no lo tiene.
+- **Cuándo calla:**
+  - el complemento venció;
+  - la dueña lo pausó (`wa_accounts.paused_at`, con `wa_set_paused`);
+  - la dueña escribió en esa conversación desde la app de WhatsApp Business: llega el echo `smb_message_echoes` y la conversación calla 4 h (`muted_until`);
+  - la conversación pasó a una persona (`handoff_at`): la dueña recibe el aviso `wa_handoff` y reactiva la conversación con `wa_resume_conversation`.
+- **Tablas:**
+  - `wa_accounts`: el número y el token en Vault (`token_secret_id`). La dueña no lee el token.
+  - `wa_conversations` y `wa_messages`: la dueña solo las lee. Se escriben con la clave de servicio.
+- **Conectar un número:** por ahora, a mano. Se guarda el token con `select vault.create_secret('<token>', 'wa-<negocio>')` y se inserta la fila de `wa_accounts` con `phone_number_id` y `token_secret_id`. Embedded Signup llega cuando Caja Simple sea Tech Provider de Meta.

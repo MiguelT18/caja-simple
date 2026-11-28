@@ -54,6 +54,8 @@ export function notificationHref(n: Notification, memberships: Membership[]): st
     case "invitation_answer":
     case "join_request":
       return owner ? `${businessHref(m.business)}/empleados` : entryHref(m);
+    case "wa_handoff":
+      return owner ? `${businessHref(m.business)}/whatsapp` : entryHref(m);
     case "plan_expiring":
     case "plan_expired":
       return owner ? `${businessHref(m.business)}/plan` : entryHref(m);

@@ -48,6 +48,8 @@ function describe({ kind, data }: Notice) {
         ? { title: `A ${data.branch} no le llegó ${data.product}`, body: `${data.person} avisó que no llegó nada: el stock no cambió${note}` }
         : { title: `${data.person} recibió ${data.received} de ${data.qty} ${data.product}`, body: `${data.branch}: faltaron ${data.qty - data.received}; el stock subió ${data.received}${note}` };
     }
+    case "wa_handoff":
+      return { title: `${data.customer} quiere hablar contigo por WhatsApp`, body: data.reason ? `«${data.reason}» · El asistente dejó de responderle` : "El asistente dejó de responderle" };
     case "stock_move": {
       const n = Math.abs(data.qty);
       const verb =

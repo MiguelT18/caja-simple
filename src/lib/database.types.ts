@@ -101,14 +101,14 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "color": string,"created_at": string,"description": string | null,"founder_since": string | null,"id": string,"image_path": string | null,"kind": Database["public"]['Enums']["business_kind"],"listed": boolean,"name": string,"owner_id": string,"plan": Database["public"]['Enums']["plan"],"plan_until": string | null,"product_form": NonNullable<Json>,"referred_by": string | null,"slug": string,"trial": boolean
+                    "assistant_until": string | null,"color": string,"created_at": string,"description": string | null,"founder_since": string | null,"id": string,"image_path": string | null,"kind": Database["public"]['Enums']["business_kind"],"listed": boolean,"name": string,"owner_id": string,"plan": Database["public"]['Enums']["plan"],"plan_until": string | null,"product_form": NonNullable<Json>,"referred_by": string | null,"slug": string,"trial": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "color"?: string,"created_at"?: string,"description"?: string | null,"founder_since"?: string | null,"id"?: string,"image_path"?: string | null,"kind"?: Database["public"]['Enums']["business_kind"],"listed"?: boolean,"name": string,"owner_id"?: string,"plan"?: Database["public"]['Enums']["plan"],"plan_until"?: string | null,"product_form"?: NonNullable<Json>,"referred_by"?: string | null,"slug": string,"trial"?: boolean
+                    "assistant_until"?: string | null,"color"?: string,"created_at"?: string,"description"?: string | null,"founder_since"?: string | null,"id"?: string,"image_path"?: string | null,"kind"?: Database["public"]['Enums']["business_kind"],"listed"?: boolean,"name": string,"owner_id"?: string,"plan"?: Database["public"]['Enums']["plan"],"plan_until"?: string | null,"product_form"?: NonNullable<Json>,"referred_by"?: string | null,"slug": string,"trial"?: boolean
                   }
                   Update: {
-                    "color"?: string,"created_at"?: string,"description"?: string | null,"founder_since"?: string | null,"id"?: string,"image_path"?: string | null,"kind"?: Database["public"]['Enums']["business_kind"],"listed"?: boolean,"name"?: string,"owner_id"?: string,"plan"?: Database["public"]['Enums']["plan"],"plan_until"?: string | null,"product_form"?: NonNullable<Json>,"referred_by"?: string | null,"slug"?: string,"trial"?: boolean
+                    "assistant_until"?: string | null,"color"?: string,"created_at"?: string,"description"?: string | null,"founder_since"?: string | null,"id"?: string,"image_path"?: string | null,"kind"?: Database["public"]['Enums']["business_kind"],"listed"?: boolean,"name"?: string,"owner_id"?: string,"plan"?: Database["public"]['Enums']["plan"],"plan_until"?: string | null,"product_form"?: NonNullable<Json>,"referred_by"?: string | null,"slug"?: string,"trial"?: boolean
                   }
                   Relationships: [
                     {
@@ -1165,6 +1165,72 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"wa_accounts": {
+                  Row: {
+                    "business_id": string,"created_at": string,"display_phone": string | null,"paused_at": string | null,"phone_number_id": string,"token_secret_id": string | null,"waba_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"display_phone"?: string | null,"paused_at"?: string | null,"phone_number_id": string,"token_secret_id"?: string | null,"waba_id"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"display_phone"?: string | null,"paused_at"?: string | null,"phone_number_id"?: string,"token_secret_id"?: string | null,"waba_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "wa_accounts_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: true
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"wa_conversations": {
+                  Row: {
+                    "business_id": string,"created_at": string,"handoff_at": string | null,"handoff_reason": string | null,"id": string,"last_customer_at": string | null,"muted_until": string | null,"name": string | null,"wa_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"handoff_at"?: string | null,"handoff_reason"?: string | null,"id"?: string,"last_customer_at"?: string | null,"muted_until"?: string | null,"name"?: string | null,"wa_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"handoff_at"?: string | null,"handoff_reason"?: string | null,"id"?: string,"last_customer_at"?: string | null,"muted_until"?: string | null,"name"?: string | null,"wa_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "wa_conversations_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"wa_messages": {
+                  Row: {
+                    "body": string,"business_id": string,"conversation_id": string,"created_at": string,"id": string,"sender": string,"wa_message_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body": string,"business_id": string,"conversation_id": string,"created_at"?: string,"id"?: string,"sender": string,"wa_message_id"?: string | null
+                  }
+                  Update: {
+                    "body"?: string,"business_id"?: string,"conversation_id"?: string,"created_at"?: string,"id"?: string,"sender"?: string,"wa_message_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "wa_messages_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "wa_messages_conversation_id_fkey"
+      columns: ["conversation_id"]
+isOneToOne: false
+      referencedRelation: "wa_conversations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -1351,10 +1417,31 @@ isOneToOne: false
                            },
 "void_sale":
 { Args: { "p_sale": string }; Returns: undefined
+                           },
+"wa_account":
+{ Args: { "p_phone_number_id": string }; Returns: Json
+                           },
+"wa_buscar_producto":
+{ Args: { "p_business": string,"p_query": string }; Returns: Json
+                           },
+"wa_horarios":
+{ Args: { "p_business": string }; Returns: Json
+                           },
+"wa_pasar_a_persona":
+{ Args: { "p_business": string,"p_conversation": string,"p_motivo": string }; Returns: undefined
+                           },
+"wa_promociones":
+{ Args: { "p_business": string }; Returns: Json
+                           },
+"wa_resume_conversation":
+{ Args: { "p_conversation": string }; Returns: undefined
+                           },
+"wa_set_paused":
+{ Args: { "p_business": string,"p_paused": boolean }; Returns: undefined
                            }
           }
           Enums: {
-            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","loss_kind": "perdido"|"roto"|"defectuoso"|"vencido"|"otro","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move","overtime_status": "pendiente"|"pagada"|"descontada"|"repuesta","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
+            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","loss_kind": "perdido"|"roto"|"defectuoso"|"vencido"|"otro","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move"|"wa_handoff","overtime_status": "pendiente"|"pagada"|"descontada"|"repuesta","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1470,7 +1557,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"loss_kind": ["perdido", "roto", "defectuoso", "vencido", "otro"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move"],"overtime_status": ["pendiente", "pagada", "descontada", "repuesta"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
+            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"loss_kind": ["perdido", "roto", "defectuoso", "vencido", "otro"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move", "wa_handoff"],"overtime_status": ["pendiente", "pagada", "descontada", "repuesta"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
           }
         }
 } as const
