@@ -36,6 +36,11 @@ describe("shiftCash", () => {
     const withRetiro = { ...moves, withdrawals: [{ id: "w", branchId: "b", date: "2026-11-03", time: "12:00", shiftId: "s1", amount: 30, voided: null } as never] };
     expect(shiftCash([close({})], withRetiro, "s1", "2026-11-03")).toMatchObject({ expenses: 20, withdrawals: 30, expected: 100.3 });
   });
+  it("los adelantos en efectivo suman el día que llegan y se restan al cobrar el pedido", () => {
+    const dep = (amount: number, kind: string, payment = "efectivo", date = "2026-11-03") => ({ orderId: "o", branchId: "b", date, shiftId: "s1", kind, amount, payment }) as never;
+    const withDeposits = { ...moves, deposits: [dep(50, "adelanto"), dep(20, "adelanto", "qr"), dep(-30, "aplicado"), dep(40, "adelanto", "efectivo", "2026-11-02")] };
+    expect(shiftCash([close({})], withDeposits, "s1", "2026-11-03")).toMatchObject({ deposits: 20, expected: 150.3 });
+  });
   it("sin cierre, todo en 0", () => {
     expect(shiftCash([], moves, "s3", "2026-11-03").expected).toBe(0);
   });

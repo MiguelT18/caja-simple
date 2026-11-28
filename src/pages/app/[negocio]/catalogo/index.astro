@@ -1,4 +1,5 @@
 ---
+import { ClipboardList } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ProductCatalog from "@/components/app/products/ProductCatalog";
 import Layout from "@/layouts/Layout.astro";
@@ -20,7 +21,12 @@ const limits = planLimits[business.plan];
     title={label}
     live
     description={`${[plural(catalog.length, "producto", "productos"), lowCount > 0 && `${lowCount} con stock bajo en alguna sucursal`].filter(Boolean).join(" · ")}. Cada sucursal pone su precio y su stock.`}
-  />
+  >
+    <a href={`${businessHref(business)}/pedidos`} class="btn btn-secondary" data-astro-prefetch>
+      <ClipboardList size={18} stroke-width={1.75} />
+      Pedidos pendientes
+    </a>
+  </PageHeader>
 
   <div data-region="catalog">
     <ProductCatalog client:load products={catalog} categories={categories} businessId={business.id} canEdit branches={ctx.membership.branches.map((b) => ({ id: b.id, name: b.name }))} limits={limits} planHref={`${businessHref(business)}/plan`} catalogHref={`${businessHref(business)}/catalogo`} fields={business.productForm.fields} />

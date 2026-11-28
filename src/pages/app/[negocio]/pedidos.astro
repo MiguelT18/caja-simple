@@ -1,0 +1,343 @@
+---
+// Pedidos pendientes: los encargos abiertos de las sucursales (con adelanto, para qué día y cómo se entregan) y lo
+// que la dueña envió a una sucursal y falta recibir. La dueña ve todas sus sucursales; la empleada, la suya (RLS).
+import { CalendarDays, CircleAlert, HandCoins, Package, Phone, ShoppingCart, Truck, Undo2 } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import FormInput from "@/components/app/FormInput.astro";
+import Modal from "@/components/app/Modal.astro";
+import Layout from "@/layouts/Layout.astro";
+import { branchHref, headerBackdrop, membership, pendingOrders } from "@/data/queries";
+import { longDate, shortDate, stamp, today as todayOf } from "@/lib/dates";
+import { formatBs, plural } from "@/lib/format";
+
+const m = membership(Astro.locals, Astro.params.negocio!);
+if (!m) return Astro.rewrite("/404");
+const isOwner = m.role === "dueño";
+const today = todayOf();
+const view = Astro.url.searchParams.get("ver") === "envios" ? "envios" : "encargos";
+const [{ orders, deliveries }, backdrop] = await Promise.all([pendingOrders(Astro.locals.supabase, m.branches), headerBackdrop(Astro.locals, m)]);
+const many = m.branches.length > 1;
+// Recibe y devuelve adelantos quien trabaja en la sucursal (la base lo exige); la dueña, si se agregó como empleada.
+const works = (branchId: string) => !isOwner || m.employee?.branchId === branchId;
+const dueText = (dueOn: string) => (dueOn < today ? `Atrasado: era para el ${shortDate(dueOn)}` : dueOn === today ? "Para hoy" : `Para el ${longDate(dueOn).toLowerCase()}`);
+const tab = (ver: string) => (ver === "encargos" ? Astro.url.pathname : `${Astro.url.pathname}?ver=${ver}`);
+---
+
+<Layout title={`Pedidos · ${m.business.name}`} context={{ membership: m }}>
+  <PageHeader {...backdrop} title="Pedidos pendientes" live description="Encargos de clientes con su adelanto y lo enviado a las sucursales que falta recibir." />
+
+  <nav class="tabs" aria-label="Qué pedidos ver">
+    <a href={tab("encargos")} class="tab" aria-current={view === "encargos" ? "page" : undefined}>
+      <ShoppingCart size={18} stroke-width={1.75} />
+      Encargos <span class="num">({orders.length})</span>
+    </a>
+    <a href={tab("envios")} class="tab" aria-current={view === "envios" ? "page" : undefined}>
+      <Truck size={18} stroke-width={1.75} />
+      Envíos por recibir <span class="num">({deliveries.length})</span>
+    </a>
+  </nav>
+
+  <div data-region="orders">
+    {
+      view === "encargos" &&
+        (orders.length === 0 ? (
+          <p class="card empty-state">
+            No hay encargos abiertos. En Vender, arma el carro y elige «Guardar como pedido»: ahí anotas el teléfono, el día y cómo se entrega.
+          </p>
+        ) : (
+          <ul class="order-list" role="list">
+            {orders.map((o) => (
+              <li class="card order">
+                <div class="order-head">
+                  <h2 class="order-title">{o.label}</h2>
+                  {many && <span class="chip chip-neutral">{o.branch.name}</span>}
+                  {o.dueOn && (
+                    <span class:list={["order-due", o.dueOn < today && "is-late"]}>
+                      {o.dueOn < today ? <CircleAlert size={16} stroke-width={1.75} /> : <CalendarDays size={16} stroke-width={1.75} />}
+                      {dueText(o.dueOn)}
+                    </span>
+                  )}
+                </div>
+                {(o.phone || o.delivery) && (
+                  <p class="order-meta">
+                    {o.phone && (
+                      <a href={`tel:${o.phone.replace(/[^\d+]/g, "")}`} class="order-phone">
+                        <Phone size={16} stroke-width={1.75} />
+                        {o.phone}
+                      </a>
+                    )}
+                    {o.delivery && (
+                      <span>
+                        <Truck size={16} stroke-width={1.75} aria-hidden="true" />
+                        {o.delivery}
+                      </span>
+                    )}
+                  </p>
+                )}
+                <ul class="order-lines" role="list">
+                  {o.lines.map((l) => (
+                    <li>
+                      <span>
+                        <span class="num">{l.qty}</span> × {l.name}
+                      </span>
+                      <span class="num">{formatBs(l.qty * l.price)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <dl class="order-money">
+                  <div>
+                    {/* shortcut: sin las promociones del día, que se aplican recién al cobrar en Vender. */}
+                    <dt>Total</dt>
+                    <dd class="num">{formatBs(o.total)}</dd>
+                  </div>
+                  <div>
+                    <dt>Adelanto</dt>
+                    <dd class="num">{formatBs(o.deposit ?? 0)}</dd>
+                  </div>
+                  <div>
+                    <dt>Falta cobrar</dt>
+                    <dd class="num order-balance">{formatBs(Math.max(o.balance, 0))}</dd>
+                  </div>
+                </dl>
+                {works(o.branch.id) && (
+                  <div class="order-actions">
+                    <button type="button" class="btn btn-secondary" data-open-dialog={`deposit-${o.id}`}>
+                      <HandCoins size={18} stroke-width={1.75} />
+                      {o.deposit ? "Recibir otro adelanto" : "Recibir adelanto"}
+                    </button>
+                    {!!o.deposit && (
+                      <form
+                        data-action="refundOrderDeposit"
+                        data-success="Adelanto devuelto. Ya puedes descartar el pedido en Vender."
+                        data-confirm={`¿Devolver ${formatBs(o.deposit)} de adelanto a «${o.label}»? Sale en efectivo de la caja del turno abierto.`}
+                        data-confirm-label="Devolver adelanto"
+                        data-danger
+                      >
+                        <input type="hidden" name="refundId" value={crypto.randomUUID()} />
+                        <input type="hidden" name="orderId" value={o.id} />
+                        <button type="submit" class="btn btn-secondary">
+                          <Undo2 size={18} stroke-width={1.75} />
+                          Devolver adelanto
+                        </button>
+                      </form>
+                    )}
+                    <a href={`${branchHref(m.business, o.branch, "registrar-venta")}?pedido=${o.id}`} class="btn btn-primary">
+                      <ShoppingCart size={18} stroke-width={1.75} />
+                      Cobrar en Vender
+                    </a>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        ))
+    }
+
+    {
+      view === "envios" &&
+        (deliveries.length === 0 ? (
+          <p class="card empty-state">No hay envíos por recibir. Lo que mandes a una sucursal desde Inventario aparece aquí hasta que lo reciban.</p>
+        ) : (
+          <ul class="order-list" role="list">
+            {deliveries.map((d) => (
+              <li class="card order">
+                <div class="order-head">
+                  <Package size={18} stroke-width={1.75} aria-hidden="true" />
+                  <h2 class="order-title">
+                    <span class="num">{d.qty}</span> × {d.product}
+                  </h2>
+                  {many && <span class="chip chip-neutral">{d.branch.name}</span>}
+                </div>
+                <p class="order-meta">
+                  <span>
+                    Envió {d.by} · {stamp(d.at)}
+                  </span>
+                  {d.reason && <span>«{d.reason}»</span>}
+                </p>
+                <div class="order-actions">
+                  <a href={`${branchHref(m.business, d.branch, "inventario")}#deliveries-title`} class="btn btn-secondary">
+                    {works(d.branch.id) ? "Recibir en Inventario" : "Ver en Inventario"}
+                  </a>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ))
+    }
+  </div>
+
+  {
+    view === "encargos" &&
+      orders
+        .filter((o) => works(o.branch.id))
+        .map((o) => (
+          <Modal
+            id={`deposit-${o.id}`}
+            title={`Adelanto de «${o.label}»`}
+            description={`Entra a la caja del turno abierto de ${o.branch.name}. Al cobrar el pedido en Vender, se descuenta de lo que falta.`}
+            action="addOrderDeposit"
+            submitLabel="Guardar adelanto"
+            success="Adelanto guardado."
+            hidden={{ depositId: crypto.randomUUID(), orderId: o.id }}
+          >
+            <FormInput
+              form={`deposit-${o.id}-form`}
+              name="amount"
+              type="number"
+              inputmode="decimal"
+              step="0.01"
+              min="0.01"
+              label="Monto (Bs)"
+              hint={o.balance > 0 ? `Falta cobrar ${formatBs(o.balance)}.` : undefined}
+              required
+            />
+            <FormInput
+              form={`deposit-${o.id}-form`}
+              name="payment"
+              label="Cómo pagó"
+              options={[
+                { value: "efectivo", label: "Efectivo (entra al cajón)", selected: true },
+                { value: "qr", label: "QR" },
+                { value: "transferencia", label: "Transferencia" },
+              ]}
+            />
+          </Modal>
+        ))
+  }
+  <p class="sr-only">{plural(orders.length, "encargo abierto", "encargos abiertos")}</p>
+</Layout>
+
+<style>
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .tab {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .tab:hover {
+    background: var(--color-surface-hover);
+  }
+
+  /* La pestaña actual: fondo y borde de acento, además de aria-current. */
+  .tab[aria-current="page"] {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft, var(--color-surface-hover));
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+
+  .order-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .order {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .order-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .order-title {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+
+  .order-due {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: auto;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .order-due.is-late {
+    color: var(--color-expense);
+  }
+
+  .order-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .order-meta > * {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .order-phone {
+    min-height: 2.75rem;
+    color: inherit;
+  }
+
+  .order-lines {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .order-lines li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .order-money {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin: 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .order-money dt {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .order-money dd {
+    margin: 0;
+    font-weight: 700;
+  }
+
+  .order-balance {
+    font-size: var(--text-lg);
+  }
+
+  .order-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+</style>

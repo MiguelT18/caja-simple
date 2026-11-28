@@ -264,6 +264,17 @@ export interface Expense {
 }
 
 /** Efectivo que se lleva la dueña de la caja de un turno: baja el esperado, pero no es un gasto. */
+/** Un movimiento de adelanto de un encargo (order_deposits): + al recibirlo, − al cobrar el pedido o devolverlo. */
+export interface Deposit {
+  orderId: string | null;
+  branchId: string;
+  date: string;
+  shiftId: string;
+  kind: "adelanto" | "aplicado" | "devuelto";
+  amount: number;
+  payment: PaymentMethod;
+}
+
 export interface Withdrawal {
   id: string;
   branchId: string;
@@ -375,6 +386,12 @@ export interface Order {
   id: string;
   label: string;
   items: { productId: string; qty: number; price?: number }[];
+  /** Encargo: teléfono del cliente, para qué día y cómo se entrega (envío, encomienda). */
+  phone?: string | null;
+  dueOn?: string | null;
+  delivery?: string | null;
+  /** Adelanto que queda (lo recibido menos lo devuelto): al cobrar, se descuenta de lo que entra a la caja. */
+  deposit?: number;
 }
 
 /** Cobro de un plan (docs/planes-de-suscripcion.md): el monto en Bs queda fijo hasta `expiresAt`. */

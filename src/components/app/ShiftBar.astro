@@ -93,6 +93,15 @@ const here = Astro.url.pathname.replace(/\/$/, "");
             <dd class="num amount-expense">{formatBs(data.expenses ?? 0, "−")}</dd>
           </div>
           {
+            !!data.deposits && (
+              <div class="term term-flow">
+                {/* Adelantos de encargos (+) menos los que se aplicaron al cobrar o se devolvieron (−). */}
+                <dt>Adelantos de pedidos</dt>
+                <dd class:list={["num", data.deposits > 0 && "amount-income"]}>{formatBs(Math.abs(data.deposits), data.deposits > 0 ? "+" : "−")}</dd>
+              </div>
+            )
+          }
+          {
             !!data.withdrawals && (
               <div class="term term-flow">
                 <dt>Retiros</dt>

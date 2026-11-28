@@ -162,6 +162,12 @@ const daysLabel = (weekdays: number[] | null) =>
                   <dt>Gastos</dt>
                   <dd class="num amount-expense">{formatBs(t.expenses, "−")}</dd>
                 </div>
+                {!!t.deposits && (
+                  <div>
+                    <dt>Adelantos de pedidos</dt>
+                    <dd class:list={["num", t.deposits > 0 && "amount-income"]}>{formatBs(Math.abs(t.deposits), t.deposits > 0 ? "+" : "−")}</dd>
+                  </div>
+                )}
                 <div class="strong">
                   <dt>Esperado en caja</dt>
                   <dd class="num">{formatBs(t.expected)}</dd>

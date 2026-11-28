@@ -439,16 +439,54 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"orders": {
+                },"order_deposits": {
                   Row: {
-                    "branch_id": string,"created_at": string,"created_by": string | null,"id": string,"items": NonNullable<Json>,"label": string,"sale_id": string | null
+                    "amount": number,"branch_id": string,"business_date": string,"id": string,"kind": string,"occurred_at": string,"order_id": string | null,"payment_method": Database["public"]['Enums']["payment_method"],"recorded_by": string | null,"shift_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "branch_id": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"items"?: NonNullable<Json>,"label": string,"sale_id"?: string | null
+                    "amount": number,"branch_id": string,"business_date": string,"id": string,"kind": string,"occurred_at"?: string,"order_id"?: string | null,"payment_method": Database["public"]['Enums']["payment_method"],"recorded_by"?: string | null,"shift_id": string
                   }
                   Update: {
-                    "branch_id"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"items"?: NonNullable<Json>,"label"?: string,"sale_id"?: string | null
+                    "amount"?: number,"branch_id"?: string,"business_date"?: string,"id"?: string,"kind"?: string,"occurred_at"?: string,"order_id"?: string | null,"payment_method"?: Database["public"]['Enums']["payment_method"],"recorded_by"?: string | null,"shift_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "order_deposits_branch_id_fkey"
+      columns: ["branch_id"]
+isOneToOne: false
+      referencedRelation: "branches"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_deposits_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "orders"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_deposits_recorded_by_fkey"
+      columns: ["recorded_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_deposits_shift_id_fkey"
+      columns: ["shift_id"]
+isOneToOne: false
+      referencedRelation: "shifts"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"orders": {
+                  Row: {
+                    "branch_id": string,"created_at": string,"created_by": string | null,"delivery": string | null,"due_on": string | null,"id": string,"items": NonNullable<Json>,"label": string,"phone": string | null,"sale_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "branch_id": string,"created_at"?: string,"created_by"?: string | null,"delivery"?: string | null,"due_on"?: string | null,"id"?: string,"items"?: NonNullable<Json>,"label": string,"phone"?: string | null,"sale_id"?: string | null
+                  }
+                  Update: {
+                    "branch_id"?: string,"created_at"?: string,"created_by"?: string | null,"delivery"?: string | null,"due_on"?: string | null,"id"?: string,"items"?: NonNullable<Json>,"label"?: string,"phone"?: string | null,"sale_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -1197,7 +1235,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "affiliate_referrals":
+            "add_order_deposit":
+{ Args: { "p_amount": number,"p_id": string,"p_order": string,"p_payment": Database["public"]['Enums']["payment_method"],"p_shift": string }; Returns: undefined
+                           },
+"affiliate_referrals":
 { Args: Record<PropertyKey, never>; Returns: {
               "businesses": number,"paying": number,"people": number
             }[]
@@ -1264,6 +1305,9 @@ isOneToOne: false
 { Args: { "p_code": string }; Returns: {
               "name": string
             }[]
+                           },
+"refund_order_deposit":
+{ Args: { "p_id": string,"p_order": string,"p_shift": string }; Returns: undefined
                            },
 "register_sale":
 { Args: { "p_branch": string,"p_items": Json,"p_payment": Database["public"]['Enums']["payment_method"],"p_sale": string,"p_shift": string,"p_sold_at"?: string }; Returns: string
