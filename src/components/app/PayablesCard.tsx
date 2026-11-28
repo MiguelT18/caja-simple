@@ -130,6 +130,12 @@ export default function PayablesCard({
     await refreshRegions();
   }
 
+  // Gastos fijos por categoría: los sueldos van juntos en «Sueldos»; el resto, en la que eligió la dueña.
+  const fixedGroups = [...Map.groupBy(fixed, (f) => (f.employeeId ? "Sueldos" : f.category)).entries()]
+    .sort(([a], [b]) => (a === "Sueldos" ? -1 : b === "Sueldos" ? 1 : a.localeCompare(b, "es")))
+    .map(([category, items]) => ({ category, items }));
+  const periodsOf = (f: FixedExpense) => pending.filter((p) => p.fixedId === f.id).sort((a, b) => a.owedOn.localeCompare(b.owedOn));
+
   const groups = GROUPS.map((g) => ({ ...g, items: pending.filter((p) => g.tones.includes(dueState(p.dueOn, today).tone)) })).filter((g) => g.items.length > 0);
 
   return (
@@ -283,46 +289,86 @@ export default function PayablesCard({
           {fixed.length === 0 ? (
             <EmptyRow icon={Repeat} tone="border border-dashed border-[var(--color-border-strong)] text-muted-foreground" title="Alquiler, sueldos, luz, agua…" text="Cada período se suma solo a Por pagar." />
           ) : (
-            <ul className="m-0 grid list-none p-0">
-              {fixed.map((f) => {
-                const FixedIcon = f.employeeId ? UserRound : Repeat;
-                return (
-                  <li key={f.id} className={ROW}>
-                    <Art className="bg-[var(--color-surface-hover)] text-muted-foreground">
-                      <FixedIcon size={18} strokeWidth={1.75} aria-hidden="true" />
-                    </Art>
-                    <div className="grid min-w-0 flex-1 basis-40 gap-0.5">
-                      <span className="inline-flex flex-wrap items-center gap-1.5 font-bold [overflow-wrap:anywhere]">
-                        {f.concept}
-                        <span className="chip chip-neutral">{frequencyLabel[f.frequency]}</span>
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        Próximo el {shortDate(f.next)}
-                        {f.employeeId && staffName(f.employeeId) && ` · sueldo de ${staffName(f.employeeId)}`}
-                      </span>
-                    </div>
-                    <span className="ml-auto num font-bold">{formatBs(f.amount)}</span>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm" aria-label={`Opciones de ${f.concept}`}>
-                          <Ellipsis />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setDialog({ kind: "fixed", item: f })}>
-                          <Pencil />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onSelect={() => archive(f)}>
-                          <Archive />
-                          Quitar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </li>
-                );
-              })}
-            </ul>
+            fixedGroups.map((g) => (
+              <div key={g.category} className="grid gap-1">
+                <h3 className="m-0 flex items-baseline justify-between gap-3 border-b border-[var(--color-border)] pb-1.5 text-sm font-semibold text-muted-foreground">
+                  <span>
+                    {g.category} <span className="font-normal">({g.items.length})</span>
+                  </span>
+                  <span className="num">{formatBs(g.items.reduce((s, f) => s + f.amount, 0))}</span>
+                </h3>
+                <ul className="m-0 grid list-none p-0">
+                  {g.items.map((f) => {
+                    const FixedIcon = f.employeeId ? UserRound : Repeat;
+                    const periods = periodsOf(f);
+                    return (
+                      <li key={f.id} className="grid gap-1">
+                        <div className={ROW}>
+                          <Art className="bg-[var(--color-surface-hover)] text-muted-foreground">
+                            <FixedIcon size={18} strokeWidth={1.75} aria-hidden="true" />
+                          </Art>
+                          <div className="grid min-w-0 flex-1 basis-40 gap-0.5">
+                            <span className="inline-flex flex-wrap items-center gap-1.5 font-bold [overflow-wrap:anywhere]">
+                              {f.concept}
+                              <span className="chip chip-neutral">{frequencyLabel[f.frequency]}</span>
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {periods.length > 0 ? (
+                                <span className="font-semibold text-[var(--color-warning)]">
+                                  {periods.length === 1 ? "1 sin pagar" : `${periods.length} sin pagar`} · {formatBs(periods.reduce((s, p) => s + p.balance, 0))}
+                                </span>
+                              ) : (
+                                "Al día"
+                              )}
+                              {` · próximo el ${shortDate(f.next)}`}
+                              {f.employeeId && staffName(f.employeeId) && ` · sueldo de ${staffName(f.employeeId)}`}
+                            </span>
+                          </div>
+                          <span className="ml-auto num font-bold">{formatBs(f.amount)}</span>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon-sm" aria-label={`Opciones de ${f.concept}`}>
+                                <Ellipsis />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => setDialog({ kind: "fixed", item: f })}>
+                                <Pencil />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem variant="destructive" onSelect={() => archive(f)}>
+                                <Archive />
+                                Quitar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        {periods.length > 0 && (
+                          <ul className="m-0 mb-1 ml-[3.25rem] grid list-none gap-0.5 p-0" aria-label={`Períodos sin pagar de ${f.concept}`}>
+                            {periods.map((p) => (
+                              <li key={p.id}>
+                                {/* Marcar abre el pago: ahí se elige si sale de la caja o de fuera, y si es todo o una parte. */}
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-md px-2 text-sm hover:bg-[var(--color-surface-hover)]">
+                                  <input
+                                    type="checkbox"
+                                    className="size-5 accent-[var(--color-primary)]"
+                                    checked={false}
+                                    onChange={() => setDialog({ kind: "pay", item: p })}
+                                    aria-label={`Marcar como pagado: ${f.concept}, tocaba el ${shortDate(p.owedOn)}, ${formatBs(p.balance)}`}
+                                  />
+                                  <span className="flex-1">Tocaba el {shortDate(p.owedOn)}</span>
+                                  <span className="num">{formatBs(p.balance)}</span>
+                                </label>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))
           )}
         </section>
       )}

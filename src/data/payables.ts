@@ -19,6 +19,8 @@ export interface Payable {
   balance: number;
   /** Viene de un gasto fijo (lo generó la base). */
   fixed: boolean;
+  /** El gasto fijo que lo generó (sus períodos sin pagar se ven en Gastos fijos). */
+  fixedId: string | null;
   createdById: string | null;
   /** Es el sueldo de esta ficha: esa persona confirma que se lo pagaron. */
   employeeId: string | null;
@@ -101,6 +103,7 @@ export async function payables(sb: Supabase, branchIds: string[], today: string,
       paid: Number(p.paid ?? 0),
       balance: Number(p.balance ?? p.amount),
       fixed: p.fixed_expense_id !== null,
+      fixedId: p.fixed_expense_id,
       createdById: p.created_by,
       employeeId: p.employee_id,
     });
