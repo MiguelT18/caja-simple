@@ -275,11 +275,11 @@ const kindLabel = { entrada: "Entrada", merma: "Merma", ajuste: "Ajuste" };
           name="productId"
           label="Producto"
           placeholder="Elige un producto"
-          searchPlaceholder="Nombre, categoría o código"
+          searchPlaceholder="Nombre, categoría, código o descripción"
           noun="productos"
           required
           requiredMessage="Elige un producto."
-          options={tracked.map((p) => ({ value: p.id, label: p.name, keywords: [p.category, p.barcode].filter(Boolean).join(" "), product: p }))}
+          options={tracked.map((p) => ({ value: p.id, label: p.name, keywords: [p.category, p.barcode, p.description].filter(Boolean).join(" "), product: p }))}
         >
           {({ product: p }: { product: (typeof tracked)[number] }) => {
             // Como en la tabla de productos: el estado va escrito y con ícono, no solo con color.

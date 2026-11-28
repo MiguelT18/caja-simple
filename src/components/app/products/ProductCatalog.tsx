@@ -191,7 +191,7 @@ export default function ProductCatalog({
     return withCategory.filter(({ product, categoryId }) => {
       if (active.length > 0 && !picked.has(categoryId ?? NONE)) return false;
       if (lowOnly && !isLow(product)) return false;
-      return !q || product.name.toLowerCase().includes(q) || product.barcode?.includes(q);
+      return !q || product.name.toLowerCase().includes(q) || product.barcode?.includes(q) || product.description?.toLowerCase().includes(q);
     });
   }, [withCategory, activeKey, lowOnly, query]);
 
@@ -220,7 +220,7 @@ export default function ProductCatalog({
       <div className="mb-5 flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
           <label className="relative min-w-0 flex-1 basis-72">
-            <span className="sr-only">Buscar por nombre o código de barras</span>
+            <span className="sr-only">Buscar por nombre, código o descripción</span>
             <Search
               className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden="true"
@@ -229,7 +229,7 @@ export default function ProductCatalog({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nombre o código de barras"
+              placeholder="Buscar por nombre, código o descripción"
               className="h-11 bg-card pl-9 text-base"
               autoComplete="off"
             />

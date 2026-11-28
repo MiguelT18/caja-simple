@@ -131,9 +131,9 @@ export function ComboFields({
             disabled={parts.length >= 20}
             placeholder="Elige un producto del catálogo"
             emptyText="No quedan productos para agregar"
-            searchPlaceholder="Nombre, categoría o código"
+            searchPlaceholder="Nombre, categoría, código o descripción"
             noun="productos"
-            options={options.map((p) => ({ value: p.id, label: p.name, keywords: [p.category, p.barcode].filter(Boolean).join(" "), product: p }))}
+            options={options.map((p) => ({ value: p.id, label: p.name, keywords: [p.category, p.barcode, p.description].filter(Boolean).join(" "), product: p }))}
             renderOption={(o) => <ComboOption p={o.product} />}
             onValueChange={(id) => id && setParts((list) => [...list, { productId: id, qty: 1 }])}
           />
