@@ -41,8 +41,9 @@ export function parseWebhook(payload: Any): WaEvent[] {
           events.push({ kind: "message", phoneNumberId, waId: m.from, name: names.get(m.from) ?? null, id: m.id, text: textOf(m) });
         }
       } else if (change.field === "smb_message_echoes") {
-        // shortcut: forma tomada de la doc de coexistencia (message_echoes con from = negocio, to = cliente);
-        // si Meta la cambia, revisar con un webhook real.
+        // Forma según la referencia de Meta (webhooks/reference/smb_message_echoes): from = negocio, to = cliente.
+        // shortcut: Meta omite `to` si no tiene el número (solo manda to_user_id, el BSUID); ese echo se salta y la
+        // conversación no se calla. Cambiar a BSUID si llegan echoes sin `to` en los logs.
         for (const m of value.message_echoes ?? []) {
           if (typeof m?.to !== "string" || typeof m?.id !== "string") continue;
           events.push({ kind: "echo", phoneNumberId, waId: m.to, id: m.id, text: textOf(m) });
