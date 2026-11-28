@@ -631,14 +631,14 @@ isOneToOne: false
                   ]
                 },"products": {
                   Row: {
-                    "attributes": NonNullable<Json>,"barcode": string | null,"business_id": string,"category_id": string | null,"created_at": string,"description": string | null,"id": string,"image_path": string | null,"name": string
+                    "attributes": NonNullable<Json>,"barcode": string | null,"business_id": string,"category_id": string | null,"created_at": string,"description": string | null,"extra_category_ids": (string)[],"id": string,"image_path": string | null,"name": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "attributes"?: NonNullable<Json>,"barcode"?: string | null,"business_id": string,"category_id"?: string | null,"created_at"?: string,"description"?: string | null,"id"?: string,"image_path"?: string | null,"name": string
+                    "attributes"?: NonNullable<Json>,"barcode"?: string | null,"business_id": string,"category_id"?: string | null,"created_at"?: string,"description"?: string | null,"extra_category_ids"?: (string)[],"id"?: string,"image_path"?: string | null,"name": string
                   }
                   Update: {
-                    "attributes"?: NonNullable<Json>,"barcode"?: string | null,"business_id"?: string,"category_id"?: string | null,"created_at"?: string,"description"?: string | null,"id"?: string,"image_path"?: string | null,"name"?: string
+                    "attributes"?: NonNullable<Json>,"barcode"?: string | null,"business_id"?: string,"category_id"?: string | null,"created_at"?: string,"description"?: string | null,"extra_category_ids"?: (string)[],"id"?: string,"image_path"?: string | null,"name"?: string
                   }
                   Relationships: [
                     {

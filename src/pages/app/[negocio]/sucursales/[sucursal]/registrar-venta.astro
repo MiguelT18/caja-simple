@@ -36,7 +36,8 @@ const bar = shiftBarData(ctx);
 // Cada categoría con un color de la paleta (el arte de los productos sin foto); el filtro solo con 2 grupos o más.
 const NONE = "none";
 const groups = [
-  ...categories.filter((c) => products.some((p) => p.categoryId === c.id)).map((c) => ({ id: c.id, name: c.name })),
+  // Con sus otras categorías: un producto aparece al filtrar por cualquiera de ellas.
+  ...categories.filter((c) => products.some((p) => p.categoryId === c.id || p.extraCategoryIds.includes(c.id))).map((c) => ({ id: c.id, name: c.name })),
   ...(products.some((p) => !p.categoryId) ? [{ id: NONE, name: "Sin categoría" }] : []),
 ];
 const colorOf = (categoryId?: string) => {
@@ -172,7 +173,7 @@ const colorOf = (categoryId?: string) => {
             const price = p.price === null ? "precio al vender" : formatBs(p.price);
             const promo = promoOf(p.id, p.price);
             return (
-              <li data-name={p.name.toLowerCase()} data-barcode={p.barcode ?? ""} data-category={p.categoryId ?? NONE}>
+              <li data-name={p.name.toLowerCase()} data-barcode={p.barcode ?? ""} data-category={[p.categoryId ?? NONE, ...p.extraCategoryIds].join(" ")}>
                 <div
                   class:list={["product", { "sold-out": p.stock === 0 }]}
                   data-product
@@ -1002,7 +1003,7 @@ const colorOf = (categoryId?: string) => {
     let visible = 0;
     for (const li of items) {
       const match = li.dataset.name!.includes(query) || (query !== "" && li.dataset.barcode!.startsWith(query));
-      li.hidden = !match || (category !== "" && li.dataset.category !== category);
+      li.hidden = !match || (category !== "" && !li.dataset.category!.split(" ").includes(category));
       if (!li.hidden) visible++;
     }
     empty.hidden = visible > 0 || items.length === 0;

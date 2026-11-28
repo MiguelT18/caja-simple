@@ -279,6 +279,7 @@ export default function ProductEditor({
     name: snap.name || (isCombo ? "Nombre del combo" : "Nombre del producto"),
     categoryId: snap.categoryId || undefined,
     category: categories[categoryIndex]?.name,
+    extraCategoryIds: [],
     image: removeImage ? undefined : preview,
     attributes: {},
     components: isCombo ? product?.components : undefined,
@@ -419,6 +420,28 @@ export default function ProductEditor({
                 )}
               />
             </Field>
+            {/* Otras categorías: aparece también en sus filtros. La principal es la de los gráficos y reportes. */}
+            {categories.length > 1 && (
+              <fieldset className="grid min-w-0 gap-1">
+                <legend className="mb-1 text-sm font-semibold">Otras categorías (opcional)</legend>
+                <p className="field-hint m-0 mb-1">También aparece al filtrar por estas. Las ventas cuentan solo en la principal.</p>
+                {categories.map((c, i) => (
+                  <label key={c.id} className={cn("flex min-h-11 cursor-pointer items-center gap-3 text-sm", c.id === snap.categoryId && "cursor-default text-muted-foreground")}>
+                    <input
+                      type="checkbox"
+                      name="extraCategoryIds"
+                      value={c.id}
+                      defaultChecked={product?.extraCategoryIds.includes(c.id)}
+                      disabled={c.id === snap.categoryId}
+                      className="size-5 shrink-0 accent-[var(--color-primary)]"
+                    />
+                    <span className="size-2.5 shrink-0 rounded-full" style={{ background: colorOf(i) }} aria-hidden="true" />
+                    {c.name}
+                    {c.id === snap.categoryId && <span className="text-xs">(principal)</span>}
+                  </label>
+                ))}
+              </fieldset>
+            )}
           </Section>
 
           {isCombo && (

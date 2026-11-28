@@ -79,8 +79,11 @@ export interface CatalogProduct {
   id: string;
   businessId: string;
   name: string;
+  /** La categoría principal: la de los gráficos y reportes. */
   categoryId?: string;
   category?: string;
+  /** Otras categorías donde también aparece (filtros y búsqueda); nunca incluye la principal. */
+  extraCategoryIds: string[];
   // EAN-13 del envase; los productos a granel o por peso no tienen.
   barcode?: string;
   /** Texto libre de la dueña (hasta 500 caracteres): se ve en el detalle del producto. */
