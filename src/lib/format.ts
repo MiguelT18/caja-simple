@@ -49,3 +49,10 @@ export function toCsv(rows: (string | number)[][]) {
   };
   return "\uFEFF" + rows.map((r) => r.map(cell).join(";")).join("\r\n") + "\r\n";
 }
+
+/** «1 h 25 min», «45 min», «2 h». */
+export function hoursLabel(minutes: number) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return [h && `${h} h`, (m || !h) && `${m} min`].filter(Boolean).join(" ");
+}

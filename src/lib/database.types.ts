@@ -477,6 +477,50 @@ isOneToOne: true
       referencedColumns: ["id"]
     }
                   ]
+                },"overtime": {
+                  Row: {
+                    "branch_id": string,"business_date": string,"business_id": string,"close_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"id": string,"minutes": number,"note": string | null,"person_id": string | null,"status": Database["public"]['Enums']["overtime_status"]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "branch_id": string,"business_date": string,"business_id": string,"close_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"id"?: string,"minutes": number,"note"?: string | null,"person_id"?: string | null,"status"?: Database["public"]['Enums']["overtime_status"]
+                  }
+                  Update: {
+                    "branch_id"?: string,"business_date"?: string,"business_id"?: string,"close_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"id"?: string,"minutes"?: number,"note"?: string | null,"person_id"?: string | null,"status"?: Database["public"]['Enums']["overtime_status"]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "overtime_branch_id_fkey"
+      columns: ["branch_id"]
+isOneToOne: false
+      referencedRelation: "branches"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "overtime_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "overtime_close_id_fkey"
+      columns: ["close_id"]
+isOneToOne: true
+      referencedRelation: "shift_closes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "overtime_decided_by_fkey"
+      columns: ["decided_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "overtime_person_id_fkey"
+      columns: ["person_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"pending_expenses": {
                   Row: {
                     "amount": number,"branch_id": string,"canceled_at": string | null,"canceled_by": string | null,"category": string,"concept": string,"created_at": string,"created_by": string | null,"due_on": string | null,"employee_id": string | null,"fixed_expense_id": string | null,"id": string,"owed_on": string
@@ -1193,6 +1237,9 @@ isOneToOne: false
 "create_plan_charge":
 { Args: { "p_branches": number,"p_business": string,"p_method": Database["public"]['Enums']["charge_method"],"p_period": Database["public"]['Enums']["plan_period"] }; Returns: string
                            },
+"decide_overtime":
+{ Args: { "p_id": string,"p_note"?: string,"p_status": Database["public"]['Enums']["overtime_status"] }; Returns: undefined
+                           },
 "delete_my_account":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
@@ -1260,7 +1307,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","loss_kind": "perdido"|"roto"|"defectuoso"|"vencido"|"otro","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
+            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","loss_kind": "perdido"|"roto"|"defectuoso"|"vencido"|"otro","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move","overtime_status": "pendiente"|"pagada"|"descontada"|"repuesta","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1376,7 +1423,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"loss_kind": ["perdido", "roto", "defectuoso", "vencido", "otro"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
+            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"loss_kind": ["perdido", "roto", "defectuoso", "vencido", "otro"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move"],"overtime_status": ["pendiente", "pagada", "descontada", "repuesta"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
           }
         }
 } as const
