@@ -6,7 +6,7 @@ import PlanCalculator from "@/components/PlanCalculator.astro";
 import PeriodSwitch from "@/components/plans/PeriodSwitch.astro";
 import PlanPrice from "@/components/plans/PlanPrice.astro";
 import Layout from "@/layouts/Layout.astro";
-import { businessContext, businessHref, currentQuote, founderPromo, myBusinesses, planCharges, referralPerks } from "@/data/queries";
+import { businessContext, businessHref, currentQuote, founderPromo, myBusinesses, planCharges, referralPerks, trialOffer } from "@/data/queries";
 import { founderMonthsLeft, paidUntil, plans, untilLabel, upgradeUrl, usdLabel, type Period } from "@/data/plans";
 import { addDays, longDate, shortDate, stamp, today } from "@/lib/dates";
 import { plural } from "@/lib/format";
@@ -16,11 +16,12 @@ if (!ctx) return Astro.rewrite("/404");
 const { business } = ctx;
 const sb = Astro.locals.supabase;
 const period: Period = Astro.url.searchParams.get("periodo") === "anual" ? "anual" : "mensual";
-const [quote, charges, promo, perks] = await Promise.all([
+const [quote, charges, promo, perks, trialDays] = await Promise.all([
   currentQuote(sb),
   planCharges(sb, business.id),
   founderPromo(sb, business.id).catch(() => null),
   business.referred ? referralPerks(sb) : null,
+  trialOffer(sb, business.id),
 ]);
 // Llegó con el link de un afiliado, no tiene precio fundador y todavía no pagó: su primer pago suma meses gratis
 // (activate_plan_charge).
@@ -133,6 +134,17 @@ const rateText = (c: (typeof charges)[number]) =>
             <div class="plan-action">
               {plan.name === "Gratis" ? (
                 <p class="plan-note">Siempre disponible, sin pagar.</p>
+              ) : plan.name === "Negocio" && trialDays && branches <= 1 ? (
+                <form class="trial-form" data-action="startTrial" data-reload novalidate>
+                  <input type="hidden" name="businessId" value={business.id} />
+                  <button type="submit" class="btn btn-primary">Probar {trialDays} días gratis</button>
+                  <p class="plan-note">Sin tarjeta. Al terminar vuelves a Gratis sin perder nada.</p>
+                  {quote && (
+                    <button type="button" class="btn btn-secondary" data-pick={1} aria-pressed={picked ? "true" : "false"} aria-controls="calc-branches">
+                      Elegir · 1 local
+                    </button>
+                  )}
+                </form>
               ) : !quote ? null : plan.name === "Negocio" && branches > 1 ? (
                 <p class="plan-note">Tienes {branches} sucursales: te toca Sucursales.</p>
               ) : (
@@ -527,6 +539,11 @@ const rateText = (c: (typeof charges)[number]) =>
 
   .plan-action .btn {
     width: 100%;
+  }
+
+  .trial-form {
+    display: grid;
+    gap: 0.5rem;
   }
 
   .plan-action .btn[aria-pressed="true"] {

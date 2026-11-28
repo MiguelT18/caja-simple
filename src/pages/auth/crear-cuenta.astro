@@ -20,7 +20,7 @@ const [invite, perks] = code
   description="Empieza a controlar tu negocio"
   pitch="Abre tu caja hoy. Empezar es gratis."
 >
-  {invite && <p class="notice" role="status">Te invitó {invite.name}: tu primer negocio prueba el plan Negocio {perks?.trialDays ?? 60} días gratis.</p>}
+  {invite && <p class="notice" role="status">Te invitó {invite.name}: puedes probar el plan Negocio {perks?.trialDays ?? 60} días gratis.</p>}
 
   <GoogleButton label="Registrarse con Google" action="/api/auth/google" />
 
