@@ -9,6 +9,7 @@ import { MENU_HIDDEN_COOKIE, MENU_WIDTH_COOKIE, menuWidth } from '../lib/sidebar
 import PageSkeleton from '../components/app/PageSkeleton.astro';
 import ToastIcons from '../components/app/ToastIcons.astro';
 import ShiftBar from '../components/app/ShiftBar.astro';
+import NewsBanner from '../components/app/NewsBanner.astro';
 import type { Branch } from '../data/types';
 import { currentUser, type Membership, type ShiftBarData } from '../data/queries';
 import { brandStyle } from '../data/brand';
@@ -42,6 +43,7 @@ const menuHidden = Astro.cookies.get(MENU_HIDDEN_COOKIE)?.value === '1';
 		<Sidebar user={currentUser(Astro.locals)} context={context} />
 		<SidebarResizer width={menuW} />
 		<main id="main" tabindex="-1">
+			<NewsBanner />
 			<slot />
 		</main>
 		{context?.shift && <ShiftBar data={context.shift} />}

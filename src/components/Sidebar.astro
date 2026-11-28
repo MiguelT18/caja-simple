@@ -1,8 +1,8 @@
 ---
-import { BriefcaseBusiness, GripVertical, Store } from "@lucide/astro";
+import { BriefcaseBusiness, Focus, GripVertical, Store } from "@lucide/astro";
 import type { Branch, User } from "../data/types";
-import { NAV_ORDER_COOKIE, appNav, applyNavOrder } from "../data/navigation";
-import { branchColor, branchHref, branchImages, branchSections, businessHref, entryHref, founderPromo, myAffiliate, myBusinesses, type Membership } from "../data/queries";
+import { NAV_ORDER_COOKIE, SHIFT_MODE_COOKIE, appNav, applyNavOrder } from "../data/navigation";
+import { branchColor, branchHref, branchImages, branchSections, businessHref, entryHref, founderPromo, myAffiliate, myBusinesses, myNews, type Membership } from "../data/queries";
 import PromoBar from "./PromoBar.astro";
 import ContextSwitcher from "./ContextSwitcher.astro";
 import Logo from "./Logo.astro";
@@ -26,7 +26,10 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
 // En Gratis o en la prueba de 30 días: los dos todavía no pagaron.
 const freeOwned = myBusinesses(Astro.locals).find((other) => other.role === "dueño" && (other.business.plan === "Gratis" || other.business.trial))?.business;
 const promo = freeOwned && !currentPath.endsWith("/plan") && !currentPath.includes("/cobro/") ? await founderPromo(Astro.locals.supabase, undefined, !!freeOwned.referred).catch(() => null) : null;
-const navSections = applyNavOrder(appNav(m, branch, !!myAffiliate(Astro.locals)), Astro.cookies.get(NAV_ORDER_COOKIE)?.value);
+// Novedades sin ver: «Nuevo» en el menú y punto en el ícono de UserCard (NewsBanner los apaga sin recargar).
+const hasNews = currentPath !== "/app/novedades" && (await myNews(Astro.locals, Astro.cookies)).unseen.length > 0;
+const shiftMode = !!branch && Astro.cookies.get(SHIFT_MODE_COOKIE)?.value === "1";
+const navSections = applyNavOrder(appNav(m, branch, !!myAffiliate(Astro.locals), shiftMode), Astro.cookies.get(NAV_ORDER_COOKIE)?.value);
 
 const businessOptions = myBusinesses(Astro.locals).map((other) => ({
   label: other.business.name,
@@ -56,7 +59,7 @@ const branchLinks = m
   : [];
 // Al navegar, el menú se conserva mientras siga siendo el mismo negocio, sucursal y aviso de precio (Layout › ClientRouter);
 // si cambia alguno, llega el de la página nueva. Lo que guarda una Action y cambia el menú recarga entera (data-reload).
-const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "promo" : ""].join(":");
+const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "promo" : "", shiftMode ? "turno" : ""].join(":");
 ---
 
 <div class="sidebar" style="view-transition-name: sidebar" transition:persist={persistKey}>
@@ -72,6 +75,21 @@ const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "
     <div class="header-actions">
       <NotificationBell />
       <ThemeToggle class="sidebar-theme" />
+      {
+        branch && (
+          <button
+            type="button"
+            class="icon-btn shift-mode"
+            aria-pressed={shiftMode ? "true" : "false"}
+            aria-label="Modo turno"
+            title={shiftMode ? "Modo turno: muestra el menú completo" : "Modo turno: solo Vender, Hoy, Inventario y Turnos"}
+            data-shift-mode
+            data-hoy={branchHref(m!.business, branch, "hoy")}
+          >
+            <Focus size={20} stroke-width={1.75} aria-hidden="true" />
+          </button>
+        )
+      }
 
       <button
         type="button"
@@ -120,6 +138,7 @@ const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "
                   >
                     <Icon size={18} stroke-width={1.75} />
                     {label}
+                    {id === "novedades" && hasNews && <span class="chip chip-live nav-new" data-news-dot>Nuevo</span>}
                     <GripVertical class="nav-grip" size={16} stroke-width={1.75} aria-hidden="true" />
                   </a>
                 </li>
@@ -167,13 +186,14 @@ const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "
 
     <footer class="sidebar-footer">
       {promo && freeOwned && <PromoBar variant="card" promo={promo} href={`${businessHref(freeOwned)}/plan`} label="Usar descuento" />}
-      <UserCard user={user} />
+      <UserCard user={user} news={hasNews} />
     </footer>
   </div>
 </div>
 
 <script>
   import Sortable from "sortablejs";
+  import { navigate } from "astro:transitions/client";
   import { onPage } from "../scripts/refresh";
 
   // Una vez por menú: el que se conserva al navegar ya está atado.
@@ -183,10 +203,13 @@ const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "
     if (!root || bound.has(root)) return;
     bound.add(root);
 
-    // Orden del menú elegido por la persona: se guarda en una cookie para que el servidor ya lo pinte ordenado.
-    const lists = root.querySelectorAll<HTMLUListElement>(".nav-sortable");
-    const announce = root.querySelector<HTMLElement>("[data-nav-announce]")!;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Las secciones del menú: se atan al cargar y otra vez cuando el Modo turno las cambia (sin recargar la página).
+    function bindNav(nav: HTMLElement) {
+    // Orden del menú elegido por la persona: se guarda en una cookie para que el servidor ya lo pinte ordenado.
+    const lists = nav.querySelectorAll<HTMLUListElement>(".nav-sortable");
+    const announce = nav.querySelector<HTMLElement>("[data-nav-announce]")!;
 
     function saveOrder() {
       let order: Record<string, string[]> = {};
@@ -226,6 +249,42 @@ const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "
       });
     }
 
+    // En móvil, elegir un enlace cierra el menú.
+    nav.querySelectorAll("a").forEach((link) => link.addEventListener("click", () => setOpen(false)));
+    }
+
+    // Modo turno: si la página sigue en el menú, cambia solo el menú (y la clave persistKey, para que al navegar se
+    // conserve); el contenido no se vuelve a cargar. Al activarlo en una página que no está en el menú corto, va a Hoy.
+    root.querySelector<HTMLButtonElement>("[data-shift-mode]")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      const on = button.getAttribute("aria-pressed") !== "true";
+      document.cookie = on ? "modo-turno=1; path=/; max-age=31536000; samesite=lax" : "modo-turno=; path=/; max-age=0; samesite=lax";
+      const kept = ["/registrar-venta", "/hoy", "/inventario", "/turnos"].some((end) => location.pathname.endsWith(end));
+      if (on && !kept) return navigate(button.dataset.hoy!, { history: "replace" });
+      // Sin disabled: el botón conserva el foco mientras llega el menú; un segundo clic espera.
+      if (button.getAttribute("aria-busy") === "true") return;
+      button.setAttribute("aria-busy", "true");
+      try {
+        const response = await fetch(location.href, { headers: { accept: "text/html" } });
+        if (!response.ok) throw new Error(String(response.status));
+        const fresh = new DOMParser().parseFromString(await response.text(), "text/html").querySelector<HTMLElement>(".sidebar");
+        const nav = fresh?.querySelector<HTMLElement>(".sidebar-nav");
+        const freshButton = fresh?.querySelector<HTMLButtonElement>("[data-shift-mode]");
+        if (!fresh || !nav || !freshButton) throw new Error("sin menú");
+        root.querySelector(".sidebar-nav")!.replaceWith(nav);
+        bindNav(nav);
+        button.setAttribute("aria-pressed", freshButton.getAttribute("aria-pressed")!);
+        button.title = freshButton.title;
+        const key = fresh.getAttribute("data-astro-transition-persist");
+        if (key) root.setAttribute("data-astro-transition-persist", key);
+      } catch {
+        // Sin red o sin menú en la respuesta: como antes, se vuelve a pedir la página.
+        return navigate(location.href, { history: "replace" });
+      } finally {
+        button.removeAttribute("aria-busy");
+      }
+    });
+
     const sidebar = root;
     const toggle = sidebar.querySelector<HTMLButtonElement>(".menu-toggle")!;
     const panel = sidebar.querySelector<HTMLElement>(".sidebar-panel")!;
@@ -246,9 +305,11 @@ const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "
       if (open) panel.querySelector<HTMLElement>("button, a")?.focus();
     });
 
+    // Los enlaces del menú (dentro de bindNav) y los del resto del panel cierran el menú en móvil.
     panel.querySelectorAll("a").forEach((link) => {
-      link.addEventListener("click", () => setOpen(false));
+      if (!link.closest(".sidebar-nav")) link.addEventListener("click", () => setOpen(false));
     });
+    bindNav(root.querySelector<HTMLElement>(".sidebar-nav")!);
 
     document.addEventListener("keydown", (event) => {
       // Si hay un popover abierto (p. ej. el selector de sucursal), Esc solo cierra ese popover.
@@ -474,6 +535,14 @@ const persistKey = ["sidebar", m?.business.id ?? "", branch?.id ?? "", promo ? "
   }
 
   /* Agarradera de arrastre: aparece al pasar el mouse; en táctil se arrastra manteniendo presionado. */
+  .nav-new {
+    margin-left: auto;
+  }
+
+  .nav-new + :global(.nav-grip) {
+    margin-left: 0;
+  }
+
   .nav-link .nav-grip {
     margin-left: auto;
     color: var(--color-text-muted);
