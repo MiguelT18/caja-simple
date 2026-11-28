@@ -38,6 +38,8 @@ export function appNav(m?: Membership, branch?: Branch, affiliate = false) {
         ...(m.role === "dueño" ? [{ id: "reportes", label: "Reportes", href: href("reportes"), icon: ChartLine }] : []),
         // La dueña ve y administra a su equipo en Empleados; la empleada, quién trabaja en su sucursal.
         ...(m.role !== "dueño" ? [{ id: "equipo", label: "Equipo", href: href("equipo"), icon: Users }] : []),
+        // Lo que falta pagar en la sucursal; la dueña lo ve en la sección del negocio.
+        ...(m.role !== "dueño" ? [{ id: "por-pagar", label: "Por pagar", href: `${businessHref(m.business)}/por-pagar`, icon: CalendarClock }] : []),
         // Los encargos de la sucursal; la dueña los ve en la sección del negocio.
         ...(m.role !== "dueño" ? [{ id: "pedidos", label: "Pedidos", href: `${businessHref(m.business)}/pedidos`, icon: ClipboardList }] : []),
       ],

@@ -1,7 +1,7 @@
 import { actions } from "astro:actions";
-import { Archive, CalendarDays, CircleAlert, CircleCheck, Clock, Ellipsis, Pencil, Plus, Repeat, UserRound, X } from "lucide-react";
+import { Archive, Crown, CalendarDays, CircleAlert, CircleCheck, Clock, Ellipsis, Pencil, Plus, Repeat, UserRound, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import type { FixedExpense, Payable } from "@/data/payables";
+import type { FixedExpense, Payable, Payer } from "@/data/payables";
 import { shortDate } from "@/lib/dates";
 import { formatBs } from "@/lib/format";
 import { dueState, frequencyLabel, type Frequency } from "@/lib/payables";
@@ -56,6 +56,7 @@ type Staff = { id: string; name: string };
 type Dialog =
   | { kind: "pay"; item: Payable }
   | { kind: "edit"; item: Payable }
+  | { kind: "pocket"; item: Payable }
   | { kind: "new" }
   | { kind: "fixed"; item?: FixedExpense }
   | null;
@@ -197,10 +198,24 @@ export default function PayablesCard({
                             Fijo
                           </span>
                         )}
-                        {p.employeeId && staffName(p.employeeId) && (
+                        {p.employeeId && (staffName(p.employeeId) || p.reimbursement) && (
                           <span className="chip chip-info">
                             <UserRound size={12} strokeWidth={1.75} aria-hidden="true" />
-                            {p.employeeId === myEmployeeId ? "Tu sueldo" : staffName(p.employeeId)}
+                            {p.reimbursement
+                              ? p.employeeId === myEmployeeId
+                                ? "Te lo deben"
+                                : staffName(p.employeeId)
+                                  ? `Reembolso a ${staffName(p.employeeId)}`
+                                  : "Reembolso"
+                              : p.employeeId === myEmployeeId
+                                ? "Tu sueldo"
+                                : staffName(p.employeeId)}
+                          </span>
+                        )}
+                        {p.payer === "dueña" && !p.reimbursement && (
+                          <span className="chip chip-neutral">
+                            <Crown size={12} strokeWidth={1.75} aria-hidden="true" />
+                            Lo paga la dueña
                           </span>
                         )}
                       </span>
@@ -214,7 +229,13 @@ export default function PayablesCard({
                         <span className="num text-[length:var(--text-lg)] leading-[var(--text-lg-lh)] font-extrabold">{formatBs(p.balance)}</span>
                         {p.paid > 0 && <span className="num text-xs text-muted-foreground">pagado {formatBs(p.paid)} de {formatBs(p.amount)}</span>}
                       </span>
-                      {(isOwner || cashShift || p.employeeId === myEmployeeId) && (
+                      {/* Pagó de su bolsillo: queda pagado fuera de la caja y la dueña le debe el reembolso. */}
+                      {!isOwner && myEmployeeId && p.payer === "sucursal" && !p.employeeId && (
+                        <Button type="button" size="sm" variant="outline" onClick={() => setDialog({ kind: "pocket", item: p })}>
+                          Lo pagué yo
+                        </Button>
+                      )}
+                      {(isOwner || p.employeeId === myEmployeeId || (cashShift && p.payer === "sucursal")) && (
                         <Button type="button" size="sm" onClick={() => setDialog({ kind: "pay", item: p })}>
                           {p.employeeId && p.employeeId === myEmployeeId ? "Me pagaron" : isOwner ? "Pagar" : "Saldar"}
                         </Button>
@@ -382,7 +403,8 @@ export default function PayablesCard({
         <PayDialog key={dialog.item.id} item={dialog.item} cashShift={cashShift} isOwner={isOwner} ownSalary={!!dialog.item.employeeId && dialog.item.employeeId === myEmployeeId} onClose={close} />
       )}
       {dialog?.kind === "edit" && <EditDialog key={dialog.item.id} item={dialog.item} onClose={close} />}
-      {dialog?.kind === "new" && <NewDialog branchId={branchId} onClose={close} />}
+      {dialog?.kind === "new" && <NewDialog branchId={branchId} isOwner={isOwner} onClose={close} />}
+      {dialog?.kind === "pocket" && <PocketDialog key={dialog.item.id} item={dialog.item} onClose={close} />}
       {dialog?.kind === "fixed" && <FixedDialog branchId={branchId} item={dialog.item} today={today} staff={staff} onClose={close} />}
     </div>
   );
@@ -486,6 +508,45 @@ function PayDialog({
   );
 }
 
+/** Quién paga (solo la dueña lo ve): la sucursal, de la caja, o solo ella. */
+function PayerField({ id, defaultValue = "sucursal" }: { id: string; defaultValue?: Payer }) {
+  return (
+    <Field id={id} label="Quién lo paga" hint="«Solo yo»: en la sucursal se ve, pero no lo pueden saldar.">
+      <select id={id} name="payer" className="input" defaultValue={defaultValue}>
+        <option value="sucursal">La sucursal (de la caja)</option>
+        <option value="dueña">Solo yo</option>
+      </select>
+    </Field>
+  );
+}
+
+/** Pago de bolsillo (quien trabaja aquí): todo o una parte. Lo que puso queda como reembolso que le paga la dueña. */
+function PocketDialog({ item, onClose }: { item: Payable; onClose: () => void }) {
+  const [paymentId] = useState(() => crypto.randomUUID());
+  const save = useActionForm(
+    (form) => actions.payFromPocket(form) as never,
+    onClose,
+    (form) => `Listo: quedó un reembolso de ${formatBs(Number(form.get("amount")))} a tu nombre.`,
+  );
+  return (
+    <AppDialog
+      title={`Pagaste ${item.concept}`}
+      description="Con tu plata, no de la caja. Queda pagado y aparte, en Por pagar, el reembolso que te debe la dueña."
+      onClose={onClose}
+    >
+      <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
+        <input type="hidden" name="paymentId" value={paymentId} />
+        <input type="hidden" name="pendingId" value={item.id} />
+        <Field id="pocket-amount" label="Cuánto pagaste" error={save.errors.amount} hint={`Falta ${formatBs(item.balance)}. Puede ser una parte.`}>
+          <MoneyInput id="pocket-amount" name="amount" min="0.01" max={item.balance} defaultValue={item.balance} required />
+        </Field>
+        <ErrorNotice message={save.message} />
+        <Footer onClose={onClose} busy={save.busy} submitProps={save.submitProps} label="Guardar pago" />
+      </form>
+    </AppDialog>
+  );
+}
+
 function EditDialog({ item, onClose }: { item: Payable; onClose: () => void }) {
   const save = useActionForm((form) => actions.updatePendingExpense(form) as never, onClose, "Pendiente actualizado.");
   return (
@@ -498,6 +559,7 @@ function EditDialog({ item, onClose }: { item: Payable; onClose: () => void }) {
         <Field id="edit-pending-due" label="Vence el (opcional)" error={save.errors.dueOn}>
           <input id="edit-pending-due" name="dueOn" type="date" className="input" min={item.owedOn} defaultValue={item.dueOn ?? ""} />
         </Field>
+        {!item.reimbursement && <PayerField id="edit-pending-payer" defaultValue={item.payer} />}
         <ErrorNotice message={save.message} />
         <Footer onClose={onClose} busy={save.busy} submitProps={save.submitProps} label="Guardar cambios" />
       </form>
@@ -505,7 +567,7 @@ function EditDialog({ item, onClose }: { item: Payable; onClose: () => void }) {
   );
 }
 
-function NewDialog({ branchId, onClose }: { branchId: string; onClose: () => void }) {
+function NewDialog({ branchId, isOwner, onClose }: { branchId: string; isOwner: boolean; onClose: () => void }) {
   const [pendingId] = useState(() => crypto.randomUUID());
   const save = useActionForm((form) => actions.createPendingExpense(form) as never, onClose, "Pendiente anotado.");
   return (
@@ -527,6 +589,7 @@ function NewDialog({ branchId, onClose }: { branchId: string; onClose: () => voi
         <Field id="new-pending-due" label="Vence el (opcional)" error={save.errors.dueOn} hint="Déjalo vacío si puede esperar.">
           <input id="new-pending-due" name="dueOn" type="date" className="input" />
         </Field>
+        {isOwner && <PayerField id="new-pending-payer" />}
         <ErrorNotice message={save.message} />
         <Footer onClose={onClose} busy={save.busy} submitProps={save.submitProps} label="Anotar pendiente" />
       </form>
@@ -590,6 +653,7 @@ function FixedDialog({ branchId, item, today, staff, onClose }: { branchId: stri
         <Field id="fixed-grace" label="Días para pagar (opcional)" error={save.errors.graceDays} hint="Ej.: 10 si la luz vence 10 días después. Vacío: sin vencimiento.">
           <input id="fixed-grace" name="graceDays" type="number" inputMode="numeric" min="0" max="365" step="1" className="input num" defaultValue={item?.graceDays ?? ""} />
         </Field>
+        <PayerField id="fixed-payer" defaultValue={item?.payer} />
         <ErrorNotice message={save.message} />
         <Footer onClose={onClose} busy={save.busy} submitProps={save.submitProps} label={item ? "Guardar cambios" : "Agregar gasto fijo"} />
       </form>

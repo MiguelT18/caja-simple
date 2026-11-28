@@ -41,6 +41,7 @@ const LIVE_ACTIONS = new Set([
   "updatePendingExpense",
   "cancelPendingExpense",
   "payPendingExpense",
+  "payFromPocket",
   "voidPendingPayment",
   "createWithdrawal",
   "voidWithdrawal",

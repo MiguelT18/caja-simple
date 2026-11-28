@@ -295,14 +295,14 @@ isOneToOne: false
                   ]
                 },"fixed_expenses": {
                   Row: {
-                    "amount": number,"archived_at": string | null,"branch_id": string,"category": string,"concept": string,"created_at": string,"employee_id": string | null,"frequency": Database["public"]['Enums']["expense_frequency"],"grace_days": number | null,"id": string,"starts_on": string
+                    "amount": number,"archived_at": string | null,"branch_id": string,"category": string,"concept": string,"created_at": string,"employee_id": string | null,"frequency": Database["public"]['Enums']["expense_frequency"],"grace_days": number | null,"id": string,"payer": string,"starts_on": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"archived_at"?: string | null,"branch_id": string,"category": string,"concept": string,"created_at"?: string,"employee_id"?: string | null,"frequency": Database["public"]['Enums']["expense_frequency"],"grace_days"?: number | null,"id"?: string,"starts_on": string
+                    "amount": number,"archived_at"?: string | null,"branch_id": string,"category": string,"concept": string,"created_at"?: string,"employee_id"?: string | null,"frequency": Database["public"]['Enums']["expense_frequency"],"grace_days"?: number | null,"id"?: string,"payer"?: string,"starts_on": string
                   }
                   Update: {
-                    "amount"?: number,"archived_at"?: string | null,"branch_id"?: string,"category"?: string,"concept"?: string,"created_at"?: string,"employee_id"?: string | null,"frequency"?: Database["public"]['Enums']["expense_frequency"],"grace_days"?: number | null,"id"?: string,"starts_on"?: string
+                    "amount"?: number,"archived_at"?: string | null,"branch_id"?: string,"category"?: string,"concept"?: string,"created_at"?: string,"employee_id"?: string | null,"frequency"?: Database["public"]['Enums']["expense_frequency"],"grace_days"?: number | null,"id"?: string,"payer"?: string,"starts_on"?: string
                   }
                   Relationships: [
                     {
@@ -561,14 +561,14 @@ isOneToOne: false
                   ]
                 },"pending_expenses": {
                   Row: {
-                    "amount": number,"branch_id": string,"canceled_at": string | null,"canceled_by": string | null,"category": string,"concept": string,"created_at": string,"created_by": string | null,"due_on": string | null,"employee_id": string | null,"fixed_expense_id": string | null,"id": string,"owed_on": string
+                    "amount": number,"branch_id": string,"canceled_at": string | null,"canceled_by": string | null,"category": string,"concept": string,"created_at": string,"created_by": string | null,"due_on": string | null,"employee_id": string | null,"fixed_expense_id": string | null,"id": string,"owed_on": string,"payer": string,"reimbursement": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount": number,"branch_id": string,"canceled_at"?: string | null,"canceled_by"?: string | null,"category": string,"concept": string,"created_at"?: string,"created_by"?: string | null,"due_on"?: string | null,"employee_id"?: string | null,"fixed_expense_id"?: string | null,"id"?: string,"owed_on"?: string
+                    "amount": number,"branch_id": string,"canceled_at"?: string | null,"canceled_by"?: string | null,"category": string,"concept": string,"created_at"?: string,"created_by"?: string | null,"due_on"?: string | null,"employee_id"?: string | null,"fixed_expense_id"?: string | null,"id"?: string,"owed_on"?: string,"payer"?: string,"reimbursement"?: boolean
                   }
                   Update: {
-                    "amount"?: number,"branch_id"?: string,"canceled_at"?: string | null,"canceled_by"?: string | null,"category"?: string,"concept"?: string,"created_at"?: string,"created_by"?: string | null,"due_on"?: string | null,"employee_id"?: string | null,"fixed_expense_id"?: string | null,"id"?: string,"owed_on"?: string
+                    "amount"?: number,"branch_id"?: string,"canceled_at"?: string | null,"canceled_by"?: string | null,"category"?: string,"concept"?: string,"created_at"?: string,"created_by"?: string | null,"due_on"?: string | null,"employee_id"?: string | null,"fixed_expense_id"?: string | null,"id"?: string,"owed_on"?: string,"payer"?: string,"reimbursement"?: boolean
                   }
                   Relationships: [
                     {
@@ -1170,7 +1170,7 @@ isOneToOne: false
           Views: {
             "pending_balances": {
                   Row: {
-                    "amount": number,"balance": number | null,"branch_id": string,"canceled_at": string | null,"canceled_by": string | null,"category": string,"concept": string,"created_at": string,"created_by": string | null,"due_on": string | null,"employee_id": string | null,"fixed_expense_id": string | null,"id": string,"owed_on": string,"paid": number | null
+                    "amount": number,"balance": number | null,"branch_id": string,"canceled_at": string | null,"canceled_by": string | null,"category": string,"concept": string,"created_at": string,"created_by": string | null,"due_on": string | null,"employee_id": string | null,"fixed_expense_id": string | null,"id": string,"owed_on": string,"paid": number | null,"payer": string,"reimbursement": boolean
                   }
                   ComputedFields: never
                   Relationships: [
@@ -1291,6 +1291,9 @@ isOneToOne: false
                            },
 "pay_pending_expense":
 { Args: { "p_amount": number,"p_payment": string,"p_pending": string,"p_shift"?: string }; Returns: undefined
+                           },
+"pay_pending_from_pocket":
+{ Args: { "p_amount": number,"p_payment": string,"p_pending": string }; Returns: undefined
                            },
 "receive_stock":
 { Args: { "p_delivery": string,"p_note"?: string,"p_qty": number }; Returns: undefined
