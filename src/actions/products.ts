@@ -370,11 +370,13 @@ export const products = {
         kind: z.enum(["entrada", "merma", "ajuste"]),
         qty: z.coerce.number({ error: "Ingresa un número" }).int("Usa un número entero").min(-100_000).max(100_000),
         reason: optional.pipe(z.string().max(120, "Máximo 120 caracteres").optional()),
+        lossKind: z.enum(["perdido", "roto", "defectuoso", "vencido", "otro"]).optional(),
       })
       .refine((v) => v.qty !== 0, { message: "La cantidad no puede ser 0", path: ["qty"] })
+      .refine((v) => v.kind !== "merma" || v.lossKind, { message: "Elige qué pasó", path: ["lossKind"] })
       .refine((v) => v.kind === "ajuste" || v.qty > 0, { message: "Usa un número mayor que 0", path: ["qty"] })
       .refine((v) => v.kind === "entrada" || v.reason, { message: "Escribe el motivo", path: ["reason"] }),
-    handler: async ({ branchId, productId, kind, qty, reason }, context) => {
+    handler: async ({ branchId, productId, kind, qty, reason, lossKind }, context) => {
       if (kind === "entrada") {
         const { data: held, error } = await db(context).rpc("send_stock", { p_branch: branchId, p_product: productId, p_qty: qty, p_reason: reason });
         check(error);
@@ -386,6 +388,7 @@ export const products = {
         p_kind: kind,
         p_qty: qty,
         p_reason: reason ?? "",
+        p_loss_kind: kind === "merma" ? lossKind : undefined,
       });
       check(error);
       return { ok: true };

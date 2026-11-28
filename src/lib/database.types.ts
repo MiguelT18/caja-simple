@@ -997,14 +997,14 @@ isOneToOne: false
                   ]
                 },"stock_movements": {
                   Row: {
-                    "approved_by": string | null,"branch_id": string,"business_id": string,"id": string,"kind": Database["public"]['Enums']["stock_move_kind"],"note": string | null,"occurred_at": string,"product_id": string,"qty": number,"reason": string | null,"recorded_by": string | null
+                    "approved_by": string | null,"branch_id": string,"business_id": string,"id": string,"kind": Database["public"]['Enums']["stock_move_kind"],"loss_kind": Database["public"]['Enums']["loss_kind"] | null,"note": string | null,"occurred_at": string,"product_id": string,"qty": number,"reason": string | null,"recorded_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "approved_by"?: string | null,"branch_id": string,"business_id": string,"id"?: string,"kind": Database["public"]['Enums']["stock_move_kind"],"note"?: string | null,"occurred_at"?: string,"product_id": string,"qty": number,"reason"?: string | null,"recorded_by"?: string | null
+                    "approved_by"?: string | null,"branch_id": string,"business_id": string,"id"?: string,"kind": Database["public"]['Enums']["stock_move_kind"],"loss_kind"?: Database["public"]['Enums']["loss_kind"] | null,"note"?: string | null,"occurred_at"?: string,"product_id": string,"qty": number,"reason"?: string | null,"recorded_by"?: string | null
                   }
                   Update: {
-                    "approved_by"?: string | null,"branch_id"?: string,"business_id"?: string,"id"?: string,"kind"?: Database["public"]['Enums']["stock_move_kind"],"note"?: string | null,"occurred_at"?: string,"product_id"?: string,"qty"?: number,"reason"?: string | null,"recorded_by"?: string | null
+                    "approved_by"?: string | null,"branch_id"?: string,"business_id"?: string,"id"?: string,"kind"?: Database["public"]['Enums']["stock_move_kind"],"loss_kind"?: Database["public"]['Enums']["loss_kind"] | null,"note"?: string | null,"occurred_at"?: string,"product_id"?: string,"qty"?: number,"reason"?: string | null,"recorded_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -1208,7 +1208,7 @@ isOneToOne: false
 { Args: { "p_delivery": string,"p_note"?: string,"p_qty": number }; Returns: undefined
                            },
 "record_stock_move":
-{ Args: { "p_branch": string,"p_kind": Database["public"]['Enums']["stock_move_kind"],"p_product": string,"p_qty": number,"p_reason": string }; Returns: undefined
+{ Args: { "p_branch": string,"p_kind": Database["public"]['Enums']["stock_move_kind"],"p_loss_kind"?: Database["public"]['Enums']["loss_kind"],"p_product": string,"p_qty": number,"p_reason": string }; Returns: undefined
                            },
 "referral_claimable":
 { Args: { "p_code": string }; Returns: string
@@ -1260,7 +1260,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
+            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","loss_kind": "perdido"|"roto"|"defectuoso"|"vencido"|"otro","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1376,7 +1376,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
+            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"loss_kind": ["perdido", "roto", "defectuoso", "vencido", "otro"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
           }
         }
 } as const

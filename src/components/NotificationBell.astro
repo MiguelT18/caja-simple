@@ -154,7 +154,7 @@ function describe(n: Notification) {
           : d.kind === "merma"
             ? [d.self ? "Restaste" : "restó", PackageMinus]
             : [d.self ? "Ajustaste" : "ajustó", ClipboardCheck];
-      const what = d.kind === "ajuste" ? `${d.product}: ${d.qty > 0 ? "+" : "−"}${n2}` : `${n2} de ${d.product}${d.kind === "merma" ? " (merma)" : ""}`;
+      const what = d.kind === "ajuste" ? `${d.product}: ${d.qty > 0 ? "+" : "−"}${n2}` : `${n2} de ${d.product}${d.kind === "merma" ? ` (${d.loss ?? "merma"})` : ""}`;
       return {
         icon,
         title: d.self ? `${verb} ${what}` : `${d.person} ${verb} ${what}`,

@@ -194,12 +194,24 @@ export interface ClosedShift {
   reopened: boolean;
 }
 
+/** Tipo de una merma (public.loss_kind). */
+export type LossKind = "perdido" | "roto" | "defectuoso" | "vencido" | "otro";
+export const LOSS_KINDS: { value: LossKind; label: string }[] = [
+  { value: "perdido", label: "Perdido" },
+  { value: "roto", label: "Roto" },
+  { value: "defectuoso", label: "Defectuoso" },
+  { value: "vencido", label: "Vencido" },
+  { value: "otro", label: "Otro" },
+];
+
 export interface StockMove {
   id: string;
   kind: "entrada" | "merma" | "ajuste";
   /** Con signo: lo que sumó o restó al stock. */
   qty: number;
   reason: string | null;
+  /** Qué pasó en una merma (perdido, roto…); null en entradas y ajustes. */
+  lossKind: LossKind | null;
   /** Lo que anotó quien recibió el envío. */
   note: string | null;
   product: string;
@@ -325,7 +337,7 @@ export type Notification = {
   | {
       /** Una entrada, merma o ajuste de la sucursal; `self`: lo registró quien recibe el aviso. `pending`: envío por confirmar. */
       kind: "stock_move";
-      data: { person: string; self: boolean; product: string; kind: "entrada" | "merma" | "ajuste"; qty: number; branch: string; reason: string | null; pending: boolean };
+      data: { person: string; self: boolean; product: string; kind: "entrada" | "merma" | "ajuste"; qty: number; branch: string; reason: string | null; loss?: LossKind | null; pending: boolean };
     }
   | { kind: "reopen_answer"; data: { accepted: boolean; person: string; branch: string; shift: string; date: string } }
   | { kind: "ownership"; data: { business: string; person: string } }
