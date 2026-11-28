@@ -85,6 +85,10 @@ Con QR no hay cobro automático, así que hacen falta recordatorios antes de que
 
 En la app (`/app/<negocio>/plan`) el único método es el **QR bancario** de monto abierto (BCP), con el monto ya convertido a bolivianos con impuestos. El QR del BCP vive en `public/pagos/`: `qr.jpg` es el original (póster completo), `qr-codigo.webp` el recorte de la tarjeta que se muestra en la página del cobro y `qr-descarga.jpg` la copia liviana para descargar (los dos salen de `qr.jpg` con sharp). Si `billing_settings.qr_image_url` tiene otra imagen, se usa esa para todo. **El QR actual vence el 07/11/2028.** Cada cobro tiene su página, `/app/<negocio>/cobro/<id>`: para qué negocio es, el monto, el QR y los pasos (pagar, enviar el comprobante por WhatsApp, activación y avisos de vencimiento). La base todavía acepta transferencia y tarjeta (`plan_charges.method`), pero la página no las ofrece.
 
+## Complemento: Asistente de WhatsApp
+
+Se contrata aparte del plan, por negocio, y vale hasta `businesses.assistant_until`. El admin lo activa a mano después del cobro, como el plan. El precio todavía no está definido. Tiene que cubrir los tokens del modelo y los mensajes que Meta cobra: las respuestas dentro de la ventana de 24 h son gratis hasta 1.000 por número al mes, y las plantillas `utility` se pagan. Detalle técnico en `docs/modelo-de-datos.md` › Asistente de WhatsApp.
+
 ## Límites en la app
 
 La base de datos aplica los límites (migraciones `supabase/migrations/20261031012616_plan_limits.sql` `20261108170000_free_plan_limits.sql` y `20261108190000_promotions.sql`). `planLimits`, en `src/data/plans.ts`, solo los muestra y tiene que coincidir con ella. Ese mismo archivo repite, para mostrarlos, los precios en dólares sin impuestos de `private.plan_usd`. No se guarda ningún precio fijo en bolivianos: se calcula al mostrarlo y al cobrar.

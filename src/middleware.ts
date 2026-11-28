@@ -14,6 +14,8 @@ const LIVE_ACTIONS = new Set([
   "decideOvertime",
   "addOrderDeposit",
   "refundOrderDeposit",
+  "setAssistantPaused",
+  "resumeConversation",
   "requestReopen",
   "savePromotion",
   "requestStockEntry",
