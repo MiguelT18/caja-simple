@@ -1,5 +1,5 @@
 ---
-import { CalendarX2, CircleCheck, GripVertical, Hourglass, LockOpen, MessageSquareText, Pencil, Plus, RotateCcw, Trash, TriangleAlert } from "@lucide/astro";
+import { CalendarX2, CircleCheck, Clock, GripVertical, Hourglass, LockOpen, MessageSquareText, Pencil, Plus, RotateCcw, Trash, TriangleAlert } from "@lucide/astro";
 import Avatar from "@/components/Avatar.astro";
 import ClosuresCalendar from "@/components/app/ClosuresCalendar";
 import PageHeader from "@/components/PageHeader.astro";
@@ -12,7 +12,7 @@ import { branchContext, branchOvertime, businessHref, closesBetween, CLOSES_PAGE
 import { ArrowLeft, ArrowRight } from "@lucide/astro";
 import { pageList } from "@/components/app/Pager";
 import { differenceLabel, formatBs, hoursLabel, overnight, shiftHours } from "@/lib/format";
-import { addDays, inShiftWindow, longDate, openFrom, parseRange, shortDate, stamp } from "@/lib/dates";
+import { addDays, longDate, openFrom, openUntil, parseRange, shortDate, stamp } from "@/lib/dates";
 import { closedReason, DAY_NAMES, isoDow } from "@/lib/schedule";
 
 const { negocio, sucursal } = Astro.params;
@@ -20,9 +20,9 @@ const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
 if (!ctx) return Astro.rewrite("/404");
 const { branch, closedNow, closures, currentShift, employees, hours, lastCount, reopenPending, role, shiftById, shiftTotals, shifts, today } = ctx;
 const isOwner = role === "dueño";
-// El turno de quien trabaja aquí: solo ese puede abrir (la base lo exige, private.check_shift_schedule). La dueña sin
+// Los turnos de quien trabaja aquí: solo esos puede abrir (la base lo exige, private.check_shift_schedule). La dueña sin
 // ficha en esta sucursal no abre, no cierra ni reabre turnos (ctx.works).
-const myShiftId = ctx.works ? ctx.membership.employee?.shiftId : undefined;
+const myShiftIds = ctx.works ? (ctx.membership.employee?.shiftIds ?? []) : [];
 const range = parseRange(Astro.url.searchParams, today);
 const askedPage = Math.min(Math.max(Number.parseInt(Astro.url.searchParams.get("pagina") ?? "1", 10) || 1, 1), 1000);
 const { closes: history, total: historyTotal, page: historyPage } = await closesBetween(Astro.locals.supabase, branch.id, range.from, range.to, askedPage);
@@ -81,12 +81,12 @@ const daysLabel = (weekdays: number[] | null) =>
     {
       shifts.map((shift) => {
         const t = shiftTotals(shift.id);
-        const staff = employees.filter((e) => e.shiftId === shift.id);
-        // Fuera de horario la empleada ve el formulario igual: la base lo rechaza (check_shift_schedule) y el error sale en un aviso flotante. La dueña lo abre confirmándolo.
-        const onSchedule = inShiftWindow(shift);
-        const schedule = `${openFrom(shift)} a ${shift.end}`;
-        // Días hábiles (horario semanal, días del turno y cierres): la empleada no lo abre; la dueña lo confirma.
-        const closed = closedNow(shift);
+        const staff = employees.filter((e) => e.shiftIds.includes(shift.id));
+        // Dentro de su margen (o con horas extra aceptadas) abre; fuera, pide horas extra. La base decide igual (check_shift_schedule).
+        const onSchedule = ctx.canOpenNow(shift);
+        const schedule = `${openFrom(shift, ctx.margins)} a ${openUntil(shift, ctx.margins)}`;
+        // Días hábiles (horario semanal, días del turno y cierres): ese día solo con horas extra aceptadas.
+        const closed = ctx.extraAccepted.has(shift.id) ? null : closedNow(shift);
         return (
           <article class:list={["card shift", { live: t.close.status === "en-curso" }]} aria-labelledby={`shift-${shift.id}-title`} data-shift-id={shift.id}>
             <header class="shift-head">
@@ -191,7 +191,7 @@ const daysLabel = (weekdays: number[] | null) =>
             {t.close.status === "pendiente" &&
               (currentShift ? (
                 <p class="muted">Cierra el turno {currentShift.name.toLowerCase()} antes de abrir este.</p>
-              ) : shift.id !== myShiftId ? (
+              ) : !myShiftIds.includes(shift.id) ? (
                 <p class="status chip-neutral">
                   <LockOpen size={16} stroke-width={2} />
                   <span>
@@ -204,11 +204,42 @@ const daysLabel = (weekdays: number[] | null) =>
                     )}
                   </span>
                 </p>
-              ) : closed ? (
-                <p class="status chip-neutral">
-                  <CalendarX2 size={16} stroke-width={2} />
-                  <span>{closed}. Hoy no se abre.</span>
-                </p>
+              ) : closed || !onSchedule ? (
+                <>
+                  <p class="status chip-neutral">
+                    {closed ? <CalendarX2 size={16} stroke-width={2} /> : <Clock size={16} stroke-width={2} />}
+                    <span>{closed ? `${closed}. Hoy no se abre.` : `Se abre de ${schedule}.`}</span>
+                  </p>
+                  {/* Fuera de horario: se pide como horas extra y la dueña acepta o rechaza en sus avisos. */}
+                  {ctx.extraPending.has(shift.id) ? (
+                    <p class="status chip-neutral">
+                      <Hourglass size={16} stroke-width={2} />
+                      <span>Pediste abrirlo fuera de horario. Te avisamos cuando quien administra el negocio responda.</span>
+                    </p>
+                  ) : (
+                    <form
+                      id={`extra-ask-${shift.id}`}
+                      class="inline-form"
+                      data-action="requestExtraShift"
+                      data-success="Listo: le avisamos a quien administra el negocio."
+                      novalidate
+                    >
+                      <input type="hidden" name="shiftId" value={shift.id} />
+                      <FormInput
+                        form={`extra-ask-${shift.id}`}
+                        name="reason"
+                        label="¿Necesitas abrirlo ahora? Motivo (opcional)"
+                        hint="Cuenta como horas extra: quien administra el negocio recibe un aviso y decide."
+                        maxlength={200}
+                      />
+                      <button type="submit" class="btn btn-secondary">
+                        <Clock size={18} stroke-width={1.75} />
+                        Pedir horas extra
+                      </button>
+                      <p class="notice notice-error" role="alert" data-form-notice />
+                    </form>
+                  )}
+                </>
               ) : (
                 <form id={`open-${shift.id}`} class="inline-form" data-action="openShift" novalidate>
                   <input type="hidden" name="branchId" value={branch.id} />
@@ -223,7 +254,6 @@ const daysLabel = (weekdays: number[] | null) =>
                     label="Dinero en caja al abrir (Bs)"
                     value={lastCount ? String(lastCount.counted) : undefined}
                     hint={[
-                      !onSchedule && `Se abre de ${schedule}.`,
                       lastCount && `Lo contado al cerrar ${lastCount.shiftName ? `el turno ${lastCount.shiftName.toLowerCase()}` : "el último turno"}. Cámbialo si no es lo que hay.`,
                       overnight(shift) && "Lo que vendas pasada la medianoche cuenta para hoy.",
                     ]
@@ -241,7 +271,7 @@ const daysLabel = (weekdays: number[] | null) =>
 
             {/* Cerrado hoy: quien trabaja en él pide reabrirlo y la dueña acepta o rechaza en sus avisos. */}
             {t.close.status === "cerrado" && t.closeId && !currentShift &&
-              (shift.id !== myShiftId ? null : reopenPending.has(t.closeId) ? (
+              (!myShiftIds.includes(shift.id) ? null : reopenPending.has(t.closeId) ? (
                 <p class="status chip-neutral">
                   <Hourglass size={16} stroke-width={2} />
                   <span>Pediste reabrirlo. Te avisamos cuando quien administra el negocio responda.</span>

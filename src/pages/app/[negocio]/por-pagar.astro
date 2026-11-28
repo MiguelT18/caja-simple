@@ -69,7 +69,6 @@ const many = m.branches.length > 1;
             today={today}
             userId={Astro.locals.userId!}
             isOwner={isOwner}
-            canAdd
             cashShift={null}
             myEmployeeId={m.employee?.branchId === b.id ? m.employee.id : null}
           />

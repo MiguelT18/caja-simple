@@ -27,7 +27,7 @@ const shiftOptions = shifts.map((s) => ({
 }));
 
 const rows = employees.map((e) => {
-  const shift = shiftById(e.shiftId);
+  const mine = e.shiftIds.map(shiftById).filter((s) => s !== undefined);
   return {
     id: e.id,
     avatarSeed: e.personId ?? e.id,
@@ -36,8 +36,10 @@ const rows = employees.map((e) => {
     role: e.jobTitle,
     branchId: e.branchId,
     branch: branchById(e.branchId)?.name ?? "—",
-    shiftId: e.shiftId ?? undefined,
-    shift: shift && { name: shift.name, tone: shift.tone },
+    shiftIds: e.shiftIds,
+    shifts: mine.map((s) => ({ name: s.name, tone: s.tone })),
+    openEarlyMin: e.openEarlyMin,
+    openLateMin: e.openLateMin,
     active: e.status === "activo",
   };
 });

@@ -44,7 +44,7 @@ describe("planLimits coincide con la base", () => {
     expect([planLimits.Gratis.promotions, planLimits.Negocio.promotions, planLimits.Sucursales.promotions]).toEqual([false, true, true]);
   });
   it("la prueba dura TRIAL_DAYS (hoy + días − 1, como plan_until; el referido, referral_trial_days)", () => {
-    const days = Number(latest("private.start_trial").match(/v_days smallint := (\d+)/)?.[1]);
+    const days = Number(latest("public.trial_offer").match(/else (\d+)::smallint/)?.[1]);
     expect(days).toBe(TRIAL_DAYS);
   });
   it("el aviso de cada cierre va en todos los planes", () => {
@@ -151,7 +151,7 @@ describe("las funciones de pago miran el plan que vale hoy", () => {
 
   it("todo chequeo de plan usa private.effective_plan (un plan vencido sigue diciendo «Negocio» hasta plan_daily)", () => {
     // Las que cobran, vencen o dan la prueba miran el plan guardado a propósito. check_free_business ya no existe.
-    const billing = ["private.effective_plan", "private.plan_daily", "private.plan_usd", "private.create_plan_charge", "private.start_trial", "private.check_free_business"];
+    const billing = ["private.effective_plan", "private.plan_daily", "private.plan_usd", "private.create_plan_charge", "private.start_trial", "public.start_trial", "private.check_free_business"];
     const raw = [...defined]
       .filter(([fn, body]) => !billing.includes(fn) && /'(Gratis|Negocio|Sucursales)'/.test(body) && !/private\.effective_plan\(/.test(body))
       .map(([fn]) => fn);
@@ -164,7 +164,13 @@ describe("las funciones de pago miran el plan que vale hoy", () => {
   });
 
   it("la prueba es una por persona", () => {
-    expect(latest("private.start_trial")).toMatch(/insert into private\.trials/);
+    expect(latest("public.start_trial")).toMatch(/insert into private\.trials/);
+    expect(latest("public.trial_offer")).toMatch(/not exists \(select 1 from private\.trials/);
+  });
+
+  it("la prueba no empieza sola al crear un negocio: la activa la dueña (start_trial)", () => {
+    const all = sources.join("\n");
+    expect(all.lastIndexOf("drop trigger businesses_start_trial")).toBeGreaterThan(all.lastIndexOf("create trigger businesses_start_trial"));
   });
 });
 

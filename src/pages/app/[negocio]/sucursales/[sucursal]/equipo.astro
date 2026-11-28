@@ -24,7 +24,7 @@ const staff = team.filter((p) => !p.isOwner).length;
   <ul class="card team" role="list">
     {
       team.map((p) => {
-        const shift = p.shiftId ? shiftById(p.shiftId) : undefined;
+        const mine = p.shiftIds.map(shiftById).filter((s) => s !== undefined);
         const me = p.personId === Astro.locals.userId;
         return (
           <li class="member">
@@ -38,7 +38,7 @@ const staff = team.filter((p) => !p.isOwner).length;
             </span>
             <span class="tags">
               {p.isOwner && <span class="chip chip-info">Dueña</span>}
-              {shift && <ShiftChip shift={shift} withTime />}
+              {mine.map((s) => <ShiftChip shift={s} withTime />)}
             </span>
           </li>
         );

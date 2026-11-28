@@ -1,5 +1,5 @@
 ---
-import { MessageCircle, AlarmClock, ArrowLeftRight, HandCoins, Wallet, Bell, BellOff, ChevronLeft, ChevronRight, CircleCheck, CalendarClock, CheckCheck, CircleX, Crown, Hourglass, ClipboardCheck, PackageCheck, PackageMinus, PackagePlus, PackageX, RotateCcw, Trash2, TriangleAlert, Truck, UserCheck, UserPlus, UserX, X } from "@lucide/astro";
+import { AlarmClock, ArrowLeftRight, Bell, BellOff, CalendarClock, CheckCheck, ChevronLeft, ChevronRight, CircleCheck, CircleX, ClipboardCheck, Clock, Crown, HandCoins, Hourglass, MessageCircle, PackageCheck, PackageMinus, PackagePlus, PackageX, RotateCcw, Trash2, TriangleAlert, Truck, UserCheck, UserPlus, UserX, Wallet, X } from "@lucide/astro";
 import type { HTMLAttributes } from "astro/types";
 import { branchColor, branchImages, inbox, myBusinesses, notificationHref } from "@/data/queries";
 import type { Notification } from "@/data/types";
@@ -11,7 +11,7 @@ type Props = HTMLAttributes<"div">;
 const { class: className, ...rest } = Astro.props;
 const { notifications, unread } = inbox(Astro.locals);
 // Una invitación o un pedido sin responder no se borra: es donde se acepta o se rechaza.
-const removable = (n: Notification) => !((n.kind === "invitation" || n.kind === "reopen_request" || n.kind === "join_request" || n.kind === "stock_request" || n.kind === "stock_delivery") && n.pending);
+const removable = (n: Notification) => !((n.kind === "invitation" || n.kind === "reopen_request" || n.kind === "extra_shift_request" || n.kind === "join_request" || n.kind === "stock_request" || n.kind === "stock_delivery") && n.pending);
 // «de hoy», «de ayer» o la fecha del turno.
 const dayOf = (date: string) => (date === today() ? "de hoy" : `del ${shortDate(date)}`);
 const canClear = notifications.some(removable);
@@ -58,6 +58,21 @@ function describe(n: Notification) {
       return { icon: AlarmClock, title: `Turno ${n.data.shift.toLowerCase()} en ${n.data.branch}: abre en ${n.data.minutes === 60 ? "1 hora" : `${n.data.minutes} minutos`}`, detail: `Hora de abrir: ${n.data.start}` };
     case "shift_late":
       return { icon: TriangleAlert, title: `Turno ${n.data.shift.toLowerCase()} sin abrir en ${n.data.branch}`, detail: `Debía abrir a las ${n.data.start}`, tone: "warning" };
+    case "shift_opened_late":
+      return { icon: TriangleAlert, title: `Turno ${n.data.shift.toLowerCase()} abierto tarde en ${n.data.branch}`, detail: `${n.data.person ?? "Alguien"} lo abrió a las ${n.data.opened}, ${n.data.minutes} min después de las ${n.data.start}`, tone: "warning" };
+    case "shift_opened_early":
+      return { icon: Clock, title: `Turno ${n.data.shift.toLowerCase()} abierto antes en ${n.data.branch}`, detail: `${n.data.person ?? "Alguien"} lo abrió a las ${n.data.opened}, ${n.data.minutes} min antes de las ${n.data.start}` };
+    case "extra_shift_request":
+      return {
+        icon: Clock,
+        title: `${n.data.person} pide abrir el turno ${n.data.shift.toLowerCase()} fuera de horario`,
+        detail: [`${n.data.branch} · a las ${n.data.at} (horario ${n.data.start} a ${n.data.end})`, n.data.reason && `«${n.data.reason}»`].filter(Boolean).join(" · "),
+        tone: n.pending ? "warning" : undefined,
+      };
+    case "extra_shift_answer":
+      return n.data.accepted
+        ? { icon: CircleCheck, title: `${n.data.person} aceptó tus horas extra`, detail: `Ya puedes abrir el turno ${n.data.shift.toLowerCase()} en ${n.data.branch}` }
+        : { icon: CircleX, title: `${n.data.person} rechazó tus horas extra`, detail: `Turno ${n.data.shift.toLowerCase()} en ${n.data.branch}` };
     case "shift_overdue":
       return { icon: TriangleAlert, title: `Turno ${n.data.shift.toLowerCase()} sin cerrar en ${n.data.branch}`, detail: `Debía cerrar a las ${n.data.end}${n.data.person ? ` · lo abrió ${n.data.person}` : ""}`, tone: "warning" };
     case "expense_added":
@@ -294,6 +309,34 @@ const label = unread === 0 ? "Notificaciones" : `Notificaciones, ${unread} sin l
                           data-reload
                           data-success="Pedido rechazado."
                           data-confirm={`¿Rechazar el pedido de ${n.data.person}? El turno ${n.data.shift.toLowerCase()} sigue cerrado.`}
+                          data-confirm-label="Rechazar"
+                          data-danger
+                        >
+                          <input type="hidden" name="requestId" value={n.requestId} />
+                          <input type="hidden" name="accept" value="false" />
+                          <button type="submit" class="btn btn-secondary" aria-label={`Rechazar el pedido de ${n.data.person}`}>
+                            Rechazar
+                          </button>
+                        </form>
+                      </div>
+                    ) : (
+                      <p class="bell-detail">Ya respondiste este pedido.</p>
+                    ))}
+                  {n.kind === "extra_shift_request" &&
+                    (n.pending ? (
+                      <div class="bell-actions">
+                        <form data-action="answerExtraShift" data-reload data-success={`Listo: ${n.data.person} ya puede abrir el turno.`}>
+                          <input type="hidden" name="requestId" value={n.requestId} />
+                          <input type="hidden" name="accept" value="true" />
+                          <button type="submit" class="btn btn-primary" aria-label={`Aceptar: ${n.data.person} abre el turno ${n.data.shift.toLowerCase()} fuera de horario`}>
+                            Aceptar
+                          </button>
+                        </form>
+                        <form
+                          data-action="answerExtraShift"
+                          data-reload
+                          data-success="Pedido rechazado."
+                          data-confirm={`¿Rechazar el pedido de ${n.data.person}? No podrá abrir el turno ${n.data.shift.toLowerCase()} fuera de horario.`}
                           data-confirm-label="Rechazar"
                           data-danger
                         >

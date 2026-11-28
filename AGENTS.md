@@ -67,9 +67,10 @@ Errores en producción: `check()` (Actions) y el middleware escriben una línea 
 src/
 ├── pages/
 │   ├── index.astro   # / (landing) · planes.astro: /planes
-│   ├── app/          # la app con sesión: /app (Tus negocios), /app/cuenta, /app/[negocio]/…, /app/[negocio]/sucursales/[sucursal]/… (ver docs/modelo-de-datos.md)
+│   ├── app/          # la app con sesión: /app (Tus negocios), /app/cuenta, /app/novedades, /app/[negocio]/…, /app/[negocio]/sucursales/[sucursal]/… (ver docs/modelo-de-datos.md)
 │   ├── auth/         # /auth/iniciar-sesion, /auth/crear-cuenta, /auth/verificar (código de la 2FA)
 │   └── api/auth/     # login, signup, google, callback, verify, logout (endpoints de Supabase Auth)
+├── content/novedades/ # notas de «Novedades» en Markdown (esquema en src/content.config.ts; quién las ve y cuáles son nuevas: src/lib/news.ts)
 ├── actions/          # Astro Actions: todas las escrituras de /app (validan con zod; RLS autoriza). index.ts las junta; un archivo por dominio (businesses, shifts, sales, products, employees, account) y shared.ts (validadores, errores, fotos)
 ├── middleware.ts     # cliente de Supabase por petición, sesión y protección de /app
 ├── layouts/
@@ -117,6 +118,7 @@ Fuera de `src/`: `supabase/migrations/` (esquema), `supabase/functions/` (`send-
   - Inputs de al menos 16px.
   - Nada se comunica solo con color.
   - `aria-*` correctos en los controles personalizados (popover, menú, toggles).
+- **Novedades:** un cambio que la persona nota lleva una nota en `src/content/novedades/AAAA-MM-DD-slug.md` (`title`, `date`, `summary` de una línea para la franja, `para`: `todos`, `dueña` o `empleada`). Sale con el deploy: la franja de arriba y el «Nuevo» del menú se apagan al verla (cookie `novedades-vistas`).
 - **Datos falsos:** no inventes clientes, métricas ni testimonios. Si hace falta mostrar algo, rotúlalo como «Ejemplo».
 - **Datos y permisos:** las páginas leen solo por `src/data/queries.ts` y escriben solo por `src/actions/`. La autorización real es RLS en la base (ver `docs/modelo-de-datos.md`): nunca la reemplaces con chequeos en el cliente. Cambios de esquema, siempre con una migración nueva. Toda tabla nueva lleva RLS y la política restrictiva «Exige la verificación en dos pasos» (`private.mfa_ok()`). Una función solo para planes pagos sigue el checklist de [`docs/planes-de-suscripcion.md`](docs/planes-de-suscripcion.md) › Límites en la app (en la base, con `private.effective_plan`).
 - **Caché (Redis):** solo lo que cambia poco (sesión, catálogo, turnos, equipo, URLs firmadas), con clave por persona. Caja, stock y avisos nunca van a la caché. El middleware la invalida tras cada Action; si una Action nueva solo toca datos frescos, agrégala a `LIVE_ACTIONS` en `src/middleware.ts`. Ver `docs/modelo-de-datos.md` › Caché.

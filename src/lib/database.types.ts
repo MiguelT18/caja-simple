@@ -185,14 +185,14 @@ isOneToOne: false
                   ]
                 },"employees": {
                   Row: {
-                    "branch_id": string,"business_id": string,"created_at": string,"email": string,"id": string,"job_title": string,"person_id": string | null,"shift_id": string | null,"status": Database["public"]['Enums']["employee_status"]
+                    "branch_id": string,"business_id": string,"created_at": string,"email": string,"id": string,"job_title": string,"open_early_min": number,"open_late_min": number,"person_id": string | null,"shift_ids": (string)[],"status": Database["public"]['Enums']["employee_status"]
                   }
                   ComputedFields: never
                   Insert: {
-                    "branch_id": string,"business_id": string,"created_at"?: string,"email": string,"id"?: string,"job_title"?: string,"person_id"?: string | null,"shift_id"?: string | null,"status"?: Database["public"]['Enums']["employee_status"]
+                    "branch_id": string,"business_id": string,"created_at"?: string,"email": string,"id"?: string,"job_title"?: string,"open_early_min"?: number,"open_late_min"?: number,"person_id"?: string | null,"shift_ids"?: (string)[],"status"?: Database["public"]['Enums']["employee_status"]
                   }
                   Update: {
-                    "branch_id"?: string,"business_id"?: string,"created_at"?: string,"email"?: string,"id"?: string,"job_title"?: string,"person_id"?: string | null,"shift_id"?: string | null,"status"?: Database["public"]['Enums']["employee_status"]
+                    "branch_id"?: string,"business_id"?: string,"created_at"?: string,"email"?: string,"id"?: string,"job_title"?: string,"open_early_min"?: number,"open_late_min"?: number,"person_id"?: string | null,"shift_ids"?: (string)[],"status"?: Database["public"]['Enums']["employee_status"]
                   }
                   Relationships: [
                     {
@@ -212,12 +212,6 @@ isOneToOne: false
       columns: ["person_id"]
 isOneToOne: false
       referencedRelation: "profiles"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "employees_shift_id_fkey"
-      columns: ["shift_id"]
-isOneToOne: false
-      referencedRelation: "shifts"
       referencedColumns: ["id"]
     }
                   ]
@@ -270,6 +264,50 @@ isOneToOne: false
       columns: ["voided_by"]
 isOneToOne: false
       referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"extra_shift_requests": {
+                  Row: {
+                    "branch_id": string,"close_id": string | null,"created_at": string,"decided_at": string | null,"decided_by": string | null,"id": string,"reason": string | null,"requested_by": string | null,"shift_id": string,"status": Database["public"]['Enums']["reopen_status"],"used_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "branch_id": string,"close_id"?: string | null,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"id"?: string,"reason"?: string | null,"requested_by"?: string | null,"shift_id": string,"status"?: Database["public"]['Enums']["reopen_status"],"used_at"?: string | null
+                  }
+                  Update: {
+                    "branch_id"?: string,"close_id"?: string | null,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"id"?: string,"reason"?: string | null,"requested_by"?: string | null,"shift_id"?: string,"status"?: Database["public"]['Enums']["reopen_status"],"used_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "extra_shift_requests_branch_id_fkey"
+      columns: ["branch_id"]
+isOneToOne: false
+      referencedRelation: "branches"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "extra_shift_requests_close_id_fkey"
+      columns: ["close_id"]
+isOneToOne: false
+      referencedRelation: "shift_closes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "extra_shift_requests_decided_by_fkey"
+      columns: ["decided_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "extra_shift_requests_requested_by_fkey"
+      columns: ["requested_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "extra_shift_requests_shift_id_fkey"
+      columns: ["shift_id"]
+isOneToOne: false
+      referencedRelation: "shifts"
       referencedColumns: ["id"]
     }
                   ]
@@ -385,14 +423,14 @@ isOneToOne: false
                   ]
                 },"notifications": {
                   Row: {
-                    "business_id": string | null,"created_at": string,"data": NonNullable<Json>,"employee_id": string | null,"id": string,"join_request_id": string | null,"kind": Database["public"]['Enums']["notification_kind"],"read_at": string | null,"reopen_request_id": string | null,"stock_delivery_id": string | null,"stock_request_id": string | null,"user_id": string
+                    "business_id": string | null,"created_at": string,"data": NonNullable<Json>,"employee_id": string | null,"extra_request_id": string | null,"id": string,"join_request_id": string | null,"kind": Database["public"]['Enums']["notification_kind"],"read_at": string | null,"reopen_request_id": string | null,"stock_delivery_id": string | null,"stock_request_id": string | null,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id"?: string | null,"created_at"?: string,"data"?: NonNullable<Json>,"employee_id"?: string | null,"id"?: string,"join_request_id"?: string | null,"kind": Database["public"]['Enums']["notification_kind"],"read_at"?: string | null,"reopen_request_id"?: string | null,"stock_delivery_id"?: string | null,"stock_request_id"?: string | null,"user_id": string
+                    "business_id"?: string | null,"created_at"?: string,"data"?: NonNullable<Json>,"employee_id"?: string | null,"extra_request_id"?: string | null,"id"?: string,"join_request_id"?: string | null,"kind": Database["public"]['Enums']["notification_kind"],"read_at"?: string | null,"reopen_request_id"?: string | null,"stock_delivery_id"?: string | null,"stock_request_id"?: string | null,"user_id": string
                   }
                   Update: {
-                    "business_id"?: string | null,"created_at"?: string,"data"?: NonNullable<Json>,"employee_id"?: string | null,"id"?: string,"join_request_id"?: string | null,"kind"?: Database["public"]['Enums']["notification_kind"],"read_at"?: string | null,"reopen_request_id"?: string | null,"stock_delivery_id"?: string | null,"stock_request_id"?: string | null,"user_id"?: string
+                    "business_id"?: string | null,"created_at"?: string,"data"?: NonNullable<Json>,"employee_id"?: string | null,"extra_request_id"?: string | null,"id"?: string,"join_request_id"?: string | null,"kind"?: Database["public"]['Enums']["notification_kind"],"read_at"?: string | null,"reopen_request_id"?: string | null,"stock_delivery_id"?: string | null,"stock_request_id"?: string | null,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -406,6 +444,12 @@ isOneToOne: false
       columns: ["employee_id"]
 isOneToOne: false
       referencedRelation: "employees"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "notifications_extra_request_id_fkey"
+      columns: ["extra_request_id"]
+isOneToOne: false
+      referencedRelation: "extra_shift_requests"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "notifications_join_request_id_fkey"
@@ -1309,6 +1353,9 @@ isOneToOne: false
               "businesses": number,"paying": number,"people": number
             }[]
                            },
+"answer_extra_shift":
+{ Args: { "p_accept": boolean,"p_request": string }; Returns: undefined
+                           },
 "answer_join":
 { Args: { "p_accept": boolean,"p_branch"?: string,"p_job_title"?: string,"p_request": string,"p_shift"?: string }; Returns: undefined
                            },
@@ -1323,14 +1370,14 @@ isOneToOne: false
                            },
 "branch_team":
 { Args: { "p_branch": string }; Returns: {
-              "avatar_url": string,"first_name": string,"is_owner": boolean,"job_title": string,"last_name": string,"person_id": string,"shift_id": string
+              "avatar_url": string,"first_name": string,"is_owner": boolean,"job_title": string,"last_name": string,"person_id": string,"shift_ids": (string)[]
             }[]
                            },
 "business_stats":
 { Args: { "p_business": string,"p_from": string,"p_to": string }; Returns: Json
                            },
-"change_my_shift":
-{ Args: { "p_employee": string,"p_shift": string }; Returns: undefined
+"change_my_shifts":
+{ Args: { "p_employee": string,"p_shifts": (string)[] }; Returns: undefined
                            },
 "charge_order":
 { Args: { "p_items": Json,"p_order": string,"p_payment": Database["public"]['Enums']["payment_method"],"p_sale": string,"p_shift": string }; Returns: string
@@ -1381,6 +1428,9 @@ isOneToOne: false
 "register_sale":
 { Args: { "p_branch": string,"p_items": Json,"p_payment": Database["public"]['Enums']["payment_method"],"p_sale": string,"p_shift": string,"p_sold_at"?: string }; Returns: string
                            },
+"request_extra_shift":
+{ Args: { "p_reason"?: string,"p_shift": string }; Returns: string
+                           },
 "request_join":
 { Args: { "p_branch"?: string,"p_business": string,"p_message"?: string }; Returns: string
                            },
@@ -1412,8 +1462,14 @@ isOneToOne: false
 "set_close_note":
 { Args: { "p_close": string,"p_note": string }; Returns: undefined
                            },
+"start_trial":
+{ Args: { "p_business": string }; Returns: string
+                           },
 "transfer_ownership":
 { Args: { "p_employee": string }; Returns: undefined
+                           },
+"trial_offer":
+{ Args: { "p_business": string }; Returns: number
                            },
 "void_sale":
 { Args: { "p_sale": string }; Returns: undefined
@@ -1441,7 +1497,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","loss_kind": "perdido"|"roto"|"defectuoso"|"vencido"|"otro","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move"|"wa_handoff","overtime_status": "pendiente"|"pagada"|"descontada"|"repuesta","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
+            "business_kind": "tienda"|"ropa"|"restaurante","charge_method": "qr"|"transferencia"|"tarjeta","close_status": "en-curso"|"cerrado","employee_status": "activo"|"invitado","expense_frequency": "semanal"|"quincenal"|"mensual"|"diario","join_status": "pendiente"|"aceptada"|"rechazada","loss_kind": "perdido"|"roto"|"defectuoso"|"vencido"|"otro","notification_kind": "invitation"|"invitation_answer"|"cash_mismatch"|"low_stock"|"shift_change"|"plan_expiring"|"plan_expired"|"shift_closed"|"shift_reminder"|"shift_late"|"reopen_request"|"reopen_answer"|"reopen_sent"|"ownership"|"join_request"|"join_answer"|"shift_overdue"|"stock_request"|"stock_answer"|"stock_delivery"|"stock_received"|"expense_added"|"cash_withdrawal"|"stock_move"|"wa_handoff"|"shift_opened_late"|"shift_opened_early"|"extra_shift_request"|"extra_shift_answer","overtime_status": "pendiente"|"pagada"|"descontada"|"repuesta","payment_method": "efectivo"|"qr"|"transferencia","plan": "Gratis"|"Negocio"|"Sucursales","plan_period": "mensual"|"anual","promo_kind": "percent"|"price"|"bundle","reopen_status": "pendiente"|"aceptada"|"rechazada","shift_tone": "morning"|"afternoon"|"night","stock_move_kind": "entrada"|"merma"|"ajuste"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1557,7 +1613,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"loss_kind": ["perdido", "roto", "defectuoso", "vencido", "otro"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move", "wa_handoff"],"overtime_status": ["pendiente", "pagada", "descontada", "repuesta"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
+            "business_kind": ["tienda", "ropa", "restaurante"],"charge_method": ["qr", "transferencia", "tarjeta"],"close_status": ["en-curso", "cerrado"],"employee_status": ["activo", "invitado"],"expense_frequency": ["semanal", "quincenal", "mensual", "diario"],"join_status": ["pendiente", "aceptada", "rechazada"],"loss_kind": ["perdido", "roto", "defectuoso", "vencido", "otro"],"notification_kind": ["invitation", "invitation_answer", "cash_mismatch", "low_stock", "shift_change", "plan_expiring", "plan_expired", "shift_closed", "shift_reminder", "shift_late", "reopen_request", "reopen_answer", "reopen_sent", "ownership", "join_request", "join_answer", "shift_overdue", "stock_request", "stock_answer", "stock_delivery", "stock_received", "expense_added", "cash_withdrawal", "stock_move", "wa_handoff", "shift_opened_late", "shift_opened_early", "extra_shift_request", "extra_shift_answer"],"overtime_status": ["pendiente", "pagada", "descontada", "repuesta"],"payment_method": ["efectivo", "qr", "transferencia"],"plan": ["Gratis", "Negocio", "Sucursales"],"plan_period": ["mensual", "anual"],"promo_kind": ["percent", "price", "bundle"],"reopen_status": ["pendiente", "aceptada", "rechazada"],"shift_tone": ["morning", "afternoon", "night"],"stock_move_kind": ["entrada", "merma", "ajuste"]
           }
         }
 } as const

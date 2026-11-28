@@ -17,6 +17,8 @@ const LIVE_ACTIONS = new Set([
   "setAssistantPaused",
   "resumeConversation",
   "requestReopen",
+  "requestExtraShift",
+  "answerExtraShift",
   "savePromotion",
   "requestStockEntry",
   "answerStockRequest",

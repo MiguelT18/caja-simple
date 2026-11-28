@@ -1,0 +1,88 @@
+---
+// Novedades de la app: las notas de src/content/novedades/ para los roles de la persona, de la más nueva a la más vieja.
+// Entrar las marca como vistas (cookie NEWS_SEEN_COOKIE); la franja y el «Nuevo» del menú se apagan (NewsBanner).
+import { render } from "astro:content";
+import PageHeader from "@/components/PageHeader.astro";
+import Layout from "@/layouts/Layout.astro";
+import { myNews, NEWS_SEEN_COOKIE } from "@/data/queries";
+import { longDate } from "@/lib/dates";
+
+const { notes, unseen } = await myNews(Astro.locals, Astro.cookies);
+if (notes[0]) Astro.cookies.set(NEWS_SEEN_COOKIE, notes[0].date, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+const fresh = new Set(unseen.map((n) => n.id));
+const rendered = await Promise.all(notes.map(async (n) => ({ ...n, Content: (await render(n.entry)).Content })));
+---
+
+<Layout title="Novedades">
+  <PageHeader title="Novedades" description="Lo nuevo y lo que mejoramos en Caja Simple." />
+
+  {
+    rendered.length === 0 ? (
+      <p class="card empty-state">Todavía no hay novedades. Cuando cambiemos algo, te lo contamos aquí.</p>
+    ) : (
+      <ol class="news" role="list">
+        {rendered.map(({ id, title, date, Content }) => (
+          <li>
+            <article class="card note" aria-labelledby={`note-${id}`}>
+              <header class="note-head">
+                <time datetime={date} class="note-date">{longDate(date)}</time>
+                {fresh.has(id) && <span class="chip chip-live">Nuevo</span>}
+              </header>
+              <h2 id={`note-${id}`}>{title}</h2>
+              <div class="note-body">
+                <Content />
+              </div>
+            </article>
+          </li>
+        ))}
+      </ol>
+    )
+  }
+</Layout>
+
+<style>
+  .news {
+    display: grid;
+    gap: 1rem;
+    max-width: 44rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .note {
+    display: grid;
+    gap: 0.5rem;
+    padding: 1.25rem;
+  }
+
+  .note-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .note-date {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .note h2 {
+    margin: 0;
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-lh);
+    font-weight: var(--font-semibold);
+  }
+
+  .note-body :global(p) {
+    margin: 0;
+  }
+
+  .note-body {
+    display: grid;
+    gap: 0.75rem;
+    color: var(--color-text);
+  }
+</style>

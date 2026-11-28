@@ -1,0 +1,93 @@
+---
+// Franja «Novedad» arriba de cada página de /app mientras haya notas que la persona no vio (src/content/novedades/).
+// Se cierra con ✕ (marca todas como vistas) o al entrar a Novedades. Sin notas nuevas deja una marca para que el
+// script apague el «Nuevo» del menú, que se conserva entre páginas (transition:persist).
+import { Megaphone, X } from "@lucide/astro";
+import { myNews } from "@/data/queries";
+
+const path = Astro.url.pathname.replace(/\/$/, "");
+const { notes, unseen } = await myNews(Astro.locals, Astro.cookies);
+// En Novedades ya las está viendo; en Vender no estorba a quien cobra (el «Nuevo» del menú sigue).
+const latest = path !== "/app/novedades" && !path.endsWith("/registrar-venta") && unseen[0];
+---
+
+{
+  latest ? (
+    <aside class="news-banner" aria-label="Novedades de la app" data-news-banner data-latest={notes[0].date}>
+      <Megaphone size={18} stroke-width={1.75} aria-hidden="true" />
+      <p>
+        <strong>Novedad:</strong> {latest.summary}{" "}
+        <a href="/app/novedades" class="news-link">
+          {unseen.length > 1 ? `Ver las ${unseen.length} novedades` : "Ver novedades"}
+        </a>
+      </p>
+      <button type="button" class="icon-btn news-close" aria-label="Ocultar novedades" data-news-close>
+        <X size={18} stroke-width={1.75} />
+      </button>
+    </aside>
+  ) : (
+    !unseen.length || path === "/app/novedades" ? <span hidden data-news-none /> : null
+  )
+}
+
+<script>
+  import { NEWS_SEEN_COOKIE } from "@/lib/news";
+  import { onPage } from "@/scripts/refresh";
+
+  const clearDots = () => document.querySelectorAll("[data-news-dot]").forEach((dot) => dot.remove());
+
+  onPage((signal) => {
+    if (document.querySelector("[data-news-none]")) clearDots();
+    const banner = document.querySelector<HTMLElement>("[data-news-banner]");
+    banner?.querySelector("[data-news-close]")?.addEventListener(
+      "click",
+      () => {
+        document.cookie = `${NEWS_SEEN_COOKIE}=${banner.dataset.latest}; path=/; max-age=31536000; samesite=lax`;
+        banner.remove();
+        clearDots();
+        document.getElementById("main")?.focus();
+      },
+      { signal },
+    );
+  });
+</script>
+
+<style>
+  .news-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.5rem 0.5rem 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    background: var(--color-primary-soft);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+  }
+
+  .news-banner > :global(svg) {
+    flex-shrink: 0;
+    color: var(--color-primary);
+  }
+
+  .news-banner p {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  /* Enlace con subrayado: no se distingue solo por color. */
+  .news-link {
+    color: var(--color-text);
+    font-weight: var(--font-semibold);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    white-space: nowrap;
+  }
+
+  .news-close {
+    flex-shrink: 0;
+  }
+</style>

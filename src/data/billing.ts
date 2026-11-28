@@ -52,6 +52,13 @@ export async function referralPerks(sb: Supabase) {
   return { freeMonths: data?.referral_free_months ?? 1, trialDays: data?.referral_trial_days ?? 60 };
 }
 
+/** Días de prueba del plan Negocio que la dueña puede activar en este negocio (public.trial_offer); null si no le toca. */
+export async function trialOffer(sb: Supabase, businessId: string): Promise<number | null> {
+  const { data, error } = await sb.rpc("trial_offer", { p_business: businessId });
+  fail(error);
+  return data ?? null;
+}
+
 /** Quién invita con el código de /r/<código>: «Ana T.». null si el código no existe o el afiliado ya no está activo. Sirve sin sesión. */
 export async function referralInvite(sb: Supabase, code: string): Promise<{ name: string } | null> {
   const { data, error } = await sb.rpc("referral_invite", { p_code: code });

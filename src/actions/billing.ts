@@ -35,6 +35,17 @@ export const billing = {
     },
   }),
 
+  /** «Probar Negocio gratis» en la página Plan: start_trial decide si vale (dueña, en Gratis, una vez por persona). */
+  startTrial: defineAction({
+    accept: "form",
+    input: z.object({ businessId: uuid }),
+    handler: async ({ businessId }, context) => {
+      const { data, error } = await db(context).rpc("start_trial", { p_business: businessId });
+      check(error);
+      return { until: data };
+    },
+  }),
+
   /** Solo los que no se pagaron (por pagar o vencidos): RLS deja fuera los pagados. */
   deletePlanCharge: defineAction({
     accept: "form",

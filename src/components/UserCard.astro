@@ -1,13 +1,15 @@
 ---
-import { LifeBuoy, LogOut } from "@lucide/astro";
+import { LifeBuoy, LogOut, Megaphone } from "@lucide/astro";
 import type { User } from "../data/types";
 import Avatar from "./Avatar.astro";
 
 interface Props {
   user: User;
+  /** Hay novedades sin ver: punto en el ícono. */
+  news?: boolean;
 }
 
-const { user } = Astro.props;
+const { user, news = false } = Astro.props;
 
 const fullName = `${user.firstName} ${user.lastName}`;
 // Ayuda guarda desde qué página se escribe, para entender el contexto del mensaje.
@@ -22,6 +24,11 @@ const helpHref = `/app/ayuda?desde=${encodeURIComponent(Astro.url.pathname)}`;
     <span class="user-email">{user.email}</span>
   </div>
   <span class="sr-only">Tu cuenta</span>
+  </a>
+  <a href="/app/novedades" class="icon-btn user-action news-action" title="Novedades">
+    <Megaphone size={18} stroke-width={1.75} aria-hidden="true" />
+    <span class="sr-only">Novedades</span>
+    {news && <span class="news-dot" data-news-dot><span class="sr-only"> (hay nuevas)</span></span>}
   </a>
   <a href={helpHref} class="icon-btn user-action" aria-label="Ayuda y comentarios" title="Ayuda y comentarios">
     <LifeBuoy size={18} stroke-width={1.75} />
@@ -99,6 +106,23 @@ const helpHref = `/app/ayuda?desde=${encodeURIComponent(Astro.url.pathname)}`;
     flex-shrink: 0;
     width: 2rem;
     height: 2rem;
+  }
+
+  .news-action {
+    position: relative;
+  }
+
+  /* Punto de «hay nuevas»: el nombre accesible lo dice; el punto solo acompaña. */
+  .news-dot {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border: 2px solid var(--color-surface-muted);
+    border-radius: 999px;
+    background: var(--color-primary);
+    box-sizing: content-box;
   }
 
   @media (pointer: coarse) {

@@ -1,0 +1,195 @@
+---
+// Hoy: lo esencial del turno abierto (o del día, sin turno), con Ventas y Gastos colapsados en sus totales.
+// Es la página del modo turno del Sidebar (navigation.ts › SHIFT_MODE_COOKIE).
+import { ChevronDown, Plus, Receipt, Wallet } from "@lucide/astro";
+import PageHeader from "@/components/PageHeader.astro";
+import ExpenseModal from "@/components/app/ExpenseModal.astro";
+import LiveStatus from "@/components/app/LiveStatus.astro";
+import MovementsTable from "@/components/app/MovementsTable";
+import Layout from "@/layouts/Layout.astro";
+import { branchContext, branchHref, orderLabels, receiptUrls, shiftBarData, sum } from "@/data/queries";
+import { longDate } from "@/lib/dates";
+import { formatBs, plural } from "@/lib/format";
+
+const { negocio, sucursal } = Astro.params;
+const ctx = await branchContext(Astro.locals, negocio!, sucursal!);
+if (!ctx) return Astro.rewrite("/404");
+const { branch, business, currentShift, expenseHistory, shiftById, today } = ctx;
+const isOwner = ctx.membership.role === "dueño";
+// Con un turno abierto, solo lo suyo; sin turno, todo el día.
+const inShift = <T extends { shiftId: string }>(rows: T[]) => (currentShift ? rows.filter((r) => r.shiftId === currentShift.id) : rows);
+const sales = inShift(ctx.sales);
+const expenses = inShift(ctx.expenses);
+const [orderNames, receipts] = await Promise.all([orderLabels(Astro.locals.supabase, branch.id, today, today), receiptUrls(Astro.locals.supabase, sales)]);
+const salesTotal = sum(sales.filter((s) => s.voided === null).map((s) => s.total));
+const expensesTotal = sum(expenses.filter((g) => g.voided === null).map((g) => g.amount));
+const usedCategories = [...new Set(expenseHistory.map((g) => g.category))].sort();
+const scope = currentShift ? `el turno ${currentShift.name.toLowerCase()}` : "hoy";
+
+const shiftOf = (id: string) => {
+  const shift = shiftById(id);
+  return { name: shift.name, tone: shift.tone };
+};
+const saleRows = [...sales]
+  .sort((a, b) => b.time.localeCompare(a.time))
+  .map((s) => ({
+    id: s.id,
+    time: s.time,
+    label: `${orderNames.has(s.id) ? `Pedido «${orderNames.get(s.id)}»` : "Venta"} · ${plural(s.items, "producto", "productos")}`,
+    shift: shiftOf(s.shiftId),
+    by: s.recordedBy.firstName,
+    amount: s.voided ?? s.total,
+    kind: "sale" as const,
+    payment: s.payment,
+    voided: s.voided !== null,
+    ...ctx.receiptOf(s, receipts),
+  }));
+const expenseRows = [...expenses]
+  .sort((a, b) => b.time.localeCompare(a.time))
+  .map((g) => ({
+    id: g.id,
+    time: g.time,
+    label: g.concept,
+    shift: shiftOf(g.shiftId),
+    by: g.recordedBy.firstName,
+    amount: g.voided ?? g.amount,
+    kind: "expense" as const,
+    voided: g.voided !== null,
+  }));
+---
+
+<Layout title={`Hoy · ${branch.name}`} context={{ membership: ctx.membership, branch, shift: shiftBarData(ctx) }}>
+  <PageHeader {...ctx.backdrop} eyebrow={longDate(today)} title="Hoy" description={`Lo esencial de ${scope} en ${branch.name}.`}>
+    {
+      !ctx.works ? null : currentShift ? (
+        <a class="btn btn-primary" href={branchHref(business, branch, "registrar-venta")}>
+          <Plus size={18} stroke-width={2} />
+          Registrar venta
+        </a>
+      ) : (
+        <a class="btn btn-secondary" href={branchHref(business, branch, "turnos")}>
+          Abre un turno<span class="label-rest"> para vender</span>
+        </a>
+      )
+    }
+  </PageHeader>
+
+  {isOwner && <LiveStatus topic={`negocio:${business.id}`} names={{ [branch.id]: branch.name }} branch={branch.id} regions={["shift-bar", "today-sales-sum", "today-sales", "today-expenses-sum", "today-expenses"]} />}
+
+  {/* Región: tras guardar trae un expenseId nuevo, así el siguiente gasto no se toma por repetido. */}
+  <div data-region="expense-form">
+    {ctx.works && currentShift && <ExpenseModal branchId={branch.id} shift={currentShift} isOwner={isOwner} categories={usedCategories} />}
+  </div>
+
+  <div class="today">
+    <details class="card block">
+      {/* Las regiones van dentro: si el <details> se cambiara entero, se cerraría al guardar. */}
+      <summary data-region="today-sales-sum">
+        <span class="block-icon" aria-hidden="true"><Receipt size={20} stroke-width={1.75} /></span>
+        <span class="block-title">
+          <span class="block-name">Ventas</span>
+          <span class="block-note">{plural(sales.length, "venta", "ventas")}</span>
+        </span>
+        <span class="num amount-income block-total">{formatBs(salesTotal, "+")}</span>
+        <ChevronDown class="chevron" size={18} stroke-width={1.75} aria-hidden="true" />
+      </summary>
+      <div class="block-body" data-region="today-sales">
+        <MovementsTable client:visible rows={saleRows} pageSize={10} empty={`No hay ventas en ${scope}.`} />
+      </div>
+    </details>
+
+    <details class="card block">
+      <summary data-region="today-expenses-sum">
+        <span class="block-icon" aria-hidden="true"><Wallet size={20} stroke-width={1.75} /></span>
+        <span class="block-title">
+          <span class="block-name">Gastos</span>
+          <span class="block-note">{plural(expenses.length, "gasto", "gastos")}</span>
+        </span>
+        {/* Quien trabaja aquí ve los gastos, no los totales (como en Gastos). */}
+        {isOwner && <span class="num amount-expense block-total">{formatBs(expensesTotal, "−")}</span>}
+        <ChevronDown class="chevron" size={18} stroke-width={1.75} aria-hidden="true" />
+      </summary>
+      <div class="block-body" data-region="today-expenses">
+        {
+          ctx.works && currentShift && (
+            <button type="button" class="btn btn-secondary add-expense" data-open-dialog="expense">
+              <Plus size={18} stroke-width={1.75} />
+              Registrar gasto
+            </button>
+          )
+        }
+        <MovementsTable client:visible rows={expenseRows} pageSize={10} empty={`No hay gastos en ${scope}.`} />
+      </div>
+    </details>
+  </div>
+</Layout>
+
+<style>
+  .today {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .block {
+    padding: 0;
+  }
+
+  .block summary {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    min-height: 3.5rem;
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .block summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .block-icon {
+    display: grid;
+    place-items: center;
+    color: var(--color-text-muted);
+  }
+
+  .block-title {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .block-name {
+    font-weight: var(--font-semibold);
+  }
+
+  .block-note {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .block-total {
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+  }
+
+  .block :global(.chevron) {
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+  }
+
+  .block[open] :global(.chevron) {
+    rotate: 180deg;
+  }
+
+  .block-body {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0 1.25rem 1.25rem;
+  }
+
+  .add-expense {
+    justify-self: start;
+  }
+</style>

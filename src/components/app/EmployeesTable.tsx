@@ -1,5 +1,5 @@
 import { actions } from "astro:actions";
-import { Check, Crown, Ellipsis, Store, Trash2 } from "lucide-react";
+import { Check, Clock, Crown, Ellipsis, Store, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ShiftTone } from "@/data/types";
 import { Button } from "@/components/ui/button";
@@ -30,8 +30,11 @@ export interface EmployeeRow {
   role: string;
   branchId: string;
   branch: string;
-  shiftId?: string;
-  shift?: { name: string; tone: ShiftTone };
+  shiftIds: string[];
+  shifts: { name: string; tone: ShiftTone }[];
+  /** Minutos antes del inicio y después del cierre en los que abre sus turnos. */
+  openEarlyMin: number;
+  openLateMin: number;
   active: boolean;
 }
 
@@ -60,7 +63,7 @@ interface Props {
 
 export default function EmployeesTable({ rows, business, branches, shifts, pageSize = 10 }: Props) {
   const pager = usePage(rows, pageSize);
-  // Persona y sucursal elegidas en el menú: abre el diálogo para confirmar el turno.
+  // Persona y sucursal elegidas en el menú: abre el diálogo para elegir sus turnos.
   const [moving, setMoving] = useState<{ employee: EmployeeRow; branch: BranchOption } | null>(null);
   if (rows.length === 0) return <p className="card empty-state">Todavía no invitaste a nadie a tu equipo.</p>;
 
@@ -130,7 +133,15 @@ export default function EmployeesTable({ rows, business, branches, shifts, pageS
                 </TableCell>
                 <TableCell className="text-muted-foreground">{e.role}</TableCell>
                 <TableCell>{e.branch}</TableCell>
-                <TableCell>{e.shift ? <ShiftBadge shift={e.shift} /> : <span className="text-muted-foreground">—</span>}</TableCell>
+                <TableCell>
+                  {e.shifts.length ? (
+                    <span className="flex flex-wrap gap-1">
+                      {e.shifts.map((s) => <ShiftBadge key={s.name} shift={s} />)}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <span className={`chip ${e.active ? "chip-income" : "chip-neutral"}`}>
                     {e.active ? "Activo" : "Invitación pendiente"}
@@ -145,6 +156,11 @@ export default function EmployeesTable({ rows, business, branches, shifts, pageS
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onSelect={() => setMoving({ employee: e, branch: { id: e.branchId, name: e.branch } })}>
+                        <Clock />
+                        Cambiar turnos
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuLabel>Asignar a sucursal</DropdownMenuLabel>
                       {branches.map((b) => {
                         const current = b.id === e.branchId;
@@ -195,16 +211,20 @@ export default function EmployeesTable({ rows, business, branches, shifts, pageS
   );
 }
 
-/** Confirma el cambio de sucursal eligiendo el turno, que es de cada sucursal. También sirve para cambiar solo el turno. */
+/** Elige los turnos (uno o más) de la persona en la sucursal: la suya, para cambiar solo los turnos, u otra, para pasarla ahí. */
 function AssignDialog({ employee, branch, shifts, onClose }: { employee: EmployeeRow; branch: BranchOption; shifts: ShiftOption[]; onClose: () => void }) {
   const save = useActionForm((form) => actions.reassignEmployee(form) as never, onClose, `Cambios de ${employee.name} guardados.`);
   const same = branch.id === employee.branchId;
-  // Propone el turno actual si sigue en la misma sucursal; si cambia, uno del mismo momento del día.
-  const suggested = (same && shifts.find((s) => s.id === employee.shiftId)) || shifts.find((s) => s.tone === employee.shift?.tone) || shifts[0];
+  // En su sucursal, marca sus turnos; si cambia, los del mismo momento del día (o el primero).
+  const tones = new Set(employee.shifts.map((s) => s.tone));
+  const suggested = same
+    ? shifts.filter((s) => employee.shiftIds.includes(s.id))
+    : shifts.filter((s) => tones.has(s.tone)).slice(0, 1);
+  const checked = new Set((suggested.length ? suggested : shifts.slice(0, 1)).map((s) => s.id));
   return (
     <AppDialog
-      title={same ? `Cambiar turno de ${employee.name}` : `Asignar a ${employee.name} a ${branch.name}`}
-      description={`${same ? `Sigue en ${branch.name}.` : `Deja ${employee.branch} y pasa a trabajar en ${branch.name}.`} Elige su turno en esta sucursal.`}
+      title={same ? `Turnos de ${employee.name}` : `Asignar a ${employee.name} a ${branch.name}`}
+      description={`${same ? `Sigue en ${branch.name}.` : `Deja ${employee.branch} y pasa a trabajar en ${branch.name}.`} Marca uno o más turnos: abre y cierra la caja en cualquiera de ellos, dentro de su margen. Si abre antes o tarde, te avisamos.`}
       onClose={onClose}
     >
         {shifts.length === 0 ? (
@@ -213,15 +233,25 @@ function AssignDialog({ employee, branch, shifts, onClose }: { employee: Employe
           <form className="grid min-w-0 gap-4" onSubmit={save.onSubmit} noValidate>
             <input type="hidden" name="id" value={employee.id} />
             <input type="hidden" name="branchId" value={branch.id} />
-            <Field id="assign-shift" label="Turno" error={save.errors.shiftId}>
-              <select id="assign-shift" name="shiftId" className={selectClass} defaultValue={suggested?.id} required>
-                {shifts.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} · {s.start}–{s.end}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <fieldset className="grid gap-1" aria-describedby={save.errors.shiftIds ? "assign-shifts-error" : undefined}>
+              <legend className="mb-1 text-sm font-semibold">Turnos</legend>
+              {shifts.map((s) => (
+                <label key={s.id} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                  <input type="checkbox" name="shiftIds" value={s.id} defaultChecked={checked.has(s.id)} className="size-5 shrink-0 accent-[var(--color-primary)]" />
+                  {s.name} <span className="text-muted-foreground num">· {s.start}–{s.end}</span>
+                </label>
+              ))}
+              {save.errors.shiftIds && <p id="assign-shifts-error" className="field-error">{save.errors.shiftIds}</p>}
+            </fieldset>
+            {/* Fuera de este margen pide horas extra y te llega el aviso para aceptar o rechazar. */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="assign-early" label="Abre desde (min antes)" error={save.errors.openEarlyMin} hint="Antes de la hora de inicio.">
+                <input id="assign-early" name="openEarlyMin" type="number" inputMode="numeric" step="1" min="0" max="240" className="input num" defaultValue={employee.openEarlyMin} required />
+              </Field>
+              <Field id="assign-late" label="Hasta (min después)" error={save.errors.openLateMin} hint="Después de la hora de cierre.">
+                <input id="assign-late" name="openLateMin" type="number" inputMode="numeric" step="1" min="0" max="240" className="input num" defaultValue={employee.openLateMin} required />
+              </Field>
+            </div>
             {save.message && (
               <p className="notice notice-error m-0" role="alert">
                 {save.message}
@@ -232,7 +262,7 @@ function AssignDialog({ employee, branch, shifts, onClose }: { employee: Employe
                 Cancelar
               </Button>
               <Button type="submit" {...save.submitProps}>
-                {save.busy ? "Guardando…" : same ? "Cambiar turno" : "Asignar"}
+                {save.busy ? "Guardando…" : same ? "Guardar turnos" : "Asignar"}
               </Button>
             </DialogFooter>
           </form>

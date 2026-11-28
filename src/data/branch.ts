@@ -1,6 +1,6 @@
 // Datos de una página de sucursal y de su barra del turno.
 import { businessVersion, cached } from "@/lib/cache";
-import { addDays, inShiftWindow, lastWeek, minutesUntilOpen, openFrom, today } from "@/lib/dates";
+import { addDays, DEFAULT_MARGINS, inShiftWindow, lastWeek, minutesUntilOpen, openFrom, openUntil, today } from "@/lib/dates";
 import { closedReason, shiftDate, type BranchHours, type Closure } from "@/lib/schedule";
 import { cents, comboStock, shiftCash, sum, totalsBy } from "./cash";
 import { COMBO_PARTS, EMPLOYEE_COLUMNS, fail, toCatalogProduct, toEmployee, toShift } from "./mappers";
@@ -42,7 +42,7 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
         closures: closures.data ?? [],
       };
     });
-  const [rows, inventory, [closes, moves], soldItems, history, previous, backdrop, reopenRows] = await Promise.all([
+  const [rows, inventory, [closes, moves], soldItems, history, previous, backdrop, reopenRows, extraRows] = await Promise.all([
     cached(`br:${locals.userId}:${branch.id}`, 600, slow, () => [businessVersion(m.business.id)]),
     sb.from("inventory").select(`price, stock, min_stock, products(*, categories(name), ${COMBO_PARTS})`).eq("branch_id", branch.id),
     // Desde el día del turno abierto si es más viejo que la semana: su esperado se calcula con sus movimientos.
@@ -62,11 +62,32 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
     headerBackdrop(locals, m, branch),
     // Pedidos de reapertura sin responder (RLS: los propios, o todos si es la dueña).
     sb.from("reopen_requests").select("close_id").eq("branch_id", branch.id).eq("status", "pendiente"),
+    // Mis pedidos de horas extra sin usar: esperando respuesta o aceptados (sirven 12 horas, como en private.check_shift_schedule).
+    sb
+      .from("extra_shift_requests")
+      .select("shift_id, status, decided_at")
+      .eq("branch_id", branch.id)
+      .eq("requested_by", locals.userId!)
+      .in("status", ["pendiente", "aceptada"])
+      .is("used_at", null),
   ]);
   fail(inventory.error);
   fail(reopenRows.error);
   /** Cierres con un pedido de reapertura esperando a la dueña. */
   const reopenPending = new Set((reopenRows.data ?? []).map((r) => r.close_id));
+  fail(extraRows.error);
+  const extra = extraRows.data ?? [];
+  /** Turnos con un pedido de horas extra mío esperando a la dueña. */
+  const extraPending = new Set(extra.filter((r) => r.status === "pendiente").map((r) => r.shift_id));
+  /** Turnos que la dueña me dejó abrir fuera de horario. */
+  const extraAccepted = new Set(
+    extra.filter((r) => r.status === "aceptada" && r.decided_at && Date.now() - Date.parse(r.decided_at) < 12 * 60 * 60 * 1000).map((r) => r.shift_id),
+  );
+  // Mi margen para abrir; `??`: una sesión cacheada de antes de los márgenes no los trae.
+  const me = m.employee;
+  const margins = { early: me?.openEarlyMin ?? DEFAULT_MARGINS.early, late: me?.openLateMin ?? DEFAULT_MARGINS.late };
+  /** ¿Puedo abrir este turno ahora? Dentro de mi margen o con horas extra aceptadas. La base decide igual. */
+  const canOpenNow = (s: { id: string; start: string; end: string }) => extraAccepted.has(s.id) || inShiftWindow(s, margins);
   fail(soldItems.error);
   const shiftRows = { data: rows.shifts };
   const staffRows = { data: rows.staff };
@@ -193,6 +214,10 @@ export async function branchContext(locals: App.Locals, businessSlug: string, br
     productById,
     shiftTotals,
     reopenPending,
+    extraPending,
+    extraAccepted,
+    margins,
+    canOpenNow,
     canCorrect,
     receiptOf,
     salesByCategory,
@@ -210,12 +235,19 @@ export function shiftBarData(ctx: NonNullable<Awaited<ReturnType<typeof branchCo
     // está en su horario: se abre o, si ya se cerró hoy, pide reabrirlo (la dueña decide). Fuera de horario, desde cuándo.
     // La base decide igual (horario y turno propio): su error sale en un toast.
     if (!ctx.works) return { branchName: ctx.branch.name, image, shiftsHref: href("turnos"), readonly: true };
-    const own = ctx.shifts.find((s) => s.id === ctx.membership.employee?.shiftId);
-    const candidates = (own ? [own] : []).filter((s) => !ctx.closedNow(s));
-    const now = candidates.find((s) => inShiftWindow(s));
+    const mine = ctx.membership.employee?.shiftIds ?? [];
+    const candidates = ctx.shifts.filter((s) => mine.includes(s.id) && !ctx.closedNow(s));
+    const now = candidates.find((s) => ctx.canOpenNow(s));
     if (!now) {
-      const next = [...candidates].sort((a, b) => minutesUntilOpen(a) - minutesUntilOpen(b)).at(0);
-      return { branchName: ctx.branch.name, image, shiftsHref: href("turnos"), wait: next && { shiftName: next.name, from: openFrom(next) } };
+      // El próximo en abrirse; fuera de horario se puede pedir abrirlo como horas extra (la dueña decide).
+      const next = [...candidates].sort((a, b) => minutesUntilOpen(a, ctx.margins) - minutesUntilOpen(b, ctx.margins)).at(0);
+      return {
+        branchName: ctx.branch.name, image, shiftsHref: href("turnos"),
+        wait: next && {
+          shiftId: next.id, shiftName: next.name, from: openFrom(next, ctx.margins), until: openUntil(next, ctx.margins),
+          extraPending: ctx.extraPending.has(next.id),
+        },
+      };
     }
     const closed = ctx.shiftTotals(now.id);
     if (closed.close.status === "cerrado" && closed.closeId) {
@@ -274,7 +306,7 @@ export async function branchTeam(locals: App.Locals, m: Membership, branchId: st
     lastName: r.last_name,
     avatarUrl: r.avatar_url ?? undefined,
     jobTitle: r.job_title ?? "",
-    shiftId: r.shift_id ?? undefined,
+    shiftIds: r.shift_ids,
     isOwner: r.is_owner,
   }));
 }

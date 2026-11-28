@@ -37,7 +37,7 @@ export const employees = {
         .insert({
           business_id: businessId,
           branch_id: branchId,
-          shift_id: shiftId,
+          shift_ids: [shiftId],
           ...(personId ? { person_id: personId, email: "" } : { email: person.toLowerCase() }),
           job_title: jobTitle,
         })
@@ -184,18 +184,22 @@ export const employees = {
     },
   }),
 
-  /** Cambia la sucursal (y el turno, que es de la sucursal) de alguien del equipo. */
+  /** Cambia la sucursal, los turnos (uno o más, de esa sucursal) y el margen para abrirlos de alguien del equipo. */
   reassignEmployee: defineAction({
     accept: "form",
-    input: z.object({ id: uuid, branchId: uuid, shiftId: z.uuid("Elige un turno") }),
-    handler: async ({ id, branchId, shiftId }, context) => {
+    input: z.object({
+      id: uuid,
+      branchId: uuid,
+      shiftIds: z.array(uuid).min(1, "Elige al menos un turno").max(20),
+      openEarlyMin: z.coerce.number({ error: "Escribe los minutos" }).int("Escribe minutos enteros").min(0, "Desde 0").max(240, "Hasta 240 minutos"),
+      openLateMin: z.coerce.number({ error: "Escribe los minutos" }).int("Escribe minutos enteros").min(0, "Desde 0").max(240, "Hasta 240 minutos"),
+    }),
+    handler: async ({ id, branchId, shiftIds, openEarlyMin, openLateMin }, context) => {
       const sb = db(context);
       // Invitar a un correo sin cuenta manda un correo: el límite evita usar la app para mandar spam.
       await limit(context, "invite", 10, 60 * 60);
-      const { data: shift } = await sb.from("shifts").select("branch_id").eq("id", shiftId).single();
-      if (shift?.branch_id !== branchId)
-        throw new ActionError({ code: "BAD_REQUEST", message: "Ese turno es de otra sucursal. Elige uno de la sucursal seleccionada." });
-      const { error } = await sb.from("employees").update({ branch_id: branchId, shift_id: shiftId }).eq("id", id).select("id").single();
+      // La base exige que todos sean de esa sucursal (private.check_employee_shifts).
+      const { error } = await sb.from("employees").update({ branch_id: branchId, shift_ids: shiftIds, open_early_min: openEarlyMin, open_late_min: openLateMin }).eq("id", id).select("id").single();
       check(error);
       return { ok: true };
     },

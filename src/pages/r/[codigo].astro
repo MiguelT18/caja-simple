@@ -42,7 +42,7 @@ const freeMonths = perks?.freeMonths ?? 0;
 const pct = promo ? `${Math.round(promo.discount * 100)}%` : "";
 const year = promo && (promo.months === 12 ? "el primer año" : `los primeros ${plural(promo.months, "mes", "meses")}`);
 const benefits = [
-  { icon: CalendarCheck, title: `${trialDays} días gratis del plan Negocio`, text: "Tu primer negocio los prueba completos, sin tarjeta. Después puedes seguir en Gratis, que no vence." },
+  { icon: CalendarCheck, title: `${trialDays} días gratis del plan Negocio`, text: "Los activas cuando quieras en tu negocio, sin tarjeta. Después puedes seguir en Gratis, que no vence." },
   promo && promo.left > 0
     ? { icon: Sparkles, title: `${pct} de descuento ${year}`, text: `Precio fundador asegurado si pagas mientras queden cupos (${promo.left === 1 ? "queda 1" : `quedan ${promo.left}`}).` }
     : freeMonths > 0
@@ -62,7 +62,7 @@ const title = invite ? `${invite.name} te invita a Caja Simple` : "Este enlace y
           !invite ? (
             <>
               <h1 id="invite-title">Este enlace ya no está activo</h1>
-              <p class="lead">Igual puedes empezar gratis: tu primer negocio prueba el plan Negocio por 30 días.</p>
+              <p class="lead">Igual puedes empezar gratis y probar el plan Negocio por 30 días.</p>
               <div class="actions">
                 <a href={signedIn ? "/app" : "/auth/crear-cuenta"} class="btn btn-primary btn-lg">{signedIn ? "Ir a tus negocios" : "Crear mi cuenta gratis"}</a>
                 <a href="/planes" class="btn btn-secondary btn-lg">Ver planes y precios</a>

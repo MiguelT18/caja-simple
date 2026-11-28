@@ -1,11 +1,11 @@
-import { ClipboardList, MessageCircle, BadgePercent, Gem, CalendarClock, HandCoins, BriefcaseBusiness, Search, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
+import { CalendarCheck, ClipboardList, Megaphone, MessageCircle, BadgePercent, Gem, CalendarClock, HandCoins, BriefcaseBusiness, Search, ChartColumn, ChartLine, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Users, Wallet, Boxes, Settings, UserRound, LifeBuoy } from "@lucide/astro";
 import { catalogLabel } from "./kinds";
 import { planLimits } from "./plans";
 import type { Branch } from "./types";
 import { branchHref, businessHref, type Membership } from "./queries";
 
 /** Secciones del panel lateral según dónde está la persona y su rol en ese negocio. */
-export function appNav(m?: Membership, branch?: Branch, affiliate = false) {
+export function appNav(m?: Membership, branch?: Branch, affiliate = false, shiftMode = false) {
   if (!m)
     return [
       {
@@ -16,6 +16,7 @@ export function appNav(m?: Membership, branch?: Branch, affiliate = false) {
           { id: "buscar", label: "Buscar", href: "/app/buscar", icon: Search },
           { id: "cuenta", label: "Tu cuenta", href: "/app/cuenta", icon: UserRound },
           ...(affiliate ? [{ id: "afiliado", label: "Afiliados", href: "/app/cuenta/afiliado", icon: HandCoins }] : []),
+          { id: "novedades", label: "Novedades", href: "/app/novedades", icon: Megaphone },
           { id: "ayuda", label: "Ayuda y comentarios", href: "/app/ayuda", icon: LifeBuoy },
         ],
       },
@@ -44,6 +45,13 @@ export function appNav(m?: Membership, branch?: Branch, affiliate = false) {
         ...(m.role !== "dueño" ? [{ id: "pedidos", label: "Pedidos", href: `${businessHref(m.business)}/pedidos`, icon: ClipboardList }] : []),
       ],
     });
+    // Modo turno: solo lo del día a día, y sin la sección del negocio.
+    if (shiftMode) {
+      const keep = ["vender", "hoy", "inventario", "turnos"];
+      const items = [...sections[0].items, { id: "hoy", label: "Hoy", href: href("hoy"), icon: CalendarCheck }];
+      sections[0].items = keep.flatMap((id) => items.filter((item) => item.id === id));
+      return sections;
+    }
   }
   if (m.role === "dueño") {
     const base = businessHref(m.business);
@@ -66,6 +74,9 @@ export function appNav(m?: Membership, branch?: Branch, affiliate = false) {
   }
   return sections;
 }
+
+/** Cookie del modo turno («1»): el menú de la sucursal muestra solo Vender, Hoy, Inventario y Turnos. La escribe el Sidebar. */
+export const SHIFT_MODE_COOKIE = "modo-turno";
 
 /** Cookie con el orden que la persona eligió arrastrando: { [section.key]: [item.id, …] }. La escribe el Sidebar. */
 export const NAV_ORDER_COOKIE = "nav-order";

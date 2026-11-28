@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, boliviaNow, inShiftWindow, inRange, lastWeek, openFrom, parseRange, periodStart, shiftProgress, toneOf } from "./dates";
+import { addDays, boliviaNow, inShiftWindow, inRange, lastWeek, openFrom, openUntil, parseRange, periodStart, shiftProgress, toneOf } from "./dates";
 
 const at = (minutes: number) => ({ date: "2026-11-03", minutes });
 const params = (q: string) => new URLSearchParams(q);
@@ -23,19 +23,29 @@ describe("boliviaNow", () => {
 describe("inShiftWindow", () => {
   const day = { start: "07:00", end: "14:00" };
   const night = { start: "22:00", end: "06:00" };
-  it("abre 15 minutos antes y cierra a la hora de fin", () => {
-    expect(inShiftWindow(day, at(6 * 60 + 44))).toBe(false);
-    expect(inShiftWindow(day, at(6 * 60 + 45))).toBe(true);
-    expect(inShiftWindow(day, at(13 * 60 + 59))).toBe(true);
-    expect(inShiftWindow(day, at(14 * 60))).toBe(false);
+  const m15 = { early: 15, late: 0 };
+  it("abre `early` minutos antes y hasta `late` después del cierre", () => {
+    expect(inShiftWindow(day, m15, at(6 * 60 + 44))).toBe(false);
+    expect(inShiftWindow(day, m15, at(6 * 60 + 45))).toBe(true);
+    expect(inShiftWindow(day, m15, at(13 * 60 + 59))).toBe(true);
+    expect(inShiftWindow(day, m15, at(14 * 60))).toBe(false);
+    expect(inShiftWindow(day, undefined, at(6 * 60 + 30))).toBe(true);
+    expect(inShiftWindow(day, undefined, at(14 * 60 + 29))).toBe(true);
+    expect(inShiftWindow(day, undefined, at(14 * 60 + 30))).toBe(false);
   });
   it("cruza la medianoche", () => {
-    expect(inShiftWindow(night, at(23 * 60))).toBe(true);
-    expect(inShiftWindow(night, at(3 * 60))).toBe(true);
-    expect(inShiftWindow(night, at(12 * 60))).toBe(false);
+    expect(inShiftWindow(night, m15, at(23 * 60))).toBe(true);
+    expect(inShiftWindow(night, m15, at(3 * 60))).toBe(true);
+    expect(inShiftWindow(night, m15, at(12 * 60))).toBe(false);
+    expect(inShiftWindow({ start: "08:33", end: "15:00" }, undefined, at(21 * 60 + 11))).toBe(false);
   });
-  it("openFrom da la vuelta a la medianoche", () => {
-    expect(openFrom({ start: "00:10" })).toBe("23:55");
+  it("con márgenes que cubren el día, siempre abre", () => {
+    expect(inShiftWindow({ start: "00:00", end: "23:00" }, { early: 240, late: 240 }, at(23 * 60 + 30))).toBe(true);
+  });
+  it("openFrom y openUntil dan la vuelta a la medianoche", () => {
+    expect(openFrom({ start: "00:10" }, m15)).toBe("23:55");
+    expect(openFrom({ start: "08:33" })).toBe("08:03");
+    expect(openUntil({ end: "23:50" })).toBe("00:20");
   });
 });
 

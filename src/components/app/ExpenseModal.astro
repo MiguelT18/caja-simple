@@ -1,0 +1,39 @@
+---
+// «Registrar gasto»: lo abre un botón con data-open-dialog="expense". Lo usan Gastos y Hoy.
+import FormInput from "./FormInput.astro";
+import Modal from "./Modal.astro";
+import type { Shift } from "@/data/types";
+
+interface Props {
+  branchId: string;
+  shift: Pick<Shift, "id" | "name">;
+  isOwner: boolean;
+  /** Categorías ya usadas, como sugerencias del campo. */
+  categories: string[];
+}
+
+const { branchId, shift, isOwner, categories } = Astro.props;
+// Nuevo en cada carga: un doble envío del mismo formulario no duplica el gasto.
+const expenseId = crypto.randomUUID();
+---
+
+<Modal
+  id="expense"
+  title="Registrar gasto"
+  description={`Sale de la caja del turno ${shift.name.toLowerCase()}.${isOwner ? "" : " La dueña recibe un aviso."}`}
+  action="createExpense"
+  draft
+  submitLabel="Guardar gasto"
+  hidden={{ expenseId, branchId, shiftId: shift.id }}
+>
+  <FormInput form="expense-form" name="concept" label="Concepto" placeholder="Ej.: Pago al proveedor de leche" required maxlength={120} />
+  <div class="field-row-2">
+    <FormInput form="expense-form" name="category" label="Categoría" placeholder="Ej.: Proveedores" list="expense-categories" required maxlength={40} />
+    <FormInput form="expense-form" name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" label="Monto (Bs)" required />
+  </div>
+  <datalist id="expense-categories">
+    {["Proveedores", "Servicios", "Transporte", "Insumos", ...categories]
+      .filter((c, i, all) => all.indexOf(c) === i)
+      .map((c) => <option value={c} />)}
+  </datalist>
+</Modal>

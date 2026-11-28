@@ -4,7 +4,7 @@
 --   duena@ejemplo.test     dueña de «Ejemplo Tienda» (plan Sucursales pagado, 2 sucursales); empleada de Ejemplo Norte, turno Mañana
 --   empleada@ejemplo.test  empleada de Ejemplo Centro, turno Mañana
 --   gratis@ejemplo.test    dueña de «Ejemplo Gratis» (plan Gratis, ya usó su prueba)
---   nueva@ejemplo.test     sin negocio: al crear el primero recibe la prueba de 30 días
+--   nueva@ejemplo.test     sin negocio: su primer negocio nace en Gratis y puede activar la prueba de 30 días
 --
 -- Los negocios se crean con create_business como cada dueña (los mismos triggers que la app). El historial de la
 -- última semana se inserta con los triggers apagados (session_replication_role = replica): la base no deja abrir
@@ -112,8 +112,8 @@ end;
 $$;
 
 -- Equipo: la empleada en Ejemplo Centro, turno Mañana.
-insert into public.employees (business_id, branch_id, email, job_title, person_id, shift_id, status)
-select b.id, br.id, 'empleada@ejemplo.test', 'Cajera', '00000000-0000-4000-a000-000000000002', s.id, 'activo'
+insert into public.employees (business_id, branch_id, email, job_title, person_id, shift_ids, status)
+select b.id, br.id, 'empleada@ejemplo.test', 'Cajera', '00000000-0000-4000-a000-000000000002', array[s.id], 'activo'
 from public.businesses b
 join public.branches br on br.business_id = b.id and br.slug = 'ejemplo-centro'
 join public.shifts s on s.branch_id = br.id and s.name = 'Mañana'
@@ -122,8 +122,8 @@ where b.slug = 'ejemplo-tienda';
 update public.employees set status = 'activo' where email = 'empleada@ejemplo.test';
 
 -- La dueña no opera la caja como dueña: trabaja como empleada en Ejemplo Norte, turno Mañana (entra activa sola).
-insert into public.employees (business_id, branch_id, email, job_title, person_id, shift_id, status)
-select b.id, br.id, 'duena@ejemplo.test', 'Encargada', '00000000-0000-4000-a000-000000000001', s.id, 'activo'
+insert into public.employees (business_id, branch_id, email, job_title, person_id, shift_ids, status)
+select b.id, br.id, 'duena@ejemplo.test', 'Encargada', '00000000-0000-4000-a000-000000000001', array[s.id], 'activo'
 from public.businesses b
 join public.branches br on br.business_id = b.id and br.slug = 'ejemplo-norte'
 join public.shifts s on s.branch_id = br.id and s.name = 'Mañana'

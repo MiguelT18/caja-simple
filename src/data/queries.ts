@@ -8,7 +8,7 @@ export * from "./business"; // páginas del negocio
 export { exportMyData } from "./account"; // descargar tus datos
 export { byPeriod, expensesByCategory, isLowStock, sum, totalsBy } from "./cash"; // cuentas puras
 export { branchImages, businessImages, headerBackdrop, closesBetween, CLOSES_PAGE_SIZE, movements, openOrders, orderLabels, receiptUrls, saleLines, stockDeliveries, stockMoves, stockRequests } from "./shared";
-export { currentQuote, founderPromo, ownedBusinesses, type FounderPromo, paymentDetails, planCharges, referralClaimable, referralInvite, referralPerks } from "./billing"; // cobro de planes
+export { currentQuote, founderPromo, ownedBusinesses, type FounderPromo, paymentDetails, planCharges, referralClaimable, referralInvite, referralPerks, trialOffer } from "./billing"; // cobro de planes
 export { affiliateSummary, commissionsByPeriod, type Commission } from "./affiliate"; // programa de afiliados
 export { branchOvertime, OVERTIME_STATUSES, type Overtime } from "./overtime"; // horas extra de la sucursal
 export { pendingOrders, type PendingOrder } from "./orders"; // pedidos pendientes: encargos y envíos
@@ -18,4 +18,5 @@ export { daysSince, hourSpan, marketingIdeas, peakHour, trend, weekdayName, week
 export { today } from "@/lib/dates";
 export { paidSince, payables, type FixedExpense, type OutsidePayment, type Payable } from "./payables"; // gastos fijos y pendientes
 export { businessPromotions, promotionsToday, type Promotion } from "./promotions"; // promociones con descuento
+export { myNews, NEWS_SEEN_COOKIE } from "./news"; // novedades de la app
 export { whatsappState, type WaConversation, type WhatsappState } from "./whatsapp"; // asistente de WhatsApp
