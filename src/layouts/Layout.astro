@@ -79,6 +79,18 @@ const menuHidden = Astro.cookies.get(MENU_HIDDEN_COOKIE)?.value === '1';
 		overflow: clip;
 	}
 
+	/* Cada panel en su columna, con lo que haya entre ellos en el HTML (el separador del menú, avisos): un elemento
+	   de más nunca corre el contenido a otra fila. En el celular el body es flex y esto no aplica. */
+	body > .sidebar {
+		grid-column: 1;
+		grid-row: 1;
+	}
+
+	body > main {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
 	body:has(> .shift-bar) {
 		padding-bottom: 0;
 		row-gap: 0;
