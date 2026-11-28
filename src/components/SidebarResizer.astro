@@ -48,7 +48,16 @@ const { width } = Astro.props;
     if (save) document.cookie = `${MENU_WIDTH_COOKIE}=${px}; ${year}`;
   }
 
+  // Mientras el ancho se anima, el menú recorta su contenido y el separador espera (CSS: html[data-menu-anim]).
+  let animTimer: number | undefined;
+  function animate() {
+    root.dataset.menuAnim = "";
+    clearTimeout(animTimer);
+    animTimer = window.setTimeout(() => delete root.dataset.menuAnim, 300);
+  }
+
   function setHidden(hidden: boolean) {
+    animate();
     if (hidden) root.dataset.menu = "oculto";
     else delete root.dataset.menu;
     document.cookie = hidden ? `${MENU_HIDDEN_COOKIE}=1; ${year}` : `${MENU_HIDDEN_COOKIE}=; path=/; max-age=0; samesite=lax`;
@@ -62,6 +71,8 @@ const { width } = Astro.props;
     event.preventDefault();
     handle.setPointerCapture(event.pointerId);
     handle.dataset.dragging = "";
+    // Al arrastrar, el menú sigue al puntero: sin transición.
+    root.dataset.menuDrag = "";
     // El borde izquierdo del menú: el padding del body.
     const left = document.querySelector(".sidebar")?.getBoundingClientRect().left ?? 0;
     let last = clamp(event.clientX - left);
@@ -75,6 +86,7 @@ const { width } = Astro.props;
     const up = () => {
       handle.removeEventListener("pointermove", move);
       delete handle.dataset.dragging;
+      delete root.dataset.menuDrag;
       handle.removeAttribute("data-collapsing");
       if (collapse) setHidden(true);
       else setWidth(last);
@@ -114,6 +126,9 @@ const { width } = Astro.props;
     position: fixed;
     top: 0.5rem;
     left: 0.5rem;
+    /* Del ancho de la franja que queda con el menú oculto (Layout: 2.75rem): el ícono queda al centro. */
+    width: 2.75rem;
+    height: 2.75rem;
   }
 
   @media (min-width: 769px) {
@@ -122,16 +137,41 @@ const { width } = Astro.props;
       position: fixed;
       z-index: 5;
       top: 50%;
-      left: calc(0.5rem + var(--sidebar-w, 18.5rem));
+      /* Centrado en el hueco entre los paneles (0.5rem de gap): más ancho que el hueco, para que el ícono de 16px
+         quepa y el área para agarrarlo sea cómoda. */
+      left: calc(0.75rem + var(--sidebar-w, 18.5rem));
       display: grid;
-      width: 0.5rem;
+      width: 1.25rem;
       height: 3rem;
       place-items: center;
       border-radius: 999px;
       color: var(--color-text-muted);
       cursor: col-resize;
       touch-action: none;
-      translate: 0 -50%;
+      translate: -50% -50%;
+    }
+
+    /* Ocultar y mostrar el menú anima el ancho de la columna; el contenido del menú se desvanece. */
+    body.app-surface {
+      transition: grid-template-columns 0.25s ease;
+    }
+
+    .sidebar {
+      transition:
+        opacity 0.2s ease,
+        visibility 0.2s;
+    }
+
+    html[data-menu-drag] body.app-surface {
+      transition: none;
+    }
+
+    html[data-menu-anim] .sidebar {
+      overflow: clip;
+    }
+
+    html[data-menu-anim] .sidebar-resizer {
+      opacity: 0;
     }
 
     .sidebar-resizer:hover,
@@ -152,7 +192,13 @@ const { width } = Astro.props;
       grid-template-columns: 2.75rem minmax(0, 1fr);
     }
 
-    html[data-menu="oculto"] .sidebar,
+    /* Oculto sigue en su columna (para animar), pero no se ve ni recibe foco. */
+    html[data-menu="oculto"] .sidebar {
+      overflow: clip;
+      opacity: 0;
+      visibility: hidden;
+    }
+
     html[data-menu="oculto"] .sidebar-resizer {
       display: none;
     }
@@ -164,6 +210,13 @@ const { width } = Astro.props;
     html[data-menu="oculto"] .icon-btn.sidebar-expand {
       display: inline-grid;
       background: var(--color-surface);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body.app-surface,
+    .sidebar {
+      transition: none !important;
     }
   }
 
