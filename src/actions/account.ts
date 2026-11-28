@@ -130,10 +130,10 @@ export const account = {
 
   changeMyShift: defineAction({
     accept: "form",
-    input: z.object({ employeeId: uuid, businessId: uuid, shiftId: z.uuid("Elige un turno") }),
-    handler: async ({ employeeId, businessId, shiftId }, context) => {
-      // La base comprueba que la ficha sea tuya y el turno, de tu sucursal (change_my_shift).
-      check(await db(context).rpc("change_my_shift", { p_employee: employeeId, p_shift: shiftId }).then((r) => r.error));
+    input: z.object({ employeeId: uuid, businessId: uuid, shiftIds: z.array(uuid).min(1, "Elige al menos un turno").max(20) }),
+    handler: async ({ employeeId, businessId, shiftIds }, context) => {
+      // La base comprueba que la ficha sea tuya y los turnos, de tu sucursal (change_my_shifts).
+      check(await db(context).rpc("change_my_shifts", { p_employee: employeeId, p_shifts: shiftIds }).then((r) => r.error));
       await bump(businessVersion(businessId));
       return { ok: true };
     },

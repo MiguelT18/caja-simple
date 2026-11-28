@@ -90,28 +90,27 @@ const sections = [
             <section id="turnos" class="section" tabindex="-1" aria-labelledby="jobs-title">
               <header class="section-head">
                 <h2 id="jobs-title">Tus turnos de trabajo</h2>
-                <p>Si cambias de horario, elígelo aquí. Quien administra el negocio recibe un aviso; la sucursal y el puesto los cambia esa persona.</p>
+                <p>Si cambias de horario, marca tus turnos aquí (puedes tener más de uno). Quien administra el negocio recibe un aviso; la sucursal y el puesto los cambia esa persona.</p>
               </header>
               <div class="surface jobs">
                 {jobs.map(({ business, branch, employee, shifts }) => {
                   const form = `shift-${employee.id}`;
                   return (
-                    <form id={form} class="job" data-action="changeMyShift" data-refresh="none" data-success="Turno cambiado." novalidate>
+                    <form id={form} class="job" data-action="changeMyShift" data-refresh="none" data-success="Turnos guardados." novalidate>
                       <input type="hidden" name="employeeId" value={employee.id} />
                       <input type="hidden" name="businessId" value={business.id} />
-                      <FormInput
-                        form={form}
-                        name="shiftId"
-                        label={`${business.name} · ${branch.name}`}
-                        options={[
-                          ...(employee.shiftId ? [] : [{ value: "", label: "Elige un turno", selected: true }]),
-                          ...shifts.map((s) => ({ value: s.id, label: `${s.name} (${shiftHours(s)})`, selected: s.id === employee.shiftId })),
-                        ]}
-                        required
-                      />
+                      <fieldset class="job-shifts">
+                        <legend>{business.name} · {branch.name}</legend>
+                        {shifts.map((s) => (
+                          <label class="job-shift">
+                            <input type="checkbox" name="shiftIds" value={s.id} checked={employee.shiftIds.includes(s.id)} />
+                            <span>{s.name} <span class="num">({shiftHours(s)})</span></span>
+                          </label>
+                        ))}
+                      </fieldset>
                       <p class="notice notice-error" role="alert" data-form-notice />
                       <button type="submit" class="btn btn-secondary">
-                        Cambiar turno<span class="sr-only"> en {business.name}</span>
+                        Guardar turnos<span class="sr-only"> en {business.name}</span>
                       </button>
                     </form>
                   );
@@ -504,6 +503,34 @@ const sections = [
 
   .job .notice {
     grid-column: 1 / -1;
+  }
+
+  .job-shifts {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  .job-shifts legend {
+    padding: 0;
+    margin-bottom: 0.25rem;
+    font-weight: var(--font-medium);
+  }
+
+  .job-shift {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+  }
+
+  .job-shift input {
+    width: 1.25rem;
+    height: 1.25rem;
+    accent-color: var(--color-primary);
   }
 
   /* --- Borrar la cuenta: separado del resto, en el rojo de lo que no se deshace --- */

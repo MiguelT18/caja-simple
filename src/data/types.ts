@@ -134,7 +134,7 @@ export interface Employee {
   id: string;
   businessId: string;
   branchId: string;
-  shiftId?: string;
+  shiftIds: string[];
   // Cuenta de la persona, si ya la tiene; así una misma persona trabaja en un negocio y lleva otro.
   personId?: string;
   email: string;
@@ -142,6 +142,9 @@ export interface Employee {
   lastName: string;
   jobTitle: string;
   status: "activo" | "invitado";
+  /** Minutos antes del inicio y después del cierre en los que abre sus turnos (los define la dueña). */
+  openEarlyMin: number;
+  openLateMin: number;
 }
 
 /** Quién registró un movimiento: la dueña o alguien del equipo. */
@@ -317,6 +320,15 @@ export type Notification = {
   | { kind: "shift_closed"; data: { branch: string; shift: string; person: string | null; date: string; difference: number } }
   | { kind: "shift_reminder"; data: { branch: string; shift: string; start: string; minutes: number } }
   | { kind: "shift_late"; data: { branch: string; shift: string; start: string } }
+  | { kind: "shift_opened_late" | "shift_opened_early"; data: { branch: string; shift: string; start: string; opened: string; minutes: number; person: string | null } }
+  | {
+      /** Alguien pide abrir su turno fuera de su horario (horas extra); la dueña acepta o rechaza. */
+      kind: "extra_shift_request";
+      requestId: string;
+      pending: boolean;
+      data: { person: string; branch: string; shift: string; start: string; end: string; at: string; reason: string | null };
+    }
+  | { kind: "extra_shift_answer"; data: { accepted: boolean; person: string; branch: string; shift: string } }
   | { kind: "shift_overdue"; data: { branch: string; shift: string; end: string; person?: string | null } }
   | { kind: "low_stock"; data: { product: string; branch: string; stock: number; minStock: number } }
   /** Alguien del equipo registró un gasto (concept) o un retiro (concept = la nota, si tiene). */

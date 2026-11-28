@@ -66,7 +66,7 @@ async function inviteTeam(sb: ReturnType<typeof db>, slug: string, invites: Retu
     const { error } = await sb.from("employees").insert({
       business_id: business.id,
       branch_id: branch.id,
-      shift_id: branch.shifts.find((s) => s.name === v.shift)!.id,
+      shift_ids: [branch.shifts.find((s) => s.name === v.shift)!.id],
       ...(v.personId ? { person_id: v.personId, email: "" } : { email: v.email }),
       job_title: v.job,
     });

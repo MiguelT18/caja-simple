@@ -54,12 +54,14 @@ export const toEmployee = (e: EmployeeRow): Employee => ({
   id: e.id,
   businessId: e.business_id,
   branchId: e.branch_id,
-  shiftId: e.shift_id ?? undefined,
+  shiftIds: e.shift_ids,
   personId: e.person_id ?? undefined,
   email: e.email,
   firstName: e.profile?.first_name || e.email,
   lastName: e.profile?.last_name ?? "",
   jobTitle: e.job_title,
+  openEarlyMin: e.open_early_min,
+  openLateMin: e.open_late_min,
   status: e.status,
 });
 

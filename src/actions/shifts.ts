@@ -140,7 +140,6 @@ export const shifts = {
       if ((active ?? 0) <= 1) throw new ActionError({ code: "BAD_REQUEST", message: "La sucursal necesita al menos un turno." });
       if ((open ?? 0) > 0) throw new ActionError({ code: "BAD_REQUEST", message: "Cierra el turno antes de quitarlo." });
       check((await sb.from("shifts").update({ archived_at: new Date().toISOString() }).eq("id", id).select("id").single()).error);
-      check((await sb.from("employees").update({ shift_id: null }).eq("shift_id", id)).error);
       return { ok: true };
     },
   }),
@@ -198,6 +197,26 @@ export const shifts = {
     input: z.object({ closeId: uuid, reason: optional.pipe(z.string().trim().max(200, "Máximo 200 caracteres").optional()) }),
     handler: async ({ closeId, reason }, context) => {
       check((await db(context).rpc("request_reopen", { p_close: closeId, p_reason: reason })).error);
+      return { ok: true };
+    },
+  }),
+
+  /** Quien tiene el turno pide abrirlo fuera de su horario (horas extra): la dueña lo acepta o lo rechaza (answerExtraShift). */
+  requestExtraShift: defineAction({
+    accept: "form",
+    input: z.object({ shiftId: uuid, reason: optional.pipe(z.string().trim().max(200, "Máximo 200 caracteres").optional()) }),
+    handler: async ({ shiftId, reason }, context) => {
+      check((await db(context).rpc("request_extra_shift", { p_shift: shiftId, p_reason: reason })).error);
+      return { ok: true };
+    },
+  }),
+
+  /** La dueña responde un pedido de horas extra; al aceptar, quien pidió puede abrir el turno en las 12 horas siguientes. */
+  answerExtraShift: defineAction({
+    accept: "form",
+    input: z.object({ requestId: uuid, accept: z.enum(["true", "false"]).transform((v) => v === "true") }),
+    handler: async ({ requestId, accept }, context) => {
+      check((await db(context).rpc("answer_extra_shift", { p_request: requestId, p_accept: accept })).error);
       return { ok: true };
     },
   }),

@@ -32,6 +32,10 @@ export function notificationHref(n: Notification, memberships: Membership[]): st
   switch (n.kind) {
     case "shift_reminder":
     case "shift_late":
+    case "shift_opened_late":
+    case "shift_opened_early":
+    case "extra_shift_request":
+    case "extra_shift_answer":
     case "shift_overdue":
     case "shift_closed":
     case "cash_mismatch":

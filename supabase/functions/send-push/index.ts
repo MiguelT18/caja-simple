@@ -33,6 +33,16 @@ function describe({ kind, data }: Notice) {
       return { title: `Turno ${String(data.shift).toLowerCase()} en ${data.branch}: abre en ${data.minutes === 60 ? "1 hora" : `${data.minutes} minutos`}`, body: `Hora de abrir: ${data.start}` };
     case "shift_late":
       return { title: `Turno ${String(data.shift).toLowerCase()} sin abrir en ${data.branch}`, body: `Debía abrir a las ${data.start}` };
+    case "shift_opened_late":
+      return { title: `Turno ${String(data.shift).toLowerCase()} abierto tarde en ${data.branch}`, body: `${data.person ?? "Alguien"} lo abrió a las ${data.opened}, ${data.minutes} min después de las ${data.start}` };
+    case "shift_opened_early":
+      return { title: `Turno ${String(data.shift).toLowerCase()} abierto antes en ${data.branch}`, body: `${data.person ?? "Alguien"} lo abrió a las ${data.opened}, ${data.minutes} min antes de las ${data.start}` };
+    case "extra_shift_request":
+      return { title: `${data.person} pide abrir el turno ${String(data.shift).toLowerCase()} fuera de horario`, body: [data.branch, data.reason && `«${data.reason}»`].filter(Boolean).join(" · ") };
+    case "extra_shift_answer":
+      return data.accepted
+        ? { title: `${data.person} aceptó tus horas extra`, body: `Ya puedes abrir el turno ${String(data.shift).toLowerCase()} en ${data.branch}` }
+        : { title: `${data.person} rechazó tus horas extra`, body: `Turno ${String(data.shift).toLowerCase()} en ${data.branch}` };
     case "shift_overdue":
       return { title: `Turno ${String(data.shift).toLowerCase()} sin cerrar en ${data.branch}`, body: `Debía cerrar a las ${data.end}${data.person ? ` · lo abrió ${data.person}` : ""}` };
     case "stock_request":

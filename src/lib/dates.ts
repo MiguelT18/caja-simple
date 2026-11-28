@@ -100,24 +100,31 @@ export function boliviaNow(at = new Date()) {
 
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
-/** Minutos antes de empezar desde los que ya se puede abrir un turno (igual que private.in_shift_window). */
-export const OPEN_EARLY_MIN = 15;
+/** Margen para abrir un turno: minutos antes del inicio y después del cierre (los de cada empleado; igual que private.in_shift_window). */
+export type OpenMargins = { early: number; late: number };
+export const DEFAULT_MARGINS: OpenMargins = { early: 30, late: 30 };
 
-/** ¿Se puede abrir el turno ahora? Desde OPEN_EARLY_MIN antes de empezar hasta la hora de cierre, cruzando la medianoche. */
-export function inShiftWindow(s: { start: string; end: string }, now = boliviaNow()) {
-  const from = minutesOf(s.start) - OPEN_EARLY_MIN;
-  const wrap = (m: number) => (m + 2880) % 1440;
-  return wrap(now.minutes - from) < wrap(minutesOf(s.end) - from);
+const hhmm = (m: number) => {
+  const x = ((m % 1440) + 1440) % 1440;
+  return `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`;
+};
+
+/** ¿Se puede abrir el turno ahora? De `early` min antes del inicio a `late` min después del cierre, cruzando la medianoche. */
+export function inShiftWindow(s: { start: string; end: string }, margins = DEFAULT_MARGINS, now = boliviaNow()) {
+  const from = minutesOf(s.start) - margins.early;
+  const span = Math.min(((minutesOf(s.end) - minutesOf(s.start) + 1440) % 1440) + margins.early + margins.late, 1440);
+  return (now.minutes - from + 2880) % 1440 < span;
 }
 
 /** Minutos que faltan para poder abrir el turno (0 si ya se puede): para elegir el próximo. */
-export const minutesUntilOpen = (s: { start: string }, now = boliviaNow()) => (minutesOf(s.start) - OPEN_EARLY_MIN - now.minutes + 2880) % 1440;
+export const minutesUntilOpen = (s: { start: string }, margins = DEFAULT_MARGINS, now = boliviaNow()) =>
+  (minutesOf(s.start) - margins.early - now.minutes + 2880) % 1440;
 
 /** Hora (HH:MM) desde la que se puede abrir el turno. */
-export const openFrom = (s: { start: string }) => {
-  const m = (minutesOf(s.start) - OPEN_EARLY_MIN + 1440) % 1440;
-  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-};
+export const openFrom = (s: { start: string }, margins = DEFAULT_MARGINS) => hhmm(minutesOf(s.start) - margins.early);
+
+/** Hora (HH:MM) hasta la que se puede abrir el turno. */
+export const openUntil = (s: { end: string }, margins = DEFAULT_MARGINS) => hhmm(minutesOf(s.end) + margins.late);
 
 /**
  * Cuánto va del horario de un turno abierto el día `openedOn` (cruza la medianoche si termina antes de empezar).

@@ -140,11 +140,26 @@ const here = Astro.url.pathname.replace(/\/$/, "");
         </button>
       )
     ) : data.wait ? (
-      // Fuera del horario de todo turno: se dice desde cuándo se abre el próximo (la base no lo dejaría antes).
-      <p class="reopen-wait">
-        <Clock size={16} stroke-width={1.75} aria-hidden="true" />
-        <span>El turno {data.wait.shiftName.toLowerCase()} se abre a partir de las <span class="num">{data.wait.from}</span>.</span>
-      </p>
+      // Fuera del horario de todo turno: se dice cuándo se abre el próximo, o se pide abrirlo como horas extra (la dueña decide).
+      data.wait.extraPending ? (
+        <p class="reopen-wait">
+          <Hourglass size={16} stroke-width={1.75} aria-hidden="true" />
+          <span>Pediste abrir el turno {data.wait.shiftName.toLowerCase()} fuera de horario. Esperando respuesta.</span>
+        </p>
+      ) : (
+        <>
+          <p class="reopen-wait">
+            <Clock size={16} stroke-width={1.75} aria-hidden="true" />
+            <span>
+              El turno {data.wait.shiftName.toLowerCase()} se abre de <span class="num">{data.wait.from}</span> a <span class="num">{data.wait.until}</span>.
+            </span>
+          </p>
+          <button type="button" class="btn btn-secondary open" data-open-dialog="bar-extra-shift">
+            <Clock size={18} stroke-width={1.75} />
+            Pedir horas extra
+          </button>
+        </>
+      )
     ) : (
       // La dueña sin ficha en la sucursal solo mira: no abre turnos (readonly).
       !data.readonly &&
@@ -186,6 +201,37 @@ const here = Astro.url.pathname.replace(/\/$/, "");
         </header>
         <input type="hidden" name="closeId" value={data.reopen.closeId} />
         <FormInput form="bar-reopen-shift-form" name="reason" label="Motivo (opcional)" hint="Por ejemplo: lo cerré antes de tiempo, faltaba registrar una venta." maxlength={200} />
+        <p class="notice notice-error" role="alert" data-form-notice></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close-dialog>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Confirmar y avisar</button>
+        </div>
+      </form>
+    </dialog>
+  )
+}
+
+{
+  !shift && data.wait && !data.wait.extraPending && (
+    <dialog id="bar-extra-shift" class="modal" aria-labelledby="bar-extra-shift-title">
+      <form
+        id="bar-extra-shift-form"
+        class="modal-form"
+        method="dialog"
+        data-action="requestExtraShift"
+        data-reload
+        data-success="Listo: le avisamos a quien administra el negocio."
+        novalidate
+      >
+        <header class="modal-head">
+          <h2 id="bar-extra-shift-title">¿Pedir abrir el turno {data.wait.shiftName.toLowerCase()} fuera de horario?</h2>
+          <p>
+            Puedes abrirlo de {data.wait.from} a {data.wait.until}. Fuera de ese horario cuenta como horas extra: a quien
+            administra el negocio le llega un aviso y decide. Si acepta, lo abres con tu conteo de caja.
+          </p>
+        </header>
+        <input type="hidden" name="shiftId" value={data.wait.shiftId} />
+        <FormInput form="bar-extra-shift-form" name="reason" label="Motivo (opcional)" hint="Por ejemplo: cubro a una compañera, hay un pedido grande." maxlength={200} />
         <p class="notice notice-error" role="alert" data-form-notice></p>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" data-close-dialog>Cancelar</button>
