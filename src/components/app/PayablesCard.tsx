@@ -73,7 +73,6 @@ export default function PayablesCard({
   today,
   userId,
   isOwner,
-  canAdd,
   cashShift,
   categories = [],
   settled = [],
@@ -88,8 +87,6 @@ export default function PayablesCard({
   today: string;
   userId: string;
   isOwner: boolean;
-  /** Puede anotar pendientes: la dueña o quien trabaja en la sucursal. */
-  canAdd: boolean;
   /** El turno abierto de quien trabaja aquí: habilita «De la caja». */
   cashShift: { id: string; name: string } | null;
   categories?: string[];
@@ -159,12 +156,10 @@ export default function PayablesCard({
               </p>
             )}
           </div>
-          {canAdd && (
-            <Button type="button" variant="outline" size="sm" onClick={() => setDialog({ kind: "new" })}>
-              <Plus />
-              Anotar pendiente
-            </Button>
-          )}
+          <Button type="button" variant="outline" size="sm" onClick={() => setDialog({ kind: "new" })}>
+            <Plus />
+            Anotar pendiente
+          </Button>
         </div>
 
         {pending.length === 0 && (

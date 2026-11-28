@@ -3,6 +3,7 @@ import { ArrowDown, Clock, HandCoins, Plus } from "@lucide/astro";
 import PageHeader from "@/components/PageHeader.astro";
 import ShiftChip from "@/components/ShiftChip.astro";
 import ExpensesTable, { type ExpenseRow } from "@/components/app/ExpensesTable";
+import ExpenseModal from "@/components/app/ExpenseModal.astro";
 import PayablesCard from "@/components/app/PayablesCard";
 import FormInput from "@/components/app/FormInput.astro";
 import Modal from "@/components/app/Modal.astro";
@@ -20,8 +21,7 @@ const rangeText = range.days === 7 && range.to === ctx.today ? "los últimos 7 d
 const { branch, business, canCorrect, currentShift, expenseHistory, expenses, shiftById, shifts, today, withdrawalHistory } = ctx;
 const isOwner = ctx.membership.role === "dueño";
 const owed = await payables(Astro.locals.supabase, [branch.id], today, range);
-// Nuevos en cada carga: un doble envío del mismo formulario no duplica el gasto ni el retiro.
-const expenseId = crypto.randomUUID();
+// Nuevo en cada carga: un doble envío del mismo formulario no duplica el retiro.
 const withdrawalId = crypto.randomUUID();
 // La dueña retira aunque no tenga ficha aquí; quien trabaja aquí, también (la dueña recibe un aviso).
 const canWithdraw = !!currentShift && (isOwner || ctx.works);
@@ -124,28 +124,7 @@ const rows: ExpenseRow[] = [
   {/* Región: tras guardar trae un expenseId nuevo, así el siguiente gasto no se toma por repetido. */}
   <div data-region="expense-form">
   {
-    ctx.works && currentShift && (
-      <Modal
-        id="expense"
-        title="Registrar gasto"
-        description={`Sale de la caja del turno ${currentShift.name.toLowerCase()}.${isOwner ? "" : " La dueña recibe un aviso."}`}
-        action="createExpense"
-        draft
-        submitLabel="Guardar gasto"
-        hidden={{ expenseId, branchId: branch.id, shiftId: currentShift.id }}
-      >
-        <FormInput form="expense-form" name="concept" label="Concepto" placeholder="Ej.: Pago al proveedor de leche" required maxlength={120} />
-        <div class="field-row-2">
-          <FormInput form="expense-form" name="category" label="Categoría" placeholder="Ej.: Proveedores" list="expense-categories" required maxlength={40} />
-          <FormInput form="expense-form" name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" label="Monto (Bs)" required />
-        </div>
-        <datalist id="expense-categories">
-          {["Proveedores", "Servicios", "Transporte", "Insumos", ...usedCategories]
-            .filter((c, i, all) => all.indexOf(c) === i)
-            .map((c) => <option value={c} />)}
-        </datalist>
-      </Modal>
-    )
+    ctx.works && currentShift && <ExpenseModal branchId={branch.id} shift={currentShift} isOwner={isOwner} categories={usedCategories} />
   }
   {
     canWithdraw && (
@@ -264,7 +243,6 @@ const rows: ExpenseRow[] = [
       today={today}
       userId={Astro.locals.userId!}
       isOwner={isOwner}
-      canAdd={isOwner}
       cashShift={ctx.works && currentShift ? { id: currentShift.id, name: currentShift.name } : null}
       categories={usedCategories}
       settled={owed.settled}
